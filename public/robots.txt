@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /$
+Allow: /login
+Allow: /signup
+Allow: /privacy
+Allow: /terms
+Disallow: /app
+Disallow: /groups/
+Disallow: /join/
+Disallow: /plans/
+Disallow: /settings
+Disallow: /admin
+Disallow: /api/
+
+Sitemap: https://mingo.app/sitemap.xml

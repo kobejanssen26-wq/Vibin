@@ -221,20 +221,12 @@ export async function runDateMatch(
   });
   const now = Math.floor(Date.now() / 1000);
 
-  const done = await db
-    .update(matches)
-    .set({
-      status: "complete",
-      chosenDateOptionId: chosen.id,
-      startsAt: chosen.startsAt,
-      completedAt: now,
-    })
-    .where(and(eq(matches.id, matchId), eq(matches.status, "activity_matched")))
-    .returning();
-  if (done.length === 0) return { completed: false }; // someone beat us to it
-
-  await db.batch([
-    db.insert(plans).values({
+  // Idempotency guard: plans.match_id is UNIQUE. Whoever inserts the plan row
+  // first is the one that "completes" the match — no reliance on UPDATE RETURNING
+  // (which D1 does not surface consistently).
+  const planRow = await db
+    .insert(plans)
+    .values({
       id: newId(),
       groupId: match.groupId,
       matchId,
@@ -242,7 +234,21 @@ export async function runDateMatch(
       startsAt: chosen.startsAt,
       locationLabel: activity?.locationLabel ?? "",
       createdAt: now,
-    }),
+    })
+    .onConflictDoNothing()
+    .returning();
+  if (planRow.length === 0) return { completed: false }; // another request won
+
+  await db.batch([
+    db
+      .update(matches)
+      .set({
+        status: "complete",
+        chosenDateOptionId: chosen.id,
+        startsAt: chosen.startsAt,
+        completedAt: now,
+      })
+      .where(eq(matches.id, matchId)),
     db
       .update(groups)
       .set({ status: "planned", updatedAt: now })

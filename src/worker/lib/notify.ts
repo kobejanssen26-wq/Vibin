@@ -2,6 +2,7 @@ import { and, eq, ne } from "drizzle-orm";
 import type { DB } from "../db/client";
 import { groupMembers, messages, notifications } from "../db/schema";
 import { newId } from "./id";
+import { chunk, rowsPerInsert } from "./chunk";
 
 export async function notifyUsers(
   db: DB,
@@ -10,17 +11,18 @@ export async function notifyUsers(
 ): Promise<void> {
   if (userIds.length === 0) return;
   const now = Math.floor(Date.now() / 1000);
-  await db.insert(notifications).values(
-    userIds.map((userId) => ({
-      id: newId(),
-      userId,
-      kind: n.kind,
-      title: n.title,
-      body: n.body ?? "",
-      data: JSON.stringify(n.data ?? {}),
-      createdAt: now,
-    })),
-  );
+  const rows = userIds.map((userId) => ({
+    id: newId(),
+    userId,
+    kind: n.kind,
+    title: n.title,
+    body: n.body ?? "",
+    data: JSON.stringify(n.data ?? {}),
+    createdAt: now,
+  }));
+  for (const batch of chunk(rows, rowsPerInsert(7))) {
+    await db.insert(notifications).values(batch);
+  }
 }
 
 export async function notifyGroup(

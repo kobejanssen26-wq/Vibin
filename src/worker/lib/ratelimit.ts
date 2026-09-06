@@ -13,6 +13,8 @@ export async function rateLimit(
   limit: number,
   windowSec: number,
 ): Promise<void> {
+  // Disabled locally so end-to-end tests can create many accounts quickly.
+  if (env.APP_ENV === "development") return;
   const now = Math.floor(Date.now() / 1000);
   const window = Math.floor(now / windowSec);
   const kvKey = `rl:${bucket}:${key}:${window}`;

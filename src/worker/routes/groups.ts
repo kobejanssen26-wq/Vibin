@@ -19,6 +19,7 @@ import {
   requireGroupMember,
 } from "../lib/access";
 import { buildGroupDTO, matchCountFor, settingsToDTO } from "../lib/group-view";
+import { chunk, rowsPerInsert } from "../lib/chunk";
 import { systemMessage, notifyGroup } from "../lib/notify";
 import { buildDeck } from "../engine/deck";
 import { activityVoteProgress } from "../engine/match";
@@ -64,7 +65,9 @@ app.post("/", async (c) => {
       status: "active",
       joinedAt: now,
     }),
-    db.insert(groupSettings).values({ groupId, updatedAt: now }),
+    // Default a new group to "all activities" so the creator can start swiping
+    // in one tap; they can narrow it down on the config screen.
+    db.insert(groupSettings).values({ groupId, allActivities: 1, updatedAt: now }),
     db.insert(groupInvites).values({
       id: newId(),
       groupId,
@@ -245,14 +248,15 @@ app.post("/:id/start", async (c) => {
     );
   }
   const now = Math.floor(Date.now() / 1000);
-  await db.insert(groupActivityPool).values(
-    deck.map((activityId, i) => ({
-      groupId,
-      activityId,
-      sort: i,
-      addedAt: now,
-    })),
-  );
+  const poolRows = deck.map((activityId, i) => ({
+    groupId,
+    activityId,
+    sort: i,
+    addedAt: now,
+  }));
+  for (const batch of chunk(poolRows, rowsPerInsert(4))) {
+    await db.insert(groupActivityPool).values(batch);
+  }
   await db
     .update(groups)
     .set({ status: "swiping", updatedAt: now })

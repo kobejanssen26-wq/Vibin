@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* respect iOS safe areas for the fixed app chrome */
+  .safe-b {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-t {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 font-semibold
+      transition active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-grape-500 focus-visible:ring-offset-2;
+  }
+  .btn-primary {
+    @apply btn text-white bg-mingo-gradient shadow-pop;
+  }
+  .btn-ghost {
+    @apply btn bg-paper-soft text-ink hover:bg-ink/5;
+  }
+  .btn-dark {
+    @apply btn bg-ink text-white hover:bg-ink-soft;
+  }
+  .field {
+    @apply w-full rounded-2xl border border-ink/10 bg-white px-4 py-3 text-ink
+      placeholder:text-ink-muted/60 focus:border-grape-400 focus:outline-none
+      focus:ring-2 focus:ring-grape-400/30;
+  }
+  .card {
+    @apply rounded-3xl bg-white shadow-card;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-ink/10 px-3 py-1.5
+      text-sm font-medium;
+  }
+  .chip-on {
+    @apply chip border-transparent bg-mingo-gradient text-white;
+  }
+}
+
+/* swipe card physics helper */
+.swipe-stack {
+  perspective: 1000px;
+}

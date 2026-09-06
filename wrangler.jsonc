@@ -4,6 +4,10 @@
   "main": "src/worker/index.ts",
   "compatibility_date": "2024-12-05",
   "compatibility_flags": ["nodejs_compat"],
+  "alias": {
+    "@shared/constants": "./src/shared/constants.ts",
+    "@shared/types": "./src/shared/types.ts"
+  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
