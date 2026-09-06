@@ -1,0 +1,56 @@
+{
+  "name": "mingo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Mingo — a group decision engine for deciding what to do together. Swipe. Match. Do.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n vite,worker -c magenta,cyan \"npm:dev:client\" \"npm:dev:worker\"",
+    "dev:client": "vite",
+    "dev:worker": "wrangler dev",
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.client.json --noEmit && tsc -p tsconfig.worker.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply mingo-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply mingo-db --remote",
+    "db:seed:local": "wrangler d1 execute mingo-db --local --file=./seed/seed.sql",
+    "db:seed:remote": "wrangler d1 execute mingo-db --remote --file=./seed/seed.sql",
+    "db:seed:build": "tsx seed/build-seed.ts",
+    "deploy": "npm run build && wrangler deploy",
+    "deploy:staging": "npm run build && wrangler deploy --env staging",
+    "cf-typegen": "wrangler types"
+  },
+  "dependencies": {
+    "hono": "^4.6.14",
+    "drizzle-orm": "^0.36.4",
+    "nanoid": "^5.0.9",
+    "zod": "^3.24.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.5.40",
+    "@cloudflare/workers-types": "^4.20241218.0",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^9.1.0",
+    "drizzle-kit": "^0.28.1",
+    "eslint": "^9.17.0",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "vitest": "^2.1.8",
+    "wrangler": "^3.95.0"
+  }
+}
