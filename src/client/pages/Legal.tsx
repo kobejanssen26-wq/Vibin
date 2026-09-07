@@ -21,8 +21,8 @@ export function Legal({ tab }: { tab: "privacy" | "terms" }) {
 
       {tab === "privacy" ? <Privacy /> : <Terms />}
 
-      <p className="mt-10 text-xs text-ink-muted">
-        This is a template covering Mingo’s actual data practices for the MVP.
+      <p className="mt-10 text-xs text-navy-400">
+        This is a template covering VIBIN’s actual data practices for the MVP.
         Have a lawyer review it before a public launch.
       </p>
     </div>
@@ -30,7 +30,7 @@ export function Legal({ tab }: { tab: "privacy" | "terms" }) {
 }
 
 const P = ({ children }: { children: React.ReactNode }) => (
-  <p className="mt-3 text-sm leading-relaxed text-ink-soft">{children}</p>
+  <p className="mt-3 text-sm leading-relaxed text-navy-700">{children}</p>
 );
 const H = ({ children }: { children: React.ReactNode }) => (
   <h2 className="mt-7 text-lg font-bold">{children}</h2>
@@ -57,7 +57,7 @@ function Privacy() {
       <H>How votes are used</H>
       <P>
         Your individual activity votes are used only to compute the group
-        result. Mingo shows the collective outcome to the group — it does not
+        result. VIBIN shows the collective outcome to the group — it does not
         reveal who voted “no”.
       </P>
       <H>Legal basis (GDPR)</H>
@@ -79,7 +79,7 @@ function Privacy() {
         retained in anonymised form so other members’ plans stay intact.
       </P>
       <H>Contact</H>
-      <P>privacy@mingo.app</P>
+      <P>privacy@vibin.be</P>
     </article>
   );
 }
@@ -91,29 +91,29 @@ function Terms() {
       <P>Last updated: {new Date().toISOString().slice(0, 10)}</P>
       <H>The service</H>
       <P>
-        Mingo helps groups decide what to do together. Activity information in
-        Mingo is provided for planning only and is not a live availability or
+        VIBIN helps groups decide what to do together. Activity information in
+        VIBIN is provided for planning only and is not a live availability or
         pricing guarantee. Always confirm with the provider before booking.
       </P>
       <H>Your account</H>
       <P>
         You are responsible for keeping your login secure and for activity in
-        your groups. Don’t use Mingo to harass others, post illegal content, or
+        your groups. Don’t use VIBIN to harass others, post illegal content, or
         abuse the platform.
       </P>
       <H>Content</H>
       <P>
-        You keep ownership of messages and content you post. You grant Mingo the
+        You keep ownership of messages and content you post. You grant VIBIN the
         licence needed to display it to your group members.
       </P>
       <H>Bookings and payments</H>
       <P>
-        Mingo does not process payments or bookings. Any purchase happens on the
+        VIBIN does not process payments or bookings. Any purchase happens on the
         provider’s own website under their terms.
       </P>
       <H>Liability</H>
       <P>
-        Mingo is provided “as is” during this early phase. To the extent
+        VIBIN is provided “as is” during this early phase. To the extent
         permitted by law, we are not liable for plans that fall through,
         inaccurate activity data, or third-party providers.
       </P>
@@ -123,7 +123,7 @@ function Terms() {
         be announced in the app.
       </P>
       <H>Contact</H>
-      <P>hello@mingo.app</P>
+      <P>hello@vibin.be</P>
     </article>
   );
 }

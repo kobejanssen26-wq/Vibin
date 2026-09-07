@@ -5,21 +5,37 @@ CREATE TABLE `activities` (
 	`title` text NOT NULL,
 	`description` text DEFAULT '' NOT NULL,
 	`category_id` text NOT NULL,
+	`subcategory` text,
+	`provider` text,
+	`provider_website` text,
 	`location_label` text NOT NULL,
+	`address` text,
+	`city` text,
+	`country` text DEFAULT 'BE' NOT NULL,
 	`lat` integer,
 	`lng` integer,
 	`price_cents` integer,
+	`price_type` text DEFAULT 'per_person' NOT NULL,
 	`price_band` text NOT NULL,
 	`currency` text DEFAULT 'EUR' NOT NULL,
 	`duration_min` integer,
+	`min_participants` integer,
+	`max_participants` integer,
+	`min_age` integer,
+	`indoor_outdoor` text,
+	`accessibility` text,
 	`opening_hours` text DEFAULT '{}' NOT NULL,
 	`website_url` text,
 	`booking_url` text,
 	`ticket_url` text,
-	`min_age` integer,
 	`image_url` text,
+	`image_source` text,
+	`image_attribution` text,
 	`tags` text DEFAULT '[]' NOT NULL,
 	`source` text DEFAULT 'seed' NOT NULL,
+	`source_url` text,
+	`last_verified_at` integer,
+	`status` text DEFAULT 'needs_review' NOT NULL,
 	`active` integer DEFAULT 1 NOT NULL,
 	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
 	`updated_at` integer DEFAULT (unixepoch()) NOT NULL,
@@ -29,6 +45,8 @@ CREATE TABLE `activities` (
 --> statement-breakpoint
 CREATE INDEX `activities_category_idx` ON `activities` (`category_id`);--> statement-breakpoint
 CREATE INDEX `activities_active_idx` ON `activities` (`active`);--> statement-breakpoint
+CREATE INDEX `activities_status_idx` ON `activities` (`status`);--> statement-breakpoint
+CREATE INDEX `activities_city_idx` ON `activities` (`city`);--> statement-breakpoint
 CREATE UNIQUE INDEX `activities_provider_external_unq` ON `activities` (`provider_id`,`external_id`);--> statement-breakpoint
 CREATE TABLE `activity_categories` (
 	`id` text PRIMARY KEY NOT NULL,

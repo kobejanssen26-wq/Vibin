@@ -76,7 +76,7 @@ export function Profile() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "mingo-data-export.json";
+    a.download = "vibin-data-export.json";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -144,7 +144,7 @@ export function Profile() {
           value={form.bio}
           onChange={(e) => setForm({ ...form, bio: e.target.value })}
         />
-        {msg && <p className="text-sm text-ink-muted">{msg}</p>}
+        {msg && <p className="text-sm text-navy-400">{msg}</p>}
         <Button type="submit" loading={busy}>
           Save changes
         </Button>
@@ -171,7 +171,7 @@ export function Profile() {
               {label}
               <input
                 type="checkbox"
-                className="h-5 w-5 accent-grape-500"
+                className="h-5 w-5 accent-brand-500"
                 checked={prefs[key] ?? true}
                 onChange={(e) =>
                   savePrefs({ ...prefs, [key]: e.target.checked })
@@ -189,13 +189,13 @@ export function Profile() {
             Export my data (JSON)
           </button>
           <button
-            className="btn-ghost text-coral-600"
+            className="btn-ghost text-danger-600"
             onClick={deleteAccount}
           >
             Delete my account
           </button>
         </div>
-        <p className="mt-2 text-xs text-ink-muted">
+        <p className="mt-2 text-xs text-navy-400">
           Account: {user.email}
           {user.emailVerified ? " · verified" : " · not verified"}
         </p>

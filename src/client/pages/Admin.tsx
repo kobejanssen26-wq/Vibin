@@ -81,7 +81,7 @@ export function Admin() {
             key={t}
             onClick={() => setTab(t)}
             className={`flex-1 rounded-xl py-2 capitalize ${
-              tab === t ? "bg-white shadow-card" : "text-ink-muted"
+              tab === t ? "bg-white shadow-card" : "text-navy-400"
             }`}
           >
             {t}
@@ -101,7 +101,7 @@ export function Admin() {
           ).map(([label, n]) => (
             <div key={label} className="card p-4">
               <p className="text-3xl font-extrabold">{n}</p>
-              <p className="text-sm text-ink-muted">{label}</p>
+              <p className="text-sm text-navy-400">{label}</p>
             </div>
           ))}
         </div>
@@ -116,15 +116,15 @@ export function Admin() {
             >
               <div>
                 <p className="font-semibold">{a.title}</p>
-                <p className="text-xs text-ink-muted">
+                <p className="text-xs text-navy-400">
                   {a.categoryId} · {a.locationLabel}
                 </p>
               </div>
               <button
                 className={`rounded-full px-3 py-1 text-xs font-bold ${
                   a.active
-                    ? "bg-emerald-500/15 text-emerald-600"
-                    : "bg-ink/10 text-ink-muted"
+                    ? "bg-lime-400/20 text-lime-700"
+                    : "bg-navy/10 text-navy-400"
                 }`}
                 onClick={() => toggleActive(a)}
               >
@@ -138,14 +138,14 @@ export function Admin() {
       {tab === "reports" && (
         <ul className="space-y-2">
           {reports.length === 0 && (
-            <p className="text-sm text-ink-muted">No reports.</p>
+            <p className="text-sm text-navy-400">No reports.</p>
           )}
           {reports.map((r) => (
             <li key={r.id} className="card p-3 text-sm">
               <p className="font-semibold">
                 {r.reason} · {r.targetType}
               </p>
-              <p className="text-xs text-ink-muted">{r.detail || "—"}</p>
+              <p className="text-xs text-navy-400">{r.detail || "—"}</p>
               <div className="mt-2 flex gap-2">
                 {["reviewing", "resolved", "dismissed"].map((s) => (
                   <button
@@ -153,8 +153,8 @@ export function Admin() {
                     onClick={() => setReport(r.id, s)}
                     className={`rounded-full px-2 py-1 text-xs font-semibold ${
                       r.status === s
-                        ? "bg-grape-500 text-white"
-                        : "bg-paper-soft text-ink-muted"
+                        ? "bg-brand-500 text-white"
+                        : "bg-paper-soft text-navy-400"
                     }`}
                   >
                     {s}

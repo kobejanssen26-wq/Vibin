@@ -49,21 +49,35 @@ export function toGroupMemberDTO(
 
 const PRICE_BAND_LABEL: Record<string, string> = {
   free: "Free",
-  "0_10": "€0–10 pp",
-  "10_25": "€10–25 pp",
-  "25_50": "€25–50 pp",
-  "50_100": "€50–100 pp",
-  "100_plus": "€100+ pp",
+  "0_10": "€0–10",
+  "10_25": "€10–25",
+  "25_50": "€25–50",
+  "50_100": "€50–100",
+  "100_plus": "€100+",
 };
 
+/**
+ * Price label that never turns a group price into a per-person price (§16).
+ */
 function priceLabel(a: Activity): string {
-  if (a.priceCents != null) {
-    const eur = a.priceCents / 100;
-    return a.priceCents === 0
-      ? "Free"
-      : `€${eur % 1 === 0 ? eur.toFixed(0) : eur.toFixed(2)} pp`;
+  const eur = (c: number) => (c % 100 === 0 ? `€${c / 100}` : `€${(c / 100).toFixed(2)}`);
+  switch (a.priceType) {
+    case "free":
+      return "Free";
+    case "varies":
+      return "Price varies";
+    case "per_group":
+      return a.priceCents != null ? `${eur(a.priceCents)} / group` : "Group price";
+    case "from_per_person":
+      return a.priceCents != null
+        ? `From ${eur(a.priceCents)} / person`
+        : `From ${PRICE_BAND_LABEL[a.priceBand]} / person`;
+    case "per_person":
+    default:
+      return a.priceCents != null
+        ? `${eur(a.priceCents)} / person`
+        : `${PRICE_BAND_LABEL[a.priceBand] ?? "Price varies"} / person`;
   }
-  return PRICE_BAND_LABEL[a.priceBand] ?? "Price varies";
 }
 
 function safeJson<T>(raw: string, fallback: T): T {
@@ -74,7 +88,11 @@ function safeJson<T>(raw: string, fallback: T): T {
   }
 }
 
-export function toActivityDTO(a: Activity, extraImages: string[] = []): ActivityDTO {
+export function toActivityDTO(
+  a: Activity,
+  extraImages: string[] = [],
+  distanceKm: number | null = null,
+): ActivityDTO {
   const images = [a.imageUrl, ...extraImages].filter(
     (x): x is string => typeof x === "string" && x.length > 0,
   );
@@ -83,26 +101,42 @@ export function toActivityDTO(a: Activity, extraImages: string[] = []): Activity
     title: a.title,
     description: a.description,
     category: a.categoryId as ActivityDTO["category"],
+    subcategory: a.subcategory,
     categoryLabel: CATEGORY_LABEL[a.categoryId] ?? "Other",
     categoryIcon: CATEGORY_ICON[a.categoryId] ?? "✨",
+    provider: a.provider,
+    providerWebsite: a.providerWebsite,
     locationLabel: a.locationLabel,
+    address: a.address,
+    city: a.city,
+    country: a.country,
     lat: a.lat != null ? a.lat / 1e6 : null,
     lng: a.lng != null ? a.lng / 1e6 : null,
+    distanceKm: distanceKm != null ? Math.round(distanceKm * 10) / 10 : null,
     priceCents: a.priceCents,
+    priceType: a.priceType,
     priceBand: a.priceBand,
     priceLabel: priceLabel(a),
     currency: a.currency,
     durationMin: a.durationMin,
+    minParticipants: a.minParticipants,
+    maxParticipants: a.maxParticipants,
+    minAge: a.minAge,
+    indoorOutdoor: a.indoorOutdoor ?? null,
+    accessibility: a.accessibility,
     openingHours: safeJson<Record<string, string>>(a.openingHours, {}),
     websiteUrl: a.websiteUrl,
     bookingUrl: a.bookingUrl,
     ticketUrl: a.ticketUrl,
-    minAge: a.minAge,
     imageUrl: a.imageUrl,
     images,
+    imageAttribution: a.imageAttribution,
     tags: safeJson<string[]>(a.tags, []),
     source: a.source,
+    sourceUrl: a.sourceUrl,
+    lastVerifiedAt: a.lastVerifiedAt,
+    status: a.status,
     availabilityNote:
-      "Activity information only — check the provider for live availability and pricing before you book.",
+      "Activity information is provided for planning. Prices and availability can change — check with the provider before you book.",
   };
 }

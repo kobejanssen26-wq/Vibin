@@ -37,7 +37,7 @@ export function GroupChat({ groupId }: { groupId: string }) {
     <div className="flex h-[60vh] flex-col">
       <div className="flex-1 space-y-3 overflow-y-auto pb-3">
         {!data ? (
-          <div className="grid place-items-center py-10 text-ink-muted">
+          <div className="grid place-items-center py-10 text-navy-400">
             <Spinner />
           </div>
         ) : (
@@ -45,7 +45,7 @@ export function GroupChat({ groupId }: { groupId: string }) {
             m.kind === "system" ? (
               <p
                 key={m.id}
-                className="mx-auto w-fit rounded-full bg-ink/5 px-3 py-1 text-center text-xs font-medium text-ink-muted"
+                className="mx-auto w-fit rounded-full bg-navy/5 px-3 py-1 text-center text-xs font-medium text-navy-400"
               >
                 {m.body}
               </p>
@@ -63,20 +63,20 @@ export function GroupChat({ groupId }: { groupId: string }) {
                 )}
                 <div className={`max-w-[78%] ${m.isYou ? "text-right" : ""}`}>
                   {!m.isYou && (
-                    <p className="text-xs font-semibold text-ink-muted">
+                    <p className="text-xs font-semibold text-navy-400">
                       {m.author?.displayName}
                     </p>
                   )}
                   <p
                     className={`inline-block rounded-2xl px-3 py-2 text-sm ${
                       m.isYou
-                        ? "bg-mingo-gradient text-white"
-                        : "bg-paper-soft text-ink"
+                        ? "bg-vibin-blue text-white"
+                        : "bg-paper-soft text-navy"
                     }`}
                   >
                     {m.body}
                   </p>
-                  <p className="mt-0.5 text-[10px] text-ink-muted">
+                  <p className="mt-0.5 text-[10px] text-navy-400">
                     {relativeTime(m.createdAt)}
                   </p>
                 </div>
@@ -87,7 +87,7 @@ export function GroupChat({ groupId }: { groupId: string }) {
         <div ref={endRef} />
       </div>
 
-      <form onSubmit={send} className="flex gap-2 border-t border-ink/5 pt-3">
+      <form onSubmit={send} className="flex gap-2 border-t border-navy/5 pt-3">
         <input
           className="field flex-1"
           placeholder="Message the group…"

@@ -34,7 +34,7 @@ export function Login() {
       footer={
         <>
           New here?{" "}
-          <Link to="/signup" className="font-semibold text-grape-600">
+          <Link to="/signup" className="font-semibold text-brand-600">
             Create an account
           </Link>
         </>
@@ -57,13 +57,13 @@ export function Login() {
           value={form.password}
           onChange={(e) => setForm({ ...form, password: e.target.value })}
         />
-        {err && <p className="text-sm font-medium text-coral-600">{err}</p>}
+        {err && <p className="text-sm font-medium text-danger-600">{err}</p>}
         <Button type="submit" loading={busy} className="w-full">
           Log in
         </Button>
         <Link
           to="/forgot-password"
-          className="block text-center text-sm text-ink-muted"
+          className="block text-center text-sm text-navy-400"
         >
           Forgot your password?
         </Link>

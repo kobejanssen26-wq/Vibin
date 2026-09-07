@@ -1,6 +1,6 @@
-/* Mingo service worker — minimal offline shell.
+/* VIBIN service worker — minimal offline shell.
    Network-first for navigation and API; cache-first for hashed static assets. */
-const CACHE = "mingo-v1";
+const CACHE = "vibin-v1";
 const APP_SHELL = ["/", "/favicon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {
@@ -22,10 +22,8 @@ self.addEventListener("fetch", (e) => {
   if (request.method !== "GET") return;
   const url = new URL(request.url);
 
-  // Never cache the API.
-  if (url.pathname.startsWith("/api/")) return;
+  if (url.pathname.startsWith("/api/")) return; // never cache the API
 
-  // Hashed assets: cache-first.
   if (url.pathname.startsWith("/assets/")) {
     e.respondWith(
       caches.match(request).then(
@@ -41,7 +39,6 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  // Navigations: network-first, fall back to cached shell when offline.
   if (request.mode === "navigate") {
     e.respondWith(
       fetch(request).catch(() => caches.match("/") || Response.error()),

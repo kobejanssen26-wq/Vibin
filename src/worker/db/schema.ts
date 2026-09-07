@@ -1,5 +1,5 @@
 /**
- * Mingo database schema (Cloudflare D1 / SQLite via Drizzle ORM).
+ * VIBIN database schema (Cloudflare D1 / SQLite via Drizzle ORM).
  *
  * Conventions
  * -----------
@@ -266,23 +266,64 @@ export const activities = sqliteTable(
     categoryId: text("category_id")
       .notNull()
       .references(() => activityCategories.id),
+    subcategory: text("subcategory"),
+
+    // provider / venue
+    provider: text("provider"), // human-readable venue/organiser name
+    providerWebsite: text("provider_website"),
+
+    // location
     locationLabel: text("location_label").notNull(),
+    address: text("address"),
+    city: text("city"),
+    country: text("country").notNull().default("BE"),
     lat: integer("lat"), // * 1e6
     lng: integer("lng"),
-    priceCents: integer("price_cents"), // per person, null = unknown/free-form
+
+    // pricing
+    priceCents: integer("price_cents"), // amount in the unit given by priceType
+    priceType: text("price_type", {
+      enum: ["per_person", "per_group", "from_per_person", "free", "varies"],
+    })
+      .notNull()
+      .default("per_person"),
     priceBand: text("price_band", {
       enum: ["free", "0_10", "10_25", "25_50", "50_100", "100_plus"],
     }).notNull(),
     currency: text("currency").notNull().default("EUR"),
+
+    // logistics
     durationMin: integer("duration_min"),
+    minParticipants: integer("min_participants"),
+    maxParticipants: integer("max_participants"),
+    minAge: integer("min_age"),
+    indoorOutdoor: text("indoor_outdoor", {
+      enum: ["indoor", "outdoor", "both"],
+    }),
+    accessibility: text("accessibility"),
     openingHours: text("opening_hours").notNull().default("{}"), // JSON
+
+    // links
     websiteUrl: text("website_url"),
     bookingUrl: text("booking_url"),
     ticketUrl: text("ticket_url"),
-    minAge: integer("min_age"),
+
+    // media
     imageUrl: text("image_url"),
+    imageSource: text("image_source"), // e.g. "Unsplash", "provider"
+    imageAttribution: text("image_attribution"), // e.g. "Photo: Jane Doe / Unsplash"
     tags: text("tags").notNull().default("[]"), // JSON array
+
+    // provenance & verification (§14, §27)
     source: text("source").notNull().default("seed"),
+    sourceUrl: text("source_url"),
+    lastVerifiedAt: integer("last_verified_at"),
+    status: text("status", {
+      enum: ["verified", "needs_review", "outdated", "inactive"],
+    })
+      .notNull()
+      .default("needs_review"),
+
     active: integer("active").notNull().default(1),
     createdAt: integer("created_at").notNull().default(now),
     updatedAt: integer("updated_at").notNull().default(now),
@@ -290,6 +331,8 @@ export const activities = sqliteTable(
   (t) => ({
     catIdx: index("activities_category_idx").on(t.categoryId),
     activeIdx: index("activities_active_idx").on(t.active),
+    statusIdx: index("activities_status_idx").on(t.status),
+    cityIdx: index("activities_city_idx").on(t.city),
     extUnq: uniqueIndex("activities_provider_external_unq").on(
       t.providerId,
       t.externalId,

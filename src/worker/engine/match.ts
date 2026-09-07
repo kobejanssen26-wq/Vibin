@@ -1,5 +1,5 @@
 /**
- * Mingo match engine — pure, deterministic decision logic.
+ * VIBIN match engine — pure, deterministic decision logic.
  *
  * Everything here is a pure function over plain data so it can be unit-tested
  * exhaustively (see match.test.ts) and reused by any route without touching the

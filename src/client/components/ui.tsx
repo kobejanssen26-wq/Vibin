@@ -3,7 +3,15 @@ import { Link } from "react-router-dom";
 import { LogoMark } from "./Logo";
 
 /* ------------------------------- Button ------------------------------- */
-type Variant = "primary" | "ghost" | "dark";
+type Variant = "primary" | "lime" | "ghost" | "dark" | "outline";
+const VARIANT: Record<Variant, string> = {
+  primary: "btn-primary",
+  lime: "btn-lime",
+  ghost: "btn-ghost",
+  dark: "btn-dark",
+  outline: "btn-outline",
+};
+
 export function Button({
   variant = "primary",
   loading,
@@ -14,14 +22,12 @@ export function Button({
   variant?: Variant;
   loading?: boolean;
 }) {
-  const cls =
-    variant === "primary"
-      ? "btn-primary"
-      : variant === "dark"
-        ? "btn-dark"
-        : "btn-ghost";
   return (
-    <button className={`${cls} ${className}`} disabled={loading || rest.disabled} {...rest}>
+    <button
+      className={`${VARIANT[variant]} ${className}`}
+      disabled={loading || rest.disabled}
+      {...rest}
+    >
       {loading && <Spinner className="h-4 w-4" />}
       {children}
     </button>
@@ -39,14 +45,8 @@ export function LinkButton({
   className?: string;
   children: ReactNode;
 }) {
-  const cls =
-    variant === "primary"
-      ? "btn-primary"
-      : variant === "dark"
-        ? "btn-dark"
-        : "btn-ghost";
   return (
-    <Link to={to} className={`${cls} ${className}`}>
+    <Link to={to} className={`${VARIANT[variant]} ${className}`}>
       {children}
     </Link>
   );
@@ -65,15 +65,19 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-sm font-semibold text-ink-soft">
+      <span className="mb-1.5 block text-sm font-semibold text-navy-700">
         {label}
       </span>
-      <input className="field" {...rest} />
+      <input
+        className={`field ${error ? "border-danger-400 focus:ring-danger-400/25" : ""}`}
+        aria-invalid={!!error}
+        {...rest}
+      />
       {hint && !error && (
-        <span className="mt-1 block text-xs text-ink-muted">{hint}</span>
+        <span className="mt-1 block text-xs text-navy-400">{hint}</span>
       )}
       {error && (
-        <span className="mt-1 block text-xs font-medium text-coral-600">
+        <span className="mt-1 block text-xs font-medium text-danger-600">
           {error}
         </span>
       )}
@@ -84,7 +88,12 @@ export function Field({
 /* ------------------------------ Spinner ------------------------------ */
 export function Spinner({ className = "h-6 w-6" }: { className?: string }) {
   return (
-    <svg className={`animate-spin ${className}`} viewBox="0 0 24 24" fill="none">
+    <svg
+      className={`animate-spin ${className} motion-reduce:animate-none`}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <circle
         className="opacity-20"
         cx="12"
@@ -105,9 +114,22 @@ export function Spinner({ className = "h-6 w-6" }: { className?: string }) {
 /* ---------------------------- Page states --------------------------- */
 export function LoadingScreen({ label = "Loading…" }: { label?: string }) {
   return (
-    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-ink-muted">
-      <LogoMark className="h-10 w-10 animate-pulse" />
+    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-navy-400">
+      <LogoMark className="h-10 w-10 animate-float-up motion-reduce:animate-none" />
       <p className="text-sm">{label}</p>
+    </div>
+  );
+}
+
+export function SkeletonCard({ className = "" }: { className?: string }) {
+  return (
+    <div className={`card overflow-hidden ${className}`}>
+      <div className="skeleton h-40 w-full rounded-none" />
+      <div className="space-y-2 p-4">
+        <div className="skeleton h-4 w-2/3" />
+        <div className="skeleton h-3 w-1/2" />
+        <div className="skeleton h-3 w-full" />
+      </div>
     </div>
   );
 }
@@ -122,12 +144,14 @@ export function ErrorState({
   onRetry?: () => void;
 }) {
   return (
-    <div className="mx-auto max-w-sm py-16 text-center">
-      <div className="mb-3 text-4xl">😕</div>
+    <div className="mx-auto max-w-sm py-16 text-center animate-float-up">
+      <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-danger-100 text-2xl">
+        ⚠️
+      </div>
       <h2 className="text-lg font-bold">{title}</h2>
-      {message && <p className="mt-1 text-sm text-ink-muted">{message}</p>}
+      {message && <p className="mt-1 text-sm text-navy-400">{message}</p>}
       {onRetry && (
-        <Button variant="ghost" className="mt-4" onClick={onRetry}>
+        <Button variant="outline" className="mt-4" onClick={onRetry}>
           Try again
         </Button>
       )}
@@ -147,10 +171,12 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="mx-auto max-w-sm py-14 text-center">
-      <div className="mb-3 text-4xl">{emoji}</div>
+    <div className="mx-auto max-w-sm py-14 text-center animate-float-up">
+      <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-3xl bg-paper-soft text-3xl">
+        {emoji}
+      </div>
       <h2 className="text-lg font-bold">{title}</h2>
-      {message && <p className="mt-1 text-sm text-ink-muted">{message}</p>}
+      {message && <p className="mt-1 text-sm text-navy-400">{message}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
   );
@@ -180,13 +206,15 @@ export function Avatar({
     <img
       src={url}
       alt={name}
+      loading="lazy"
       style={s}
       className={`shrink-0 rounded-full object-cover ${className}`}
     />
   ) : (
     <span
       style={s}
-      className={`grid shrink-0 place-items-center rounded-full bg-mingo-gradient font-bold text-white ${className}`}
+      className={`grid shrink-0 place-items-center rounded-full bg-brand-500 font-bold text-white ${className}`}
+      aria-label={name}
     >
       {ini}
     </span>
@@ -219,7 +247,7 @@ export function AvatarStack({
       {extra > 0 && (
         <span
           style={{ width: size, height: size, marginLeft: -size * 0.3 }}
-          className="grid place-items-center rounded-full bg-ink text-xs font-bold text-white ring-2 ring-white"
+          className="grid place-items-center rounded-full bg-navy text-xs font-bold text-white ring-2 ring-white"
         >
           +{extra}
         </span>

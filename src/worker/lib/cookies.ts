@@ -30,7 +30,7 @@ export function clearSessionCookie(c: Ctx) {
 
 /**
  * CSRF: double-submit cookie. The token is readable by JS (not httpOnly) so the
- * client echoes it in the X-Mingo-CSRF header on every mutating request; the
+ * client echoes it in the X-Vibin-CSRF header on every mutating request; the
  * server checks header === cookie. Combined with SameSite=Lax on the session
  * cookie this blocks cross-site form posts.
  */

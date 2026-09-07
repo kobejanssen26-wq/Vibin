@@ -20,11 +20,11 @@ export function AuthLayout({
       </Link>
       <div className="card p-6">
         <h1 className="text-2xl font-extrabold">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-ink-muted">{subtitle}</p>}
+        {subtitle && <p className="mt-1 text-sm text-navy-400">{subtitle}</p>}
         <div className="mt-5">{children}</div>
       </div>
       {footer && (
-        <p className="mt-4 text-center text-sm text-ink-muted">{footer}</p>
+        <p className="mt-4 text-center text-sm text-navy-400">{footer}</p>
       )}
     </div>
   );

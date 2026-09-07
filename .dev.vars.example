@@ -1,0 +1,7 @@
+# Copy to `.dev.vars` for local `wrangler dev`. Git-ignored.
+# These override the vars in wrangler.jsonc for local development only.
+APP_ENV=development
+APP_URL=http://localhost:5173
+AUTH_SECRET=dev-only-insecure-secret-change-me-0123456789abcdef
+EMAIL_API_KEY=
+EMAIL_FROM=hello@vibin.local

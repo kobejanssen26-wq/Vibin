@@ -3,23 +3,14 @@
  * into group_activity_pool once, when swiping starts, so every member — including
  * late joiners — swipes the same cards in the same order, and undo is stable.
  */
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import type { DB } from "../db/client";
 import { activities } from "../db/schema";
 import { LIMITS } from "@shared/constants";
 import type { Activity, GroupSettings } from "../db/schema";
 
-const BUDGET_TO_BANDS: Record<string, string[]> = {
-  any: ["free", "0_10", "10_25", "25_50", "50_100", "100_plus"],
-  free: ["free"],
-  "0_10": ["free", "0_10"],
-  "10_25": ["free", "0_10", "10_25"],
-  "25_50": ["free", "0_10", "10_25", "25_50"],
-  "50_100": ["free", "0_10", "10_25", "25_50", "50_100"],
-  "100_plus": ["free", "0_10", "10_25", "25_50", "50_100", "100_plus"],
-};
-
-function haversineKm(
+/** Straight-line distance in km between two WGS84 points. */
+export function haversineKm(
   lat1: number,
   lng1: number,
   lat2: number,
@@ -36,6 +27,16 @@ function haversineKm(
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+const BUDGET_TO_BANDS: Record<string, string[]> = {
+  any: ["free", "0_10", "10_25", "25_50", "50_100", "100_plus"],
+  free: ["free"],
+  "0_10": ["free", "0_10"],
+  "10_25": ["free", "0_10", "10_25"],
+  "25_50": ["free", "0_10", "10_25", "25_50"],
+  "50_100": ["free", "0_10", "10_25", "25_50", "50_100"],
+  "100_plus": ["free", "0_10", "10_25", "25_50", "50_100", "100_plus"],
+};
+
 export async function buildDeck(
   db: DB,
   settings: GroupSettings,
@@ -47,6 +48,9 @@ export async function buildDeck(
 
   const where = [
     eq(activities.active, 1),
+    // only surface activities that are current — never "outdated" or "inactive"
+    ne(activities.status, "outdated"),
+    ne(activities.status, "inactive"),
     inArray(activities.priceBand, bands as Activity["priceBand"][]),
     ...(cats.length ? [inArray(activities.categoryId, cats)] : []),
   ];

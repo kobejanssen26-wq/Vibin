@@ -37,11 +37,11 @@ export function GroupHome() {
     <div className="space-y-5">
       <div className="flex items-start justify-between">
         <div>
-          <Link to="/app" className="text-sm text-ink-muted">
+          <Link to="/app" className="text-sm text-navy-400">
             ← Groups
           </Link>
           <h1 className="text-2xl font-extrabold">{group.name}</h1>
-          <p className="text-sm text-ink-muted">
+          <p className="text-sm text-navy-400">
             {group.activeMemberCount} active ·{" "}
             {group.settings?.dateKnown ? "date set" : "date TBD"}
           </p>
@@ -53,7 +53,7 @@ export function GroupHome() {
           <button
             key={t}
             className={`flex-1 rounded-xl py-2 capitalize ${
-              tab === t ? "bg-white shadow-card" : "text-ink-muted"
+              tab === t ? "bg-white shadow-card" : "text-navy-400"
             }`}
             onClick={() => setTab(t)}
           >
@@ -67,11 +67,11 @@ export function GroupHome() {
       ) : (
         <>
           {cta && (
-            <div className="card bg-mingo-gradient p-5 text-white">
+            <div className="card bg-vibin-blue p-5 text-white">
               <p className="font-bold">{cta.title}</p>
               <p className="mt-0.5 text-sm text-white/90">{cta.sub}</p>
               <button
-                className="btn mt-3 w-full bg-white text-ink"
+                className="btn mt-3 w-full bg-white text-navy"
                 onClick={() => nav(cta.to)}
               >
                 {cta.label}
@@ -99,7 +99,7 @@ export function GroupHome() {
                       {m.displayName}
                       {m.isYou && " (you)"}
                     </p>
-                    <p className="text-xs text-ink-muted">
+                    <p className="text-xs text-navy-400">
                       {m.role === "creator" ? "Creator" : "Member"}
                       {m.status !== "active" && ` · ${m.status}`}
                     </p>
@@ -129,7 +129,7 @@ export function GroupHome() {
                       className="block rounded-2xl bg-paper-soft p-3"
                     >
                       <p className="font-semibold">{p.activity.title}</p>
-                      <p className="text-sm text-ink-muted">
+                      <p className="text-sm text-navy-400">
                         {formatWhen(p.startsAt)} · {p.locationLabel}
                       </p>
                     </Link>
@@ -137,7 +137,7 @@ export function GroupHome() {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-ink-muted">No confirmed plans yet.</p>
+              <p className="text-sm text-navy-400">No confirmed plans yet.</p>
             )}
           </section>
 
@@ -154,7 +154,7 @@ export function GroupHome() {
                     <span className="text-2xl">{m.activity.categoryIcon}</span>
                     <div className="flex-1">
                       <p className="text-sm font-semibold">{m.activity.title}</p>
-                      <p className="text-xs text-ink-muted">
+                      <p className="text-xs text-navy-400">
                         {m.status === "complete"
                           ? `Planned · ${formatWhen(m.startsAt)}`
                           : m.needsDateMatch
@@ -184,7 +184,7 @@ export function GroupHome() {
 
           {group.isCreator && group.status !== "archived" && (
             <button
-              className="w-full py-3 text-center text-sm text-coral-600"
+              className="w-full py-3 text-center text-sm text-danger-600"
               onClick={async () => {
                 if (!confirm("Archive this group for everyone?")) return;
                 await api(`/groups/${id}`, { method: "DELETE" });
@@ -196,7 +196,7 @@ export function GroupHome() {
           )}
           {!group.isCreator && (
             <button
-              className="w-full py-3 text-center text-sm text-ink-muted"
+              className="w-full py-3 text-center text-sm text-navy-400"
               onClick={async () => {
                 if (!confirm("Leave this group?")) return;
                 try {
@@ -305,7 +305,7 @@ function MemberActions({
         </button>
       )}
       <button
-        className="btn-ghost px-2 py-1 text-xs text-coral-600"
+        className="btn-ghost px-2 py-1 text-xs text-danger-600"
         disabled={busy}
         onClick={() => confirm("Remove this member?") && set("removed")}
       >

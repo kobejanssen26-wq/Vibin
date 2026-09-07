@@ -110,7 +110,7 @@ app.post("/signup", async (c) => {
   });
   await sendEmail(c.env, {
     to: body.email,
-    subject: "Confirm your Mingo account",
+    subject: "Confirm your VIBIN account",
     text: verifyEmailBody(`${c.env.APP_URL}/verify-email?token=${token}`),
   });
 
@@ -210,7 +210,7 @@ app.post("/request-reset", async (c) => {
     });
     await sendEmail(c.env, {
       to: user.email,
-      subject: "Reset your Mingo password",
+      subject: "Reset your VIBIN password",
       text: resetEmailBody(`${c.env.APP_URL}/reset-password?token=${token}`),
     });
   }

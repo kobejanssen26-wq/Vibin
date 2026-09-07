@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "mingo",
+  "name": "vibin",
   "main": "src/worker/index.ts",
   "compatibility_date": "2024-12-05",
   "compatibility_flags": ["nodejs_compat"],
@@ -18,23 +18,26 @@
   "placement": { "mode": "smart" },
   "vars": {
     "APP_ENV": "production",
-    "APP_URL": "https://mingo.kobe-janssen26.workers.dev"
+    // Canonical origin. Once vibin.be is attached as a Custom Domain in the
+    // Cloudflare dashboard this is the live URL; until then the site is also
+    // reachable at the *.workers.dev URL printed by `wrangler deploy`.
+    "APP_URL": "https://vibin.be"
   },
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "mingo-db",
-      "database_id": "0297a11a-8d19-4383-9cc3-cb720fd961ce",
+      "database_name": "vibin-db",
+      "database_id": "a794e4c2-f107-436e-a285-e5ddcaf7fb96",
       "migrations_dir": "migrations"
     }
   ],
   "kv_namespaces": [
     {
       "binding": "KV",
-      "id": "e229485391af448aab97480e565a7e1d"
+      "id": "f3474231263f41679e49437d440c9072"
     }
   ]
-  // R2 (media/avatar uploads) is optional. To enable it: turn on R2 in the
-  // Cloudflare dashboard, run `wrangler r2 bucket create mingo-media`, then add:
-  //   "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "mingo-media" }]
+  // R2 (photo uploads) is optional. To enable: turn on R2 in the Cloudflare
+  // dashboard, `wrangler r2 bucket create vibin-media`, then add:
+  //   "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "vibin-media" }]
 }

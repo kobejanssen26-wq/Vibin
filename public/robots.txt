@@ -12,4 +12,4 @@ Disallow: /settings
 Disallow: /admin
 Disallow: /api/
 
-Sitemap: https://mingo.app/sitemap.xml
+Sitemap: https://vibin.be/sitemap.xml

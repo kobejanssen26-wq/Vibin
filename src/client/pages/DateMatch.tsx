@@ -7,9 +7,9 @@ import { formatDay, formatTime } from "../lib/format";
 import type { DateMatchStateDTO } from "@shared/types";
 
 const VOTES = [
-  { v: "yes", label: "Yes", cls: "bg-emerald-500 text-white" },
-  { v: "maybe", label: "Maybe", cls: "bg-tangerine-400 text-white" },
-  { v: "no", label: "No", cls: "bg-coral-500 text-white" },
+  { v: "yes", label: "Yes", cls: "bg-lime-400 text-white" },
+  { v: "maybe", label: "Maybe", cls: "bg-amber-400 text-white" },
+  { v: "no", label: "No", cls: "bg-danger-500 text-white" },
 ] as const;
 
 export function DateMatch() {
@@ -94,7 +94,7 @@ export function DateMatch() {
         <Confetti fire />
         <div className="text-5xl">🎉</div>
         <h1 className="mt-2 text-2xl font-extrabold">Everyone agreed!</h1>
-        <p className="mt-1 text-sm text-ink-muted">Opening your plan…</p>
+        <p className="mt-1 text-sm text-navy-400">Opening your plan…</p>
         <Link to={`/groups/${id}/plan`} className="btn-primary mt-6">
           View the plan
         </Link>
@@ -105,12 +105,12 @@ export function DateMatch() {
   return (
     <div className="space-y-5">
       <div>
-        <Link to={`/groups/${id}`} className="text-sm text-ink-muted">
+        <Link to={`/groups/${id}`} className="text-sm text-navy-400">
           ← Group
         </Link>
         <h1 className="text-2xl font-extrabold">When should we go?</h1>
-        <p className="text-sm text-ink-muted">
-          For <strong>{state.activity.title}</strong>. Mingo picks the first slot
+        <p className="text-sm text-navy-400">
+          For <strong>{state.activity.title}</strong>. VIBIN picks the first slot
           everyone accepts.
         </p>
       </div>
@@ -118,9 +118,9 @@ export function DateMatch() {
       <AvatarStack people={state.members} />
 
       {state.status === "no_consensus" && (
-        <p className="rounded-2xl bg-coral-500/10 px-4 py-3 text-sm font-medium text-coral-700">
+        <p className="rounded-2xl bg-danger-500/10 px-4 py-3 text-sm font-medium text-danger-700">
           No slot works for everyone yet. Add another option or change a vote —
-          Mingo won’t pick a time that excludes someone.
+          VIBIN won’t pick a time that excludes someone.
         </p>
       )}
 
@@ -130,10 +130,10 @@ export function DateMatch() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-bold">{formatDay(o.startsAt)}</p>
-                <p className="text-sm text-ink-muted">{formatTime(o.startsAt)}</p>
+                <p className="text-sm text-navy-400">{formatTime(o.startsAt)}</p>
               </div>
               {o.unanimous && (
-                <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-xs font-bold text-emerald-600">
+                <span className="rounded-full bg-lime-400/20 px-2 py-1 text-xs font-bold text-lime-700">
                   Works for all
                 </span>
               )}
@@ -148,7 +148,7 @@ export function DateMatch() {
                   className={`flex-1 rounded-xl py-2 text-sm font-bold transition ${
                     o.yourVote === btn.v
                       ? btn.cls
-                      : "bg-paper-soft text-ink-muted"
+                      : "bg-paper-soft text-navy-400"
                   }`}
                 >
                   {btn.label}
@@ -156,7 +156,7 @@ export function DateMatch() {
               ))}
             </div>
 
-            <div className="mt-2 flex gap-3 text-xs text-ink-muted">
+            <div className="mt-2 flex gap-3 text-xs text-navy-400">
               <span>✅ {o.tally.yes}</span>
               <span>🤔 {o.tally.maybe}</span>
               <span>❌ {o.tally.no}</span>

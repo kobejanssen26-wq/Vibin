@@ -34,7 +34,7 @@ function client() {
     const headers = { "content-type": "application/json" };
     const c = cookieHeader();
     if (c) headers.cookie = c;
-    if (method !== "GET") headers["x-mingo-csrf"] = jar.get("mingo_csrf") ?? "";
+    if (method !== "GET") headers["x-vibin-csrf"] = jar.get("vibin_csrf") ?? "";
     const res = await fetch(`${BASE}/api${path}`, {
       method,
       headers,
@@ -69,7 +69,7 @@ async function signup(api, name) {
 }
 
 async function run() {
-  console.log(`\nMingo integration test → ${BASE}\n`);
+  console.log(`\nVIBIN integration test → ${BASE}\n`);
 
   const health = await client()("GET", "/health");
   ok("health endpoint responds", health.status === 200 && health.json.ok);
@@ -106,7 +106,7 @@ async function run() {
   const idor = await mallory("GET", `/groups/${g.id}`);
   ok("non-member gets 403 on another group (no IDOR)", idor.status === 403);
   const idorVote = await mallory("POST", `/groups/${g.id}/swipe`, {
-    activityId: "act_padel-hoogstraten",
+    activityId: "act_bowling-stones-antwerp",
     value: "like",
   });
   ok("non-member cannot vote in another group", idorVote.status === 403);
@@ -211,7 +211,7 @@ async function run() {
   const eveState = await eve("GET", `/groups/${g3.id}/swipe`);
   ok("removed member loses read access to the group", eveState.status === 403);
   const eveVote = await eve("POST", `/groups/${g3.id}/swipe`, {
-    activityId: "act_bowling-turnhout",
+    activityId: "act_kinepolis-cinema",
     value: "like",
   });
   ok("removed member cannot vote", eveVote.status === 403);

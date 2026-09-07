@@ -23,7 +23,7 @@ export function InviteBox({
   const share = async () => {
     if (navigator.share) {
       try {
-        await navigator.share({ title: "Join my Mingo group", url });
+        await navigator.share({ title: "Join my VIBIN group", url });
       } catch {
         /* user cancelled */
       }

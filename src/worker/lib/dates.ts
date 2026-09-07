@@ -1,6 +1,6 @@
 /**
- * Date helpers for Mingo. All times are stored as unix epoch SECONDS.
- * Wall-clock resolution is done in Europe/Brussels (Mingo's launch market),
+ * Date helpers for VIBIN. All times are stored as unix epoch SECONDS.
+ * Wall-clock resolution is done in Europe/Brussels (VIBIN's launch market),
  * DST-aware via Intl. No external date library.
  */
 import type { DateMode, TimeBand } from "@shared/constants";
@@ -245,11 +245,11 @@ export function buildIcs(opts: {
   return [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Mingo//EN",
+    "PRODID:-//VIBIN//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",
-    `UID:${opts.uid}@mingo.app`,
+    `UID:${opts.uid}@vibin.be`,
     `DTSTAMP:${icsStamp(Math.floor(Date.now() / 1000))}`,
     `DTSTART:${icsStamp(opts.startSec)}`,
     `DTEND:${icsStamp(end)}`,

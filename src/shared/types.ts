@@ -80,30 +80,58 @@ export interface GroupSummaryDTO {
   lastActivityAt: number;
 }
 
+export type PriceType = "per_person" | "per_group" | "from_per_person" | "free" | "varies";
+export type IndoorOutdoor = "indoor" | "outdoor" | "both" | null;
+export type ActivityStatus = "verified" | "needs_review" | "outdated" | "inactive";
+
 export interface ActivityDTO {
   id: string;
   title: string;
   description: string;
   category: CategoryId;
+  subcategory: string | null;
   categoryLabel: string;
   categoryIcon: string;
+  // provider / source
+  provider: string | null;
+  providerWebsite: string | null;
+  // location
   locationLabel: string;
+  address: string | null;
+  city: string | null;
+  country: string;
   lat: number | null;
   lng: number | null;
+  /** straight-line km from the group's chosen point, when one is set */
+  distanceKm: number | null;
+  // pricing
   priceCents: number | null;
+  priceType: PriceType;
   priceBand: PriceBand;
   priceLabel: string;
   currency: string;
+  // logistics
   durationMin: number | null;
+  minParticipants: number | null;
+  maxParticipants: number | null;
+  minAge: number | null;
+  indoorOutdoor: IndoorOutdoor;
+  accessibility: string | null;
   openingHours: Record<string, string>;
+  // links
   websiteUrl: string | null;
   bookingUrl: string | null;
   ticketUrl: string | null;
-  minAge: number | null;
+  // media
   imageUrl: string | null;
   images: string[];
+  imageAttribution: string | null;
   tags: string[];
+  // provenance
   source: string;
+  sourceUrl: string | null;
+  lastVerifiedAt: number | null;
+  status: ActivityStatus;
   /** activity info only — NOT a live-availability guarantee */
   availabilityNote: string;
 }

@@ -8,6 +8,7 @@ import {
   activityImages,
   activityVotes,
   groupActivityPool,
+  groupSettings,
   matches,
 } from "../db/schema";
 import { parseBody } from "../lib/validate";
@@ -15,6 +16,7 @@ import { badRequest, conflict } from "../lib/errors";
 import { newId } from "../lib/id";
 import { requireActiveMember, requireGroupMember, activeMemberIds } from "../lib/access";
 import { activityVoteProgress } from "../engine/match";
+import { haversineKm } from "../engine/deck";
 import { runActivityMatch } from "../lib/engine-run";
 import { matchDTO } from "../lib/match-view";
 import { toActivityDTO } from "../lib/dto";
@@ -33,24 +35,28 @@ async function deckWithActivities(db: ReturnType<typeof createDb>, groupId: stri
     .orderBy(asc(groupActivityPool.sort));
   if (pool.length === 0) return [];
   const ids = pool.map((p) => p.activityId);
-  const acts = await db
-    .select()
-    .from(activities)
-    .where(inArray(activities.id, ids));
-  const imgs = await db
-    .select()
-    .from(activityImages)
-    .where(inArray(activityImages.activityId, ids));
+  const [acts, imgs, settings] = await Promise.all([
+    db.select().from(activities).where(inArray(activities.id, ids)),
+    db.select().from(activityImages).where(inArray(activityImages.activityId, ids)),
+    db.query.groupSettings.findFirst({ where: eq(groupSettings.groupId, groupId) }),
+  ]);
+  const glat = settings?.lat != null ? settings.lat / 1e6 : null;
+  const glng = settings?.lng != null ? settings.lng / 1e6 : null;
   const byId = new Map(acts.map((a) => [a.id, a]));
   return pool
     .map((p) => {
       const a = byId.get(p.activityId);
       if (!a) return null;
+      const dist =
+        glat != null && glng != null && a.lat != null && a.lng != null
+          ? haversineKm(glat, glng, a.lat / 1e6, a.lng / 1e6)
+          : null;
       return {
         sort: p.sort,
         activity: toActivityDTO(
           a,
           imgs.filter((i) => i.activityId === a.id).sort((x, y) => x.sort - y.sort).map((i) => i.url),
+          dist,
         ),
       };
     })

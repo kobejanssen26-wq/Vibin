@@ -1,6 +1,6 @@
 # Quick end-to-end check against the LIVE deployment using an existing account.
 param(
-  [string]$Base = "https://mingo.kobe-janssen26.workers.dev",
+  [string]$Base = "https://vibin.kobe-janssen26.workers.dev",
   [string]$Email = "live-check-a@example.com",
   [string]$Password = "supersecret123"
 )
@@ -8,8 +8,8 @@ $ErrorActionPreference = "Stop"
 $s = New-Object Microsoft.PowerShell.Commands.WebRequestSession
 function Req($m, $p, $b) {
   $h = @{}
-  $csrf = ($s.Cookies.GetCookies($Base) | Where-Object Name -eq "mingo_csrf").Value
-  if ($csrf) { $h["x-mingo-csrf"] = $csrf }
+  $csrf = ($s.Cookies.GetCookies($Base) | Where-Object Name -eq "vibin_csrf").Value
+  if ($csrf) { $h["x-vibin-csrf"] = $csrf }
   $a = @{ Uri = "$Base/api$p"; Method = $m; WebSession = $s; Headers = $h; ContentType = "application/json" }
   if ($null -ne $b) { $a.Body = ($b | ConvertTo-Json -Depth 8 -Compress) }
   Invoke-RestMethod @a

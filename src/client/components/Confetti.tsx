@@ -1,11 +1,19 @@
 import { useEffect, useRef } from "react";
 
-/** Lightweight canvas confetti — one burst, cleans itself up. No dependency. */
+/**
+ * Lightweight canvas confetti in the VIBIN palette — one burst, self-cleaning,
+ * no dependency. Respects prefers-reduced-motion (renders nothing).
+ */
 export function Confetti({ fire }: { fire: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     if (!fire || !ref.current) return;
+    if (
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    ) {
+      return;
+    }
     const canvas = ref.current;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -14,18 +22,18 @@ export function Confetti({ fire }: { fire: boolean }) {
     canvas.height = canvas.clientHeight * dpr;
     ctx.scale(dpr, dpr);
 
-    const colors = ["#ff2d55", "#ff7a1a", "#8b3dff", "#ffd166", "#06d6a0"];
+    const colors = ["#3155ff", "#b8f23d", "#6f80ff", "#f7f8fc", "#9bd91f"];
     const W = canvas.clientWidth;
     const H = canvas.clientHeight;
-    const parts = Array.from({ length: 140 }, () => ({
-      x: W / 2 + (Math.random() - 0.5) * 80,
+    const parts = Array.from({ length: 150 }, () => ({
+      x: W / 2 + (Math.random() - 0.5) * 90,
       y: H / 2 + (Math.random() - 0.5) * 40,
-      vx: (Math.random() - 0.5) * 12,
-      vy: Math.random() * -14 - 4,
-      g: 0.3 + Math.random() * 0.2,
-      s: 4 + Math.random() * 6,
+      vx: (Math.random() - 0.5) * 13,
+      vy: Math.random() * -15 - 4,
+      g: 0.3 + Math.random() * 0.22,
+      s: 4 + Math.random() * 7,
       rot: Math.random() * Math.PI,
-      vr: (Math.random() - 0.5) * 0.3,
+      vr: (Math.random() - 0.5) * 0.32,
       c: colors[(Math.random() * colors.length) | 0]!,
       life: 0,
     }));
@@ -40,7 +48,7 @@ export function Confetti({ fire }: { fire: boolean }) {
         p.x += p.vx;
         p.y += p.vy;
         p.rot += p.vr;
-        const alpha = Math.max(0, 1 - p.life / 110);
+        const alpha = Math.max(0, 1 - p.life / 120);
         if (alpha > 0 && p.y < H + 20) alive = true;
         ctx.save();
         ctx.globalAlpha = alpha;
@@ -60,6 +68,7 @@ export function Confetti({ fire }: { fire: boolean }) {
     <canvas
       ref={ref}
       className="pointer-events-none absolute inset-0 h-full w-full"
+      aria-hidden="true"
     />
   );
 }

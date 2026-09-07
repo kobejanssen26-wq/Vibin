@@ -63,7 +63,7 @@ export async function planRowToDTO(
   const googleUrl = plan.startsAt
     ? googleCalendarUrl({
         title: `${activityDTO.title} — with ${group?.name ?? "the group"}`,
-        details: `Planned with Mingo. ${activityDTO.websiteUrl ?? ""}`.trim(),
+        details: `Planned with VIBIN. ${activityDTO.websiteUrl ?? ""}`.trim(),
         location: plan.locationLabel,
         startSec: plan.startsAt,
         durationMin,
@@ -97,8 +97,8 @@ export async function planIcs(
   });
   return buildIcs({
     uid: plan.id,
-    title: `${activity?.title ?? "Activity"} — ${group?.name ?? "Mingo"}`,
-    description: `Planned with Mingo.${activity?.websiteUrl ? " " + activity.websiteUrl : ""}`,
+    title: `${activity?.title ?? "Activity"} — ${group?.name ?? "VIBIN"}`,
+    description: `Planned with VIBIN.${activity?.websiteUrl ? " " + activity.websiteUrl : ""}`,
     location: plan.locationLabel,
     startSec: plan.startsAt,
     durationMin: activity?.durationMin ?? 120,

@@ -76,9 +76,9 @@ export type GroupStatus = (typeof GROUP_STATUSES)[number];
 
 export const INVITE_CODE_LENGTH = 6;
 export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
-export const SESSION_COOKIE = "mingo_session";
-export const CSRF_COOKIE = "mingo_csrf";
-export const CSRF_HEADER = "x-mingo-csrf";
+export const SESSION_COOKIE = "vibin_session";
+export const CSRF_COOKIE = "vibin_csrf";
+export const CSRF_HEADER = "x-vibin-csrf";
 
 export const LIMITS = {
   groupName: { min: 2, max: 60 },

@@ -92,32 +92,62 @@ app.patch("/providers/:id", async (c) => {
 });
 
 /* ---------------------------- activities --------------------------- */
+const urlOrNull = z.string().url().max(500).nullable().default(null);
 const activityInput = z.object({
-  title: z.string().trim().min(2).max(120),
+  title: z.string().trim().min(2).max(160),
   description: z.string().trim().max(2000).default(""),
   categoryId: z.enum(ACTIVITY_CATEGORIES.map((x) => x.id) as [string, ...string[]]),
-  locationLabel: z.string().trim().min(2).max(120),
+  subcategory: z.string().trim().max(60).nullable().default(null),
+  provider: z.string().trim().max(120).nullable().default(null),
+  providerWebsite: urlOrNull,
+  locationLabel: z.string().trim().min(2).max(160),
+  address: z.string().trim().max(200).nullable().default(null),
+  city: z.string().trim().max(80).nullable().default(null),
+  country: z.string().trim().length(2).default("BE"),
   lat: z.number().min(-90).max(90).nullable().default(null),
   lng: z.number().min(-180).max(180).nullable().default(null),
   priceCents: z.number().int().min(0).nullable().default(null),
+  priceType: z
+    .enum(["per_person", "per_group", "from_per_person", "free", "varies"])
+    .default("per_person"),
   priceBand: z.enum(["free", "0_10", "10_25", "25_50", "50_100", "100_plus"]),
-  durationMin: z.number().int().min(0).nullable().default(null),
-  websiteUrl: z.string().url().nullable().default(null),
-  bookingUrl: z.string().url().nullable().default(null),
-  ticketUrl: z.string().url().nullable().default(null),
+  durationMin: z.number().int().min(0).max(10080).nullable().default(null),
+  minParticipants: z.number().int().min(1).max(999).nullable().default(null),
+  maxParticipants: z.number().int().min(1).max(9999).nullable().default(null),
   minAge: z.number().int().min(0).max(99).nullable().default(null),
-  imageUrl: z.string().url().nullable().default(null),
-  tags: z.array(z.string().max(40)).max(20).default([]),
+  indoorOutdoor: z.enum(["indoor", "outdoor", "both"]).nullable().default(null),
+  accessibility: z.string().trim().max(300).nullable().default(null),
+  websiteUrl: urlOrNull,
+  bookingUrl: urlOrNull,
+  ticketUrl: urlOrNull,
+  imageUrl: urlOrNull,
+  imageSource: z.string().trim().max(80).nullable().default(null),
+  imageAttribution: z.string().trim().max(200).nullable().default(null),
+  tags: z.array(z.string().max(40)).max(24).default([]),
+  source: z.string().trim().max(120).default("admin"),
+  sourceUrl: urlOrNull,
+  status: z
+    .enum(["verified", "needs_review", "outdated", "inactive"])
+    .default("needs_review"),
   active: z.boolean().default(true),
 });
 
+const scaleLatLng = (v: number | null | undefined) =>
+  v == null ? (v === null ? null : undefined) : Math.round(v * 1e6);
+
 app.get("/activities", async (c) => {
   const db = createDb(c.env);
+  const status = new URL(c.req.url).searchParams.get("status");
   const rows = await db
     .select()
     .from(activities)
+    .where(
+      status && ["verified", "needs_review", "outdated", "inactive"].includes(status)
+        ? eq(activities.status, status as never)
+        : undefined,
+    )
     .orderBy(desc(activities.updatedAt))
-    .limit(500);
+    .limit(1000);
   return c.json({ activities: rows });
 });
 
@@ -134,22 +164,11 @@ app.post("/activities", async (c) => {
     id,
     providerId: provider.id,
     externalId: `admin-${id}`,
-    title: body.title,
-    description: body.description,
-    categoryId: body.categoryId,
-    locationLabel: body.locationLabel,
-    lat: body.lat != null ? Math.round(body.lat * 1e6) : null,
-    lng: body.lng != null ? Math.round(body.lng * 1e6) : null,
-    priceCents: body.priceCents,
-    priceBand: body.priceBand,
-    durationMin: body.durationMin,
-    websiteUrl: body.websiteUrl,
-    bookingUrl: body.bookingUrl,
-    ticketUrl: body.ticketUrl,
-    minAge: body.minAge,
-    imageUrl: body.imageUrl,
+    ...body,
+    lat: scaleLatLng(body.lat) ?? null,
+    lng: scaleLatLng(body.lng) ?? null,
     tags: JSON.stringify(body.tags),
-    source: "admin",
+    lastVerifiedAt: body.status === "verified" ? now : null,
     active: body.active ? 1 : 0,
     createdAt: now,
     updatedAt: now,
@@ -164,25 +183,39 @@ app.put("/activities/:id", async (c) => {
     where: eq(activities.id, c.req.param("id")),
   });
   if (!existing) throw notFound();
+  const now = Math.floor(Date.now() / 1000);
   await db
     .update(activities)
     .set({
       ...body,
-      lat: body.lat != null ? Math.round(body.lat * 1e6) : body.lat === null ? null : undefined,
-      lng: body.lng != null ? Math.round(body.lng * 1e6) : body.lng === null ? null : undefined,
+      lat: scaleLatLng(body.lat),
+      lng: scaleLatLng(body.lng),
       tags: body.tags ? JSON.stringify(body.tags) : undefined,
       active: body.active == null ? undefined : body.active ? 1 : 0,
-      updatedAt: Math.floor(Date.now() / 1000),
+      // marking an activity "verified" stamps the verification date
+      lastVerifiedAt: body.status === "verified" ? now : undefined,
+      updatedAt: now,
     })
     .where(eq(activities.id, c.req.param("id")));
   return c.json({ ok: true });
+});
+
+/** Quick "I checked this and it's still current" action (§27). */
+app.post("/activities/:id/verify", async (c) => {
+  const db = createDb(c.env);
+  const now = Math.floor(Date.now() / 1000);
+  await db
+    .update(activities)
+    .set({ status: "verified", lastVerifiedAt: now, updatedAt: now })
+    .where(eq(activities.id, c.req.param("id")));
+  return c.json({ ok: true, lastVerifiedAt: now });
 });
 
 app.delete("/activities/:id", async (c) => {
   const db = createDb(c.env);
   await db
     .update(activities)
-    .set({ active: 0, updatedAt: Math.floor(Date.now() / 1000) })
+    .set({ active: 0, status: "inactive", updatedAt: Math.floor(Date.now() / 1000) })
     .where(eq(activities.id, c.req.param("id")));
   return c.json({ ok: true, note: "Soft-deleted (deactivated)." });
 });

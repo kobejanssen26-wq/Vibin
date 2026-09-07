@@ -25,13 +25,13 @@ export function ForgotPassword() {
       title="Reset your password"
       subtitle="We’ll email you a link to set a new one."
       footer={
-        <Link to="/login" className="font-semibold text-grape-600">
+        <Link to="/login" className="font-semibold text-brand-600">
           Back to log in
         </Link>
       }
     >
       {sent ? (
-        <p className="text-sm text-ink-muted">
+        <p className="text-sm text-navy-400">
           If an account exists for <strong>{email}</strong>, a reset link is on
           its way. In development the link is printed to the server console.
         </p>

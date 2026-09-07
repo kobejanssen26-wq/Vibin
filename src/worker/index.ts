@@ -28,7 +28,7 @@ api.use("*", async (c, next) => {
   const mw = cors({
     origin: [c.env.APP_URL, "http://localhost:5173"],
     credentials: true,
-    allowHeaders: ["content-type", "x-mingo-csrf"],
+    allowHeaders: ["content-type", "x-vibin-csrf"],
   });
   return mw(c, next);
 });

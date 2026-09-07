@@ -2,20 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ------------------------------------------------------------------ *
+ *  VIBIN design tokens (mirror of tailwind.config.ts)               *
+ * ------------------------------------------------------------------ */
+:root {
+  --vibin-blue: #3155ff;
+  --vibin-lime: #b8f23d;
+  --vibin-navy: #101426;
+  --vibin-white: #f7f8fc;
+  color-scheme: light;
+}
+
 @layer base {
-  :root {
-    color-scheme: light;
-  }
   html,
   body,
   #root {
     height: 100%;
   }
   body {
-    @apply bg-paper text-ink font-sans antialiased;
+    @apply bg-paper text-navy font-sans antialiased;
     -webkit-tap-highlight-color: transparent;
   }
-  /* respect iOS safe areas for the fixed app chrome */
+  h1,
+  h2,
+  h3 {
+    @apply font-extrabold tracking-tight text-navy;
+  }
+  ::selection {
+    background: var(--vibin-lime);
+    color: var(--vibin-navy);
+  }
   .safe-b {
     padding-bottom: env(safe-area-inset-bottom);
   }
@@ -27,36 +43,79 @@
 @layer components {
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 font-semibold
-      transition active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-grape-500 focus-visible:ring-offset-2;
+      transition-[transform,background-color,box-shadow] duration-150 ease-out
+      active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-paper;
   }
   .btn-primary {
-    @apply btn text-white bg-mingo-gradient shadow-pop;
+    @apply btn bg-brand-500 text-white shadow-pop hover:bg-brand-600;
+  }
+  .btn-lime {
+    @apply btn bg-lime-400 text-navy shadow-lime hover:bg-lime-300;
   }
   .btn-ghost {
-    @apply btn bg-paper-soft text-ink hover:bg-ink/5;
+    @apply btn bg-paper-soft text-navy hover:bg-paper-line;
   }
   .btn-dark {
-    @apply btn bg-ink text-white hover:bg-ink-soft;
+    @apply btn bg-navy text-white hover:bg-navy-800;
+  }
+  .btn-outline {
+    @apply btn border border-paper-line bg-white text-navy hover:border-brand-300 hover:text-brand-600;
   }
   .field {
-    @apply w-full rounded-2xl border border-ink/10 bg-white px-4 py-3 text-ink
-      placeholder:text-ink-muted/60 focus:border-grape-400 focus:outline-none
-      focus:ring-2 focus:ring-grape-400/30;
+    @apply w-full rounded-2xl border border-paper-line bg-white px-4 py-3 text-navy
+      placeholder:text-navy-400 transition
+      focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400/25;
   }
   .card {
-    @apply rounded-3xl bg-white shadow-card;
+    @apply rounded-3xl bg-paper-card shadow-card;
   }
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full border border-ink/10 px-3 py-1.5
-      text-sm font-medium;
+    @apply inline-flex items-center gap-1.5 rounded-full border border-paper-line bg-white px-3 py-1.5
+      text-sm font-medium text-navy transition-[background-color,border-color,color,transform] duration-150
+      active:scale-[0.97];
   }
   .chip-on {
-    @apply chip border-transparent bg-mingo-gradient text-white;
+    @apply chip border-transparent bg-brand-500 text-white;
+  }
+  .chip-lime {
+    @apply chip border-transparent bg-lime-400 text-navy;
+  }
+  .skeleton {
+    @apply relative overflow-hidden rounded-2xl bg-paper-soft;
+  }
+  .skeleton::after {
+    content: "";
+    @apply absolute inset-0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.65),
+      transparent
+    );
+    transform: translateX(-100%);
+    animation: shimmer 1.6s infinite;
   }
 }
 
-/* swipe card physics helper */
+/* swipe stack perspective */
 .swipe-stack {
-  perspective: 1000px;
+  perspective: 1200px;
+}
+
+/* ------------------------------------------------------------------ *
+ *  Reduced motion — strip non-essential animation & transitions      *
+ * ------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .skeleton::after {
+    display: none;
+  }
 }

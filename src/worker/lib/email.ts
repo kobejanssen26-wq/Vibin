@@ -30,7 +30,7 @@ export async function sendEmail(env: Env, msg: OutboundEmail): Promise<void> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: env.EMAIL_FROM ?? "Mingo <hello@mingo.app>",
+      from: env.EMAIL_FROM ?? "VIBIN <hello@vibin.be>",
       to: msg.to,
       subject: msg.subject,
       text: msg.text,
@@ -43,9 +43,9 @@ export async function sendEmail(env: Env, msg: OutboundEmail): Promise<void> {
 }
 
 export function verifyEmailBody(url: string): OutboundEmail["text"] {
-  return `Welcome to Mingo!\n\nConfirm your email address to finish setting up your account:\n${url}\n\nThis link expires in 24 hours. If you didn't sign up, ignore this message.`;
+  return `Welcome to VIBIN!\n\nConfirm your email address to finish setting up your account:\n${url}\n\nThis link expires in 24 hours. If you didn't sign up, ignore this message.`;
 }
 
 export function resetEmailBody(url: string): OutboundEmail["text"] {
-  return `Someone (hopefully you) asked to reset your Mingo password.\n\nReset it here:\n${url}\n\nThis link expires in 1 hour. If you didn't request this, ignore this message — your password won't change.`;
+  return `Someone (hopefully you) asked to reset your VIBIN password.\n\nReset it here:\n${url}\n\nThis link expires in 1 hour. If you didn't request this, ignore this message — your password won't change.`;
 }

@@ -8,8 +8,8 @@ function J($o) { $o | ConvertTo-Json -Depth 8 -Compress }
 $sess = New-Object Microsoft.PowerShell.Commands.WebRequestSession
 function Req($method, $path, $body) {
   $headers = @{}
-  $csrf = ($sess.Cookies.GetCookies("http://127.0.0.1:8787") | Where-Object Name -eq "mingo_csrf").Value
-  if ($csrf) { $headers["x-mingo-csrf"] = $csrf }
+  $csrf = ($sess.Cookies.GetCookies("http://127.0.0.1:8787") | Where-Object Name -eq "vibin_csrf").Value
+  if ($csrf) { $headers["x-vibin-csrf"] = $csrf }
   $args = @{ Uri = "$base$path"; Method = $method; WebSession = $sess; Headers = $headers; ContentType = "application/json" }
   if ($body -ne $null) { $args.Body = (J $body) }
   Invoke-RestMethod @args

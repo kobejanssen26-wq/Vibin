@@ -48,7 +48,7 @@ export function PlanView() {
     const url = `${location.origin}/plans/${plan.id}`;
     if (navigator.share) {
       try {
-        await navigator.share({ title: `Mingo plan: ${a.title}`, url });
+        await navigator.share({ title: `VIBIN plan: ${a.title}`, url });
       } catch {
         /* cancelled */
       }
@@ -60,7 +60,7 @@ export function PlanView() {
   return (
     <div className="space-y-5">
       <div>
-        <Link to={`/groups/${plan.groupId}`} className="text-sm text-ink-muted">
+        <Link to={`/groups/${plan.groupId}`} className="text-sm text-navy-400">
           ← {plan.groupName}
         </Link>
         <div className="mt-1 flex items-center gap-2">
@@ -73,13 +73,13 @@ export function PlanView() {
         {a.imageUrl ? (
           <img src={a.imageUrl} alt="" className="h-44 w-full object-cover" />
         ) : (
-          <div className="grid h-44 w-full place-items-center bg-mingo-gradient text-6xl">
+          <div className="grid h-44 w-full place-items-center bg-vibin-blue text-6xl">
             {a.categoryIcon}
           </div>
         )}
         <div className="space-y-2 p-4">
           <h2 className="text-xl font-extrabold">{a.title}</h2>
-          <p className="text-sm text-ink-muted">{a.description}</p>
+          <p className="text-sm text-navy-400">{a.description}</p>
           <div className="grid grid-cols-1 gap-1 pt-1 text-sm">
             <Row icon="📍" text={plan.locationLabel} />
             <Row icon="📅" text={formatWhen(plan.startsAt)} />
@@ -142,7 +142,7 @@ export function PlanView() {
         </Link>
       </div>
 
-      <p className="rounded-2xl bg-paper-soft px-4 py-3 text-xs text-ink-muted">
+      <p className="rounded-2xl bg-paper-soft px-4 py-3 text-xs text-navy-400">
         {a.availabilityNote}
       </p>
 
@@ -169,12 +169,12 @@ function ReportLink({
 }) {
   const [sent, setSent] = useState(false);
   return sent ? (
-    <p className="text-center text-xs text-ink-muted">
+    <p className="text-center text-xs text-navy-400">
       Thanks — we’ll review it.
     </p>
   ) : (
     <button
-      className="w-full text-center text-xs text-ink-muted underline"
+      className="w-full text-center text-xs text-navy-400 underline"
       onClick={async () => {
         const detail = prompt("What's wrong with this activity’s info?");
         if (detail == null) return;

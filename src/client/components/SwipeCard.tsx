@@ -1,23 +1,26 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { ActivityDTO } from "@shared/types";
 import { CATEGORY_ICON } from "@shared/constants";
 
 export type SwipeDir = "like" | "nope" | "superlike";
 
 const CATEGORY_BG: Record<string, string> = {
-  sport: "from-coral-400 to-tangerine-500",
-  adventure: "from-tangerine-400 to-coral-500",
-  food_drinks: "from-coral-400 to-grape-500",
-  nightlife: "from-grape-500 to-ink",
-  creative: "from-grape-400 to-coral-400",
-  relaxation: "from-tangerine-400 to-grape-400",
-  culture: "from-grape-500 to-coral-500",
-  nature: "from-emerald-400 to-tangerine-400",
-  gaming: "from-grape-600 to-coral-500",
-  entertainment: "from-coral-500 to-grape-600",
-  learning: "from-tangerine-500 to-grape-500",
-  other: "from-coral-400 to-grape-500",
+  sport: "from-brand-500 to-brand-700",
+  adventure: "from-brand-600 to-navy-800",
+  food_drinks: "from-brand-500 to-navy-700",
+  nightlife: "from-navy-800 to-brand-700",
+  creative: "from-brand-500 to-brand-400",
+  relaxation: "from-brand-400 to-brand-600",
+  culture: "from-navy-700 to-brand-600",
+  nature: "from-brand-600 to-lime-500",
+  gaming: "from-navy-800 to-brand-600",
+  entertainment: "from-brand-500 to-navy-800",
+  learning: "from-brand-600 to-brand-400",
+  other: "from-brand-500 to-navy-700",
 };
+
+const THRESHOLD = 108;
+const VELOCITY = 0.55; // px per ms
 
 export function SwipeCard({
   activity,
@@ -33,16 +36,39 @@ export function SwipeCard({
   offset?: number;
 }) {
   const [drag, setDrag] = useState({ x: 0, y: 0, active: false });
-  const start = useRef<{ x: number; y: number } | null>(null);
+  const [exit, setExit] = useState<{ x: number; y: number; r: number } | null>(
+    null,
+  );
+  const start = useRef<{ x: number; y: number; t: number } | null>(null);
+  const last = useRef<{ x: number; t: number } | null>(null);
+  const vx = useRef(0);
+
+  const fling = useCallback(
+    (dir: SwipeDir) => {
+      const dx = dir === "nope" ? -700 : dir === "like" ? 700 : 0;
+      const dy = dir === "superlike" ? -800 : -40;
+      setExit({ x: dx, y: dy, r: dx / 12 });
+      setDrag({ x: 0, y: 0, active: false });
+      window.setTimeout(() => onSwipe?.(dir), 220);
+    },
+    [onSwipe],
+  );
 
   const onDown = (e: React.PointerEvent) => {
-    if (!interactive) return;
+    if (!interactive || exit) return;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    start.current = { x: e.clientX, y: e.clientY };
+    start.current = { x: e.clientX, y: e.clientY, t: performance.now() };
+    last.current = { x: e.clientX, t: performance.now() };
     setDrag((d) => ({ ...d, active: true }));
   };
   const onMove = (e: React.PointerEvent) => {
     if (!start.current) return;
+    const now = performance.now();
+    if (last.current) {
+      const dt = now - last.current.t || 16;
+      vx.current = (e.clientX - last.current.x) / dt;
+    }
+    last.current = { x: e.clientX, t: now };
     setDrag({
       x: e.clientX - start.current.x,
       y: e.clientY - start.current.y,
@@ -53,25 +79,35 @@ export function SwipeCard({
     if (!start.current) return;
     const { x, y } = drag;
     start.current = null;
-    if (x > 120) onSwipe?.("like");
-    else if (x < -120) onSwipe?.("nope");
-    else if (y < -140) onSwipe?.("superlike");
-    setDrag({ x: 0, y: 0, active: false });
+    const fast = Math.abs(vx.current) > VELOCITY;
+    if (x > THRESHOLD || (fast && vx.current > 0)) fling("like");
+    else if (x < -THRESHOLD || (fast && vx.current < 0)) fling("nope");
+    else if (y < -THRESHOLD * 1.3) fling("superlike");
+    else setDrag({ x: 0, y: 0, active: false }); // spring back
   };
 
-  const rot = drag.x / 18;
-  const likeOp = Math.max(0, Math.min(1, drag.x / 120));
-  const nopeOp = Math.max(0, Math.min(1, -drag.x / 120));
-  const superOp = Math.max(0, Math.min(1, -drag.y / 140));
+  const pos = exit ?? drag;
+  const rot = exit ? exit.r : drag.x / 16;
+  const likeOp = Math.max(0, Math.min(1, pos.x / THRESHOLD));
+  const nopeOp = Math.max(0, Math.min(1, -pos.x / THRESHOLD));
+  const superOp = Math.max(0, Math.min(1, -pos.y / (THRESHOLD * 1.3)));
+
+  const transition = exit
+    ? "transform 0.24s cubic-bezier(0.4, 0, 1, 1), opacity 0.24s ease"
+    : drag.active
+      ? "none"
+      : "transform 0.4s cubic-bezier(0.22, 1.4, 0.4, 1)"; // springy snap-back
 
   return (
     <div
       className="absolute inset-0 select-none"
       style={{
         zIndex: z,
-        transform: `translate(${drag.x}px, ${drag.y + offset}px) rotate(${rot}deg) scale(${1 - offset / 900})`,
-        transition: drag.active ? "none" : "transform 0.35s cubic-bezier(.22,1,.36,1)",
+        transform: `translate(${pos.x}px, ${pos.y + offset}px) rotate(${rot}deg) scale(${1 - offset / 1100})`,
+        opacity: exit ? 0 : 1,
+        transition,
         touchAction: "none",
+        cursor: interactive ? (drag.active ? "grabbing" : "grab") : "default",
       }}
       onPointerDown={onDown}
       onPointerMove={onMove}
@@ -79,73 +115,108 @@ export function SwipeCard({
       onPointerCancel={onUp}
     >
       <article className="card relative h-full overflow-hidden">
-        <div className="relative h-[58%] w-full overflow-hidden">
+        {/* edge glow feedback */}
+        <div
+          className="pointer-events-none absolute inset-0 z-10 rounded-3xl ring-4 ring-inset ring-brand-500 transition-opacity"
+          style={{ opacity: likeOp * 0.9 }}
+        />
+        <div
+          className="pointer-events-none absolute inset-0 z-10 rounded-3xl ring-4 ring-inset ring-navy transition-opacity"
+          style={{ opacity: nopeOp * 0.9 }}
+        />
+        <div
+          className="pointer-events-none absolute inset-0 z-10 rounded-3xl ring-4 ring-inset ring-lime-400 transition-opacity"
+          style={{ opacity: superOp * 0.9 }}
+        />
+
+        <div className="relative h-[56%] w-full overflow-hidden">
           {activity.imageUrl ? (
             <img
               src={activity.imageUrl}
-              alt=""
+              alt={activity.title}
               className="h-full w-full object-cover"
               draggable={false}
+              loading="lazy"
             />
           ) : (
             <div
-              className={`h-full w-full bg-gradient-to-br ${
+              className={`grid h-full w-full place-items-center bg-gradient-to-br ${
                 CATEGORY_BG[activity.category] ?? CATEGORY_BG.other
-              } grid place-items-center text-7xl`}
+              } text-7xl`}
             >
               {CATEGORY_ICON[activity.category] ?? "✨"}
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent" />
-          <span className="chip absolute left-3 top-3 border-white/30 bg-white/85 backdrop-blur">
+          <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-navy via-navy/70 to-transparent" />
+          <span className="chip absolute left-3 top-3 border-white/20 bg-white/90 backdrop-blur">
             {activity.categoryIcon} {activity.categoryLabel}
           </span>
 
-          <Stamp text="LIKE" color="text-emerald-400 border-emerald-400" op={likeOp} rotate={-14} pos="left-4 top-6" />
-          <Stamp text="NOPE" color="text-coral-500 border-coral-500" op={nopeOp} rotate={14} pos="right-4 top-6" />
-          <Stamp text="SUPER" color="text-grape-400 border-grape-400" op={superOp} rotate={-8} pos="left-1/2 -translate-x-1/2 bottom-6" />
+          <Stamp text="YES" cls="text-brand-500 border-brand-500" op={likeOp} rotate={-13} pos="left-4 top-6" />
+          <Stamp text="PASS" cls="text-navy border-navy" op={nopeOp} rotate={13} pos="right-4 top-6" />
+          <Stamp text="LOVE IT" cls="text-lime-500 border-lime-500" op={superOp} rotate={-7} pos="left-1/2 -translate-x-1/2 bottom-6" />
 
           <div className="absolute bottom-3 left-3 right-3 text-white">
-            <h2 className="text-2xl font-extrabold leading-tight drop-shadow">
+            <h2 className="text-2xl font-extrabold leading-tight drop-shadow-sm">
               {activity.title}
             </h2>
-            <p className="text-sm opacity-90">📍 {activity.locationLabel}</p>
+            <p className="text-sm opacity-90">
+              📍 {activity.locationLabel}
+              {activity.distanceKm != null && ` · ${activity.distanceKm} km`}
+            </p>
           </div>
         </div>
 
-        <div className="flex h-[42%] flex-col gap-2 p-4">
-          <div className="flex flex-wrap gap-2 text-sm font-medium text-ink-soft">
-            <span className="chip">💰 {activity.priceLabel}</span>
+        <div className="flex h-[44%] flex-col gap-2 p-4">
+          <div className="flex flex-wrap gap-2 text-sm font-medium text-navy-700">
+            <span className="chip">💶 {activity.priceLabel}</span>
             {activity.durationMin && (
-              <span className="chip">⏱️ {Math.round(activity.durationMin / 15) * 15} min</span>
+              <span className="chip">⏱️ {formatDuration(activity.durationMin)}</span>
             )}
-            {activity.minAge && <span className="chip">🔞 {activity.minAge}+</span>}
+            {activity.indoorOutdoor && (
+              <span className="chip">
+                {activity.indoorOutdoor === "indoor" ? "🏠 Indoor" : activity.indoorOutdoor === "outdoor" ? "🌳 Outdoor" : "🏠🌳 Both"}
+              </span>
+            )}
+            {activity.minAge ? <span className="chip">🔞 {activity.minAge}+</span> : null}
           </div>
-          <p className="line-clamp-4 text-sm leading-relaxed text-ink-muted">
+          <p className="line-clamp-4 text-sm leading-relaxed text-navy-400">
             {activity.description}
           </p>
+          {activity.provider && (
+            <p className="mt-auto text-xs text-navy-400">
+              by <span className="font-semibold text-navy-700">{activity.provider}</span>
+            </p>
+          )}
         </div>
       </article>
     </div>
   );
 }
 
+function formatDuration(min: number): string {
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m ? `${h} h ${m} min` : `${h} h`;
+}
+
 function Stamp({
   text,
-  color,
+  cls,
   op,
   rotate,
   pos,
 }: {
   text: string;
-  color: string;
+  cls: string;
   op: number;
   rotate: number;
   pos: string;
 }) {
   return (
     <span
-      className={`pointer-events-none absolute ${pos} rounded-lg border-4 px-3 py-1 text-2xl font-extrabold uppercase tracking-wider ${color}`}
+      className={`pointer-events-none absolute ${pos} z-20 rounded-xl border-[3px] bg-white/80 px-3 py-1 text-2xl font-extrabold uppercase tracking-wider backdrop-blur ${cls}`}
       style={{ opacity: op, transform: `rotate(${rotate}deg)` }}
     >
       {text}

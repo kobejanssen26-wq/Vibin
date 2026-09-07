@@ -1,12 +1,11 @@
-/* Rasterises public/favicon.svg into the PWA PNG icons. Run: node scripts/make-icons.mjs
-   Requires `sharp` (a dev dependency). If sharp is unavailable the manifest
-   still works with the SVG icon — these PNGs are a progressive enhancement. */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+/* Rasterises the VIBIN mark into favicon + PWA + OG images.
+   Run: node scripts/make-icons.mjs   (requires the `sharp` dev dependency)
+   If sharp is missing the app still works with the SVG favicon. */
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const svg = readFileSync(join(root, "public/favicon.svg"));
 mkdirSync(join(root, "public/icons"), { recursive: true });
 
 let sharp;
@@ -17,29 +16,58 @@ try {
   process.exit(0);
 }
 
-const targets = [
-  ["icon-192.png", 192, false],
-  ["icon-512.png", 512, false],
-  ["icon-maskable-512.png", 512, true],
-  ["apple-touch-icon.png", 180, false],
-  ["og.png", 1200, false],
-];
+const NAVY = "#101426";
+const BLUE = "#3155ff";
+const LIME = "#b8f23d";
+const WHITE = "#f7f8fc";
 
-for (const [name, size, maskable] of targets) {
-  let img = sharp(svg, { density: 384 }).resize(size, size, {
-    fit: "contain",
-    background: maskable ? "#14101a" : { r: 0, g: 0, b: 0, alpha: 0 },
-  });
-  if (name === "og.png") {
-    img = sharp({
-      create: {
-        width: 1200,
-        height: 630,
-        channels: 4,
-        background: "#14101a",
-      },
-    }).composite([{ input: await sharp(svg, { density: 384 }).resize(360, 360).png().toBuffer(), gravity: "center" }]);
-  }
-  writeFileSync(join(root, "public/icons", name), await img.png().toBuffer());
-  console.log("wrote", name);
+// The V mark, drawn on a 48-box. `pad` shrinks it for maskable safe zone.
+const mark = (box = 48, bg = NAVY, radius = box * 0.25) => `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="${box}" height="${box}">
+  <rect width="48" height="48" rx="${(radius / box) * 48}" fill="${bg}"/>
+  <path d="M9 11h8.6l8.4 20L21.6 41 9 11Z" fill="${BLUE}"/>
+  <path d="M39 11h-8.6L21.6 35.3 25.9 41 39 11Z" fill="${LIME}"/>
+  <circle cx="23.7" cy="37.6" r="3" fill="${WHITE}"/>
+</svg>`;
+
+const maskable = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="512" height="512">
+  <rect width="100" height="100" fill="${NAVY}"/>
+  <g transform="translate(28 28) scale(0.9)">
+    <path d="M9 11h8.6l8.4 20L21.6 41 9 11Z" fill="${BLUE}"/>
+    <path d="M39 11h-8.6L21.6 35.3 25.9 41 39 11Z" fill="${LIME}"/>
+    <circle cx="23.7" cy="37.6" r="3" fill="${WHITE}"/>
+  </g>
+</svg>`;
+
+const og = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <rect width="1200" height="630" fill="${NAVY}"/>
+  <circle cx="120" cy="90" r="420" fill="${BLUE}" opacity="0.16"/>
+  <circle cx="1120" cy="620" r="360" fill="${LIME}" opacity="0.14"/>
+  <g transform="translate(96 210) scale(3.1)">
+    <path d="M9 11h8.6l8.4 20L21.6 41 9 11Z" fill="${BLUE}"/>
+    <path d="M39 11h-8.6L21.6 35.3 25.9 41 39 11Z" fill="${LIME}"/>
+    <circle cx="23.7" cy="37.6" r="3" fill="${WHITE}"/>
+  </g>
+  <text x="270" y="300" font-family="Plus Jakarta Sans, Arial, sans-serif" font-size="120" font-weight="800" fill="${WHITE}" letter-spacing="-3">VIBIN</text>
+  <text x="272" y="372" font-family="Plus Jakarta Sans, Arial, sans-serif" font-size="42" font-weight="600" fill="${LIME}">Find your vibe. Make a plan.</text>
+</svg>`;
+
+async function png(svg, size, out) {
+  const buf = await sharp(Buffer.from(svg)).resize(size).png().toBuffer();
+  writeFileSync(join(root, out), buf);
+  console.log("wrote", out);
 }
+
+await png(mark(512), 512, "public/icons/icon-512.png");
+await png(mark(192), 192, "public/icons/icon-192.png");
+await png(maskable, 512, "public/icons/icon-maskable-512.png");
+await png(mark(180, NAVY, 40), 180, "public/apple-touch-icon.png");
+await png(mark(32), 32, "public/favicon-32.png");
+await png(mark(16), 16, "public/favicon-16.png");
+writeFileSync(
+  join(root, "public/og.png"),
+  await sharp(Buffer.from(og)).png().toBuffer(),
+);
+console.log("wrote public/og.png");

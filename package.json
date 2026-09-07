@@ -1,9 +1,9 @@
 {
-  "name": "mingo",
-  "version": "0.1.0",
+  "name": "vibin",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
-  "description": "Mingo — a group decision engine for deciding what to do together. Swipe. Match. Do.",
+  "description": "VIBIN — find your vibe, make a plan. Groups swipe on activities and only match when everyone agrees.",
   "engines": {
     "node": ">=20"
   },
@@ -19,13 +19,12 @@
     "test:integration": "node tests/integration.mjs",
     "smoke": "powershell -ExecutionPolicy Bypass -File scripts/smoke.ps1",
     "db:generate": "drizzle-kit generate",
-    "db:migrate:local": "wrangler d1 migrations apply mingo-db --local",
-    "db:migrate:remote": "wrangler d1 migrations apply mingo-db --remote",
+    "db:migrate:local": "wrangler d1 migrations apply vibin-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply vibin-db --remote",
     "db:seed:build": "tsx seed/build-seed.ts",
-    "db:seed:local": "npm run db:seed:build && wrangler d1 execute mingo-db --local --file=./seed/seed.sql",
-    "db:seed:remote": "npm run db:seed:build && wrangler d1 execute mingo-db --remote --file=./seed/seed.sql",
+    "db:seed:local": "npm run db:seed:build && wrangler d1 execute vibin-db --local --file=./seed/seed.sql",
+    "db:seed:remote": "npm run db:seed:build && wrangler d1 execute vibin-db --remote --file=./seed/seed.sql",
     "deploy": "npm run build && wrangler deploy",
-    "deploy:staging": "npm run build && wrangler deploy --env staging",
     "cf-typegen": "wrangler types"
   },
   "dependencies": {

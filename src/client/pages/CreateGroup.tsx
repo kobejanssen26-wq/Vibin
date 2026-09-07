@@ -38,7 +38,7 @@ export function CreateGroup() {
   return (
     <div>
       <h1 className="text-2xl font-extrabold">Name your group</h1>
-      <p className="mt-1 text-sm text-ink-muted">
+      <p className="mt-1 text-sm text-navy-400">
         You can change this later. Next you’ll set what, where and when.
       </p>
 
@@ -63,7 +63,7 @@ export function CreateGroup() {
             </button>
           ))}
         </div>
-        {err && <p className="text-sm font-medium text-coral-600">{err}</p>}
+        {err && <p className="text-sm font-medium text-danger-600">{err}</p>}
         <Button type="submit" loading={busy} className="w-full">
           Create group
         </Button>

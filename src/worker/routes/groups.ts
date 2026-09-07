@@ -269,7 +269,7 @@ app.post("/:id/start", async (c) => {
   await notifyGroup(db, groupId, uid(c), {
     kind: "swiping_started",
     title: `Swiping started in ${group.name}`,
-    body: "Open Mingo and start swiping.",
+    body: "Open VIBIN and start swiping.",
   });
 
   const fresh = await db.query.groups.findFirst({ where: eq(groups.id, groupId) });

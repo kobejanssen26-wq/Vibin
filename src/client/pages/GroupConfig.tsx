@@ -124,7 +124,7 @@ export function GroupConfig() {
     <div className="space-y-7 pb-4">
       <div>
         <h1 className="text-2xl font-extrabold">{group.name}</h1>
-        <p className="text-sm text-ink-muted">Set what, where and when.</p>
+        <p className="text-sm text-navy-400">Set what, where and when.</p>
       </div>
 
       <InviteBox code={group.inviteCode} url={group.inviteUrl} />
@@ -135,14 +135,14 @@ export function GroupConfig() {
         <label className="mb-3 flex items-center gap-3 rounded-2xl bg-paper-soft p-3">
           <input
             type="checkbox"
-            className="h-5 w-5 accent-grape-500"
+            className="h-5 w-5 accent-brand-500"
             checked={draft.allActivities}
             onChange={(e) =>
               setDraft((d) => ({ ...d, allActivities: e.target.checked }))
             }
           />
           <span className="font-semibold">All activities</span>
-          <span className="text-sm text-ink-muted">— don’t restrict by category</span>
+          <span className="text-sm text-navy-400">— don’t restrict by category</span>
         </label>
         <div
           className={`flex flex-wrap gap-2 ${draft.allActivities ? "pointer-events-none opacity-40" : ""}`}
@@ -172,7 +172,7 @@ export function GroupConfig() {
           }
         />
         <div>
-          <span className="mb-1.5 block text-sm font-semibold text-ink-soft">
+          <span className="mb-1.5 block text-sm font-semibold text-navy-700">
             Radius
           </span>
           <div className="flex flex-wrap gap-2">
@@ -215,15 +215,15 @@ export function GroupConfig() {
           onClick={() =>
             setDraft((d) => ({ ...d, dateMode: "unknown", dateSpecific: null }))
           }
-          className={`mb-3 w-full rounded-2xl border-2 p-3 text-left font-semibold transition ${
+          className={`mb-3 w-full rounded-2xl border-2 p-3.5 text-left font-semibold transition ${
             draft.dateMode === "unknown"
-              ? "border-grape-500 bg-grape-500/5"
-              : "border-ink/10"
+              ? "border-brand-500 bg-brand-500/5"
+              : "border-paper-line hover:border-brand-300"
           }`}
         >
           🤷 We don’t know when yet
-          <span className="block text-sm font-normal text-ink-muted">
-            Mingo will run a date vote after you match an activity.
+          <span className="block text-sm font-normal text-navy-400">
+            VIBIN runs a quick date vote after you match an activity.
           </span>
         </button>
         <div className="flex flex-wrap gap-2">
@@ -283,7 +283,7 @@ export function GroupConfig() {
         </section>
       )}
 
-      {err && <p className="text-sm font-medium text-coral-600">{err}</p>}
+      {err && <p className="text-sm font-medium text-danger-600">{err}</p>}
 
       <div className="sticky bottom-4 space-y-2 rounded-2xl bg-paper/80 p-1 backdrop-blur">
         <Button
@@ -295,7 +295,7 @@ export function GroupConfig() {
           Save & start swiping →
         </Button>
         <button
-          className="w-full text-center text-sm text-ink-muted"
+          className="w-full text-center text-sm text-navy-400"
           onClick={async () => {
             if (await save()) nav(`/groups/${id}`);
           }}

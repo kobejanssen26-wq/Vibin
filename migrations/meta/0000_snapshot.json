@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "3a5933a7-6558-4499-bcda-0394dc69eba0",
+  "id": "3fe498a2-14e1-48d2-9b6a-68b3cf80b420",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "activities": {
@@ -50,12 +50,55 @@
           "notNull": true,
           "autoincrement": false
         },
+        "subcategory": {
+          "name": "subcategory",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "provider_website": {
+          "name": "provider_website",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "location_label": {
           "name": "location_label",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "address": {
+          "name": "address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "city": {
+          "name": "city",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "country": {
+          "name": "country",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'BE'"
         },
         "lat": {
           "name": "lat",
@@ -78,6 +121,14 @@
           "notNull": false,
           "autoincrement": false
         },
+        "price_type": {
+          "name": "price_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'per_person'"
+        },
         "price_band": {
           "name": "price_band",
           "type": "text",
@@ -96,6 +147,41 @@
         "duration_min": {
           "name": "duration_min",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "min_participants": {
+          "name": "min_participants",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "max_participants": {
+          "name": "max_participants",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "min_age": {
+          "name": "min_age",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "indoor_outdoor": {
+          "name": "indoor_outdoor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "accessibility": {
+          "name": "accessibility",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -129,15 +215,22 @@
           "notNull": false,
           "autoincrement": false
         },
-        "min_age": {
-          "name": "min_age",
-          "type": "integer",
+        "image_url": {
+          "name": "image_url",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "image_url": {
-          "name": "image_url",
+        "image_source": {
+          "name": "image_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "image_attribution": {
+          "name": "image_attribution",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -158,6 +251,28 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'seed'"
+        },
+        "source_url": {
+          "name": "source_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "last_verified_at": {
+          "name": "last_verified_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'needs_review'"
         },
         "active": {
           "name": "active",
@@ -196,6 +311,20 @@
           "name": "activities_active_idx",
           "columns": [
             "active"
+          ],
+          "isUnique": false
+        },
+        "activities_status_idx": {
+          "name": "activities_status_idx",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        },
+        "activities_city_idx": {
+          "name": "activities_city_idx",
+          "columns": [
+            "city"
           ],
           "isUnique": false
         },

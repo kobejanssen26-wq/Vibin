@@ -24,13 +24,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="mx-auto flex min-h-full max-w-md flex-col bg-paper">
-      <header className="safe-t sticky top-0 z-30 flex items-center justify-between border-b border-ink/5 bg-paper/90 px-4 py-3 backdrop-blur">
-        <Link to="/app" aria-label="Mingo home">
+      <header className="safe-t sticky top-0 z-30 flex items-center justify-between border-b border-navy/5 bg-paper/90 px-4 py-3 backdrop-blur">
+        <Link to="/app" aria-label="VIBIN home" className="transition-transform active:scale-95">
           <Wordmark />
         </Link>
         <div className="flex items-center gap-1">
           <button
-            className="relative rounded-full p-2 hover:bg-ink/5"
+            className="relative rounded-full p-2 hover:bg-navy/5"
             onClick={() => {
               setBell((v) => !v);
               if (!bell && data?.unread) void markRead();
@@ -39,7 +39,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             <span className="text-lg">🔔</span>
             {!!data?.unread && (
-              <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-coral-500 px-1 text-[10px] font-bold text-white">
+              <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-danger-500 px-1 text-[10px] font-bold text-white">
                 {data.unread}
               </span>
             )}
@@ -54,8 +54,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       {bell && (
-        <div className="border-b border-ink/5 bg-white px-4 py-2">
-          <p className="mb-1 text-xs font-bold uppercase tracking-wide text-ink-muted">
+        <div className="border-b border-navy/5 bg-white px-4 py-2">
+          <p className="mb-1 text-xs font-bold uppercase tracking-wide text-navy-400">
             Notifications
           </p>
           {data?.notifications.length ? (
@@ -64,22 +64,22 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <li key={n.id} className="text-sm">
                   <span className="font-semibold">{n.title}</span>
                   {n.body && (
-                    <span className="block text-ink-muted">{n.body}</span>
+                    <span className="block text-navy-400">{n.body}</span>
                   )}
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="py-2 text-sm text-ink-muted">Nothing yet.</p>
+            <p className="py-2 text-sm text-navy-400">Nothing yet.</p>
           )}
         </div>
       )}
 
       {menu && (
-        <div className="border-b border-ink/5 bg-white px-4 py-2 text-sm">
+        <div className="border-b border-navy/5 bg-white px-4 py-2 text-sm">
           <NavLink
             to="/settings"
-            className="block rounded-lg px-2 py-2 hover:bg-ink/5"
+            className="block rounded-lg px-2 py-2 hover:bg-navy/5"
             onClick={() => setMenu(false)}
           >
             Profile & settings
@@ -87,14 +87,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           {user?.role === "admin" && (
             <NavLink
               to="/admin"
-              className="block rounded-lg px-2 py-2 hover:bg-ink/5"
+              className="block rounded-lg px-2 py-2 hover:bg-navy/5"
               onClick={() => setMenu(false)}
             >
               Admin
             </NavLink>
           )}
           <button
-            className="block w-full rounded-lg px-2 py-2 text-left text-coral-600 hover:bg-ink/5"
+            className="block w-full rounded-lg px-2 py-2 text-left text-danger-600 hover:bg-navy/5"
             onClick={async () => {
               await logout();
               nav("/");

@@ -36,7 +36,7 @@ export function Signup() {
       footer={
         <>
           Already have one?{" "}
-          <Link to="/login" className="font-semibold text-grape-600">
+          <Link to="/login" className="font-semibold text-brand-600">
             Log in
           </Link>
         </>
@@ -69,11 +69,11 @@ export function Signup() {
           value={form.password}
           onChange={(e) => setForm({ ...form, password: e.target.value })}
         />
-        {err && <p className="text-sm font-medium text-coral-600">{err}</p>}
+        {err && <p className="text-sm font-medium text-danger-600">{err}</p>}
         <Button type="submit" loading={busy} className="w-full">
           Create account
         </Button>
-        <p className="text-center text-xs text-ink-muted">
+        <p className="text-center text-xs text-navy-400">
           By continuing you agree to our{" "}
           <Link to="/terms" className="underline">
             Terms

@@ -5,11 +5,11 @@ import type { GroupSummaryDTO } from "@shared/types";
 import { formatWhen } from "../lib/format";
 
 const STATUS_LABEL: Record<string, { label: string; tone: string }> = {
-  configuring: { label: "Setting up", tone: "bg-tangerine-400/15 text-tangerine-600" },
-  swiping: { label: "Swiping", tone: "bg-coral-400/15 text-coral-600" },
-  date_matching: { label: "Picking a date", tone: "bg-grape-400/15 text-grape-600" },
-  planned: { label: "Planned 🎉", tone: "bg-emerald-400/15 text-emerald-600" },
-  archived: { label: "Archived", tone: "bg-ink/10 text-ink-muted" },
+  configuring: { label: "Setting up", tone: "bg-amber-400/15 text-amber-600" },
+  swiping: { label: "Swiping", tone: "bg-brand-500/10 text-brand-600" },
+  date_matching: { label: "Picking a date", tone: "bg-brand-500/10 text-brand-600" },
+  planned: { label: "Planned", tone: "bg-lime-400/25 text-lime-700" },
+  archived: { label: "Archived", tone: "bg-navy/10 text-navy-400" },
 };
 
 export function Dashboard() {
@@ -52,28 +52,28 @@ export function Dashboard() {
                       {s.label}
                     </span>
                   </div>
-                  <p className="mt-1 text-sm text-ink-muted">
+                  <p className="mt-1 text-sm text-navy-400">
                     {g.activeMemberCount} member{g.activeMemberCount === 1 ? "" : "s"}
                     {g.matchCount > 0 && ` · ${g.matchCount} match${g.matchCount === 1 ? "" : "es"}`}
                     {!g.dateKnown && g.status === "swiping" && " · date TBD"}
                   </p>
                   {g.progress && (
                     <div className="mt-3">
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-ink/10">
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-navy/10">
                         <div
-                          className="h-full rounded-full bg-mingo-gradient transition-all"
+                          className="h-full rounded-full bg-vibin-blue transition-all"
                           style={{
                             width: `${g.progress.total ? (g.progress.voted / g.progress.total) * 100 : 0}%`,
                           }}
                         />
                       </div>
-                      <p className="mt-1 text-xs text-ink-muted">
+                      <p className="mt-1 text-xs text-navy-400">
                         {g.progress.voted} / {g.progress.total} voted on the current card
                       </p>
                     </div>
                   )}
                   {g.upcomingPlan && (
-                    <p className="mt-2 rounded-xl bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-700">
+                    <p className="mt-2 rounded-xl bg-lime-400/15 px-3 py-2 text-xs font-semibold text-lime-700">
                       Next: {g.upcomingPlan.activity.title} ·{" "}
                       {formatWhen(g.upcomingPlan.startsAt)}
                     </p>
@@ -85,9 +85,9 @@ export function Dashboard() {
         </ul>
       )}
 
-      <div className="mt-8 rounded-2xl border border-dashed border-ink/15 p-4 text-center text-sm text-ink-muted">
+      <div className="mt-8 rounded-2xl border border-dashed border-navy/15 p-4 text-center text-sm text-navy-400">
         Got an invite link? Just open it — it looks like{" "}
-        <code className="rounded bg-ink/5 px-1">mingo.app/join/ABC123</code>
+        <code className="rounded bg-navy/5 px-1">vibin.be/join/ABC123</code>
       </div>
     </div>
   );

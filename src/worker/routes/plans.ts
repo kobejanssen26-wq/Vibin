@@ -71,7 +71,7 @@ app.get("/plans/:planId/calendar.ics", async (c) => {
   return new Response(ics, {
     headers: {
       "content-type": "text/calendar; charset=utf-8",
-      "content-disposition": `attachment; filename="mingo-plan-${plan.id}.ics"`,
+      "content-disposition": `attachment; filename="vibin-plan-${plan.id}.ics"`,
     },
   });
 });

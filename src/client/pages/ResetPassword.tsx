@@ -32,7 +32,7 @@ export function ResetPassword() {
   return (
     <AuthLayout title="Choose a new password">
       {!token ? (
-        <p className="text-sm text-coral-600">
+        <p className="text-sm text-danger-600">
           This link is missing its token. Request a new one from{" "}
           <Link to="/forgot-password" className="underline">
             here
@@ -40,7 +40,7 @@ export function ResetPassword() {
           .
         </p>
       ) : done ? (
-        <p className="text-sm text-ink-muted">
+        <p className="text-sm text-navy-400">
           Password updated. Redirecting you to log in…
         </p>
       ) : (
@@ -54,7 +54,7 @@ export function ResetPassword() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          {err && <p className="text-sm font-medium text-coral-600">{err}</p>}
+          {err && <p className="text-sm font-medium text-danger-600">{err}</p>}
           <Button type="submit" loading={busy} className="w-full">
             Update password
           </Button>

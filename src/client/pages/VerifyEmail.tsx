@@ -43,12 +43,12 @@ export function VerifyEmail() {
             : "Verifying…"
       }
       footer={
-        <Link to="/app" className="font-semibold text-grape-600">
-          Go to Mingo
+        <Link to="/app" className="font-semibold text-brand-600">
+          Go to VIBIN
         </Link>
       }
     >
-      <p className="text-sm text-ink-muted">
+      <p className="text-sm text-navy-400">
         {state === "ok"
           ? "Your email address is confirmed. You're all set."
           : state === "error"
