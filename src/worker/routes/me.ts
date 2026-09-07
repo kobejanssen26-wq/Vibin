@@ -16,7 +16,7 @@ import {
 } from "../db/schema";
 import { parseBody } from "../lib/validate";
 import { loadMe } from "../lib/me";
-import { badRequest, notFound } from "../lib/errors";
+import { AppError, badRequest, notFound } from "../lib/errors";
 import { verifyPassword } from "../lib/password";
 import { destroyAllSessions } from "../lib/session";
 import { clearSessionCookie } from "../lib/cookies";
@@ -58,6 +58,13 @@ app.patch("/", async (c) => {
 });
 
 app.post("/avatar", async (c) => {
+  if (!c.env.MEDIA) {
+    throw new AppError(
+      503,
+      "unavailable",
+      "Photo uploads aren't enabled on this deployment yet.",
+    );
+  }
   const form = await c.req.formData();
   const file = form.get("file");
   if (!(file instanceof File)) throw badRequest("No file uploaded.");
@@ -67,7 +74,7 @@ app.post("/avatar", async (c) => {
   }
   const ext = file.type.split("/")[1]!.replace("jpeg", "jpg");
   const key = `avatars/${uid(c)}/${newId()}.${ext}`;
-  await c.env.MEDIA.put(key, await file.arrayBuffer(), {
+  await c.env.MEDIA!.put(key, await file.arrayBuffer(), {
     httpMetadata: { contentType: file.type },
   });
   const db = createDb(c.env);

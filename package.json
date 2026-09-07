@@ -21,9 +21,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply mingo-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply mingo-db --remote",
-    "db:seed:local": "wrangler d1 execute mingo-db --local --file=./seed/seed.sql",
-    "db:seed:remote": "wrangler d1 execute mingo-db --remote --file=./seed/seed.sql",
     "db:seed:build": "tsx seed/build-seed.ts",
+    "db:seed:local": "npm run db:seed:build && wrangler d1 execute mingo-db --local --file=./seed/seed.sql",
+    "db:seed:remote": "npm run db:seed:build && wrangler d1 execute mingo-db --remote --file=./seed/seed.sql",
     "deploy": "npm run build && wrangler deploy",
     "deploy:staging": "npm run build && wrangler deploy --env staging",
     "cf-typegen": "wrangler types"

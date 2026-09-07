@@ -15,9 +15,14 @@ worker-configuration.d.ts
 .env.*
 !.env.example
 
-# logs
+# logs & transient
 *.log
 npm-debug.log*
+.tail.*
+.wdev.*
+
+# generated from seed/activities.ts by `npm run db:seed:build`
+seed/seed.sql
 
 # editor / os
 .DS_Store

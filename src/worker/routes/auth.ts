@@ -133,7 +133,7 @@ app.post("/login", async (c) => {
   // Always run a hash to blunt user-enumeration timing.
   const stored =
     user?.passwordHash ??
-    "pbkdf2$210000$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+    "pbkdf2$100000x6$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
   const { ok, needsRehash } = await verifyPassword(body.password, stored);
 
   if (!user || !ok || user.status !== "active") {

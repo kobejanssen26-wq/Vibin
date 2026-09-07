@@ -9,8 +9,12 @@ const app = new Hono<Ctx>();
  * Serves objects from the R2 media bucket (avatars, uploaded activity images).
  * Public read is fine — keys are unguessable nanoids — but we only expose the
  * `avatars/` and `activities/` prefixes and always send safe headers.
+ *
+ * When R2 isn't bound (not enabled on the account) this just 404s; the app
+ * falls back to initials everywhere an avatar would appear.
  */
 app.get("/:key{.+}", async (c) => {
+  if (!c.env.MEDIA) throw notFound();
   const key = c.req.param("key");
   if (!/^(avatars|activities)\//.test(key)) throw notFound();
 

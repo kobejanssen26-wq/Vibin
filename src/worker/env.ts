@@ -3,7 +3,8 @@ export interface Env {
   // --- bindings (wrangler.jsonc) ---
   DB: D1Database;
   KV: KVNamespace;
-  MEDIA: R2Bucket;
+  /** Optional — only bound when R2 is enabled on the account. */
+  MEDIA?: R2Bucket;
   ASSETS: Fetcher;
 
   // --- vars ---
@@ -11,7 +12,8 @@ export interface Env {
   APP_URL: string;
 
   // --- secrets (wrangler secret put / .dev.vars) ---
-  AUTH_SECRET: string;
+  /** Reserved for signed tokens (not yet used — sessions are opaque + KV-backed). */
+  AUTH_SECRET?: string;
   EMAIL_API_KEY?: string;
   EMAIL_FROM?: string;
 }

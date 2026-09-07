@@ -15,6 +15,10 @@ calendar invite and a booking link where one exists.
 
 There is **no discovery feed**. The swipe is the product.
 
+> **Live:** https://mingo.kobe-janssen26.workers.dev — deployed on Cloudflare
+> Workers + D1 (region WEUR). Installable as a PWA (open on a phone → *Add to
+> Home Screen*). Redeploy with `npm run deploy`.
+
 ---
 
 ## Contents
@@ -330,6 +334,16 @@ unanimous acceptance, `no_consensus` never auto-picking an excluding date, IDOR
 - Push notifications are stored in-app only (no web-push / APNs yet).
 - Admin UI is intentionally minimal (stats, activity activate/deactivate, reports).
 - Legal pages are templates — have them reviewed before a public launch.
+- **Password hashing** is PBKDF2 with 6 chained 100k-iteration rounds (~600k
+  effective). The Workers runtime caps a single PBKDF2 call at 100k, hence the
+  chaining. Consider moving hashing to a Durable Object for a stronger KDF later.
+- **Photo uploads (R2)** are disabled on the live deploy because R2 isn't
+  enabled on the account. The app shows initials everywhere instead. To turn it
+  on: enable R2 in the Cloudflare dashboard, `wrangler r2 bucket create
+  mingo-media`, add the `r2_buckets` binding to `wrangler.jsonc`, redeploy.
+- The `*.workers.dev` URL works everywhere but won't rank on Google. For
+  discoverability, add a custom domain (Workers → Settings → Domains) and submit
+  the sitemap in Google Search Console.
 
 **Recommended next steps:**
 

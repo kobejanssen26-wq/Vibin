@@ -4,6 +4,7 @@
   "main": "src/worker/index.ts",
   "compatibility_date": "2024-12-05",
   "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
   "alias": {
     "@shared/constants": "./src/shared/constants.ts",
     "@shared/types": "./src/shared/types.ts"
@@ -13,78 +14,27 @@
     "binding": "ASSETS",
     "not_found_handling": "single-page-application"
   },
-  "observability": {
-    "enabled": true
-  },
-  "placement": {
-    "mode": "smart"
-  },
+  "observability": { "enabled": true },
+  "placement": { "mode": "smart" },
   "vars": {
-    "APP_ENV": "development",
-    "APP_URL": "http://localhost:5173"
+    "APP_ENV": "production",
+    "APP_URL": "https://mingo.kobe-janssen26.workers.dev"
   },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "mingo-db",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "database_id": "0297a11a-8d19-4383-9cc3-cb720fd961ce",
       "migrations_dir": "migrations"
     }
   ],
   "kv_namespaces": [
     {
       "binding": "KV",
-      "id": "REPLACE_WITH_KV_NAMESPACE_ID"
+      "id": "e229485391af448aab97480e565a7e1d"
     }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "MEDIA",
-      "bucket_name": "mingo-media"
-    }
-  ],
-  "env": {
-    "staging": {
-      "name": "mingo-staging",
-      "vars": {
-        "APP_ENV": "staging",
-        "APP_URL": "https://staging.mingo.app"
-      },
-      "d1_databases": [
-        {
-          "binding": "DB",
-          "database_name": "mingo-db-staging",
-          "database_id": "REPLACE_WITH_STAGING_D1_DATABASE_ID",
-          "migrations_dir": "migrations"
-        }
-      ],
-      "kv_namespaces": [
-        { "binding": "KV", "id": "REPLACE_WITH_STAGING_KV_NAMESPACE_ID" }
-      ],
-      "r2_buckets": [
-        { "binding": "MEDIA", "bucket_name": "mingo-media-staging" }
-      ]
-    },
-    "production": {
-      "name": "mingo",
-      "vars": {
-        "APP_ENV": "production",
-        "APP_URL": "https://mingo.app"
-      },
-      "d1_databases": [
-        {
-          "binding": "DB",
-          "database_name": "mingo-db",
-          "database_id": "REPLACE_WITH_PROD_D1_DATABASE_ID",
-          "migrations_dir": "migrations"
-        }
-      ],
-      "kv_namespaces": [
-        { "binding": "KV", "id": "REPLACE_WITH_PROD_KV_NAMESPACE_ID" }
-      ],
-      "r2_buckets": [
-        { "binding": "MEDIA", "bucket_name": "mingo-media" }
-      ]
-    }
-  }
+  ]
+  // R2 (media/avatar uploads) is optional. To enable it: turn on R2 in the
+  // Cloudflare dashboard, run `wrangler r2 bucket create mingo-media`, then add:
+  //   "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "mingo-media" }]
 }
