@@ -11,8 +11,8 @@ import {
 } from "../components/ui";
 import { InviteBox } from "../components/InviteBox";
 import { GroupChat } from "../components/GroupChat";
+import { PageHeader } from "../components/PageHeader";
 import { useConfirm } from "../components/Confirm";
-import { IconArrowLeft } from "../components/icons";
 import { formatWhen } from "../lib/format";
 import type { GroupDTO, MatchDTO, PlanDTO } from "@shared/types";
 
@@ -38,20 +38,13 @@ export function GroupHome() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <Link
-          to="/app"
-          className="-ml-2 inline-flex h-9 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-navy-500 hover:bg-navy/5"
-        >
-          <IconArrowLeft size={18} /> Groups
-        </Link>
-        <h1 className="text-[22px] font-extrabold">{group.name}</h1>
-        <p className="text-sm text-navy-400">
-          {group.activeMemberCount} active member
-          {group.activeMemberCount === 1 ? "" : "s"} ·{" "}
-          {group.settings?.dateKnown ? "date set" : "date to decide"}
-        </p>
-      </div>
+      <PageHeader
+        back={{ to: "/app", label: "Groups" }}
+        title={group.name}
+        subtitle={`${group.activeMemberCount} active member${
+          group.activeMemberCount === 1 ? "" : "s"
+        } · ${group.settings?.dateKnown ? "date set" : "date to decide"}`}
+      />
 
       {actionErr && (
         <p className="rounded-xl bg-danger-50 px-3 py-2 text-sm font-medium text-danger-700">

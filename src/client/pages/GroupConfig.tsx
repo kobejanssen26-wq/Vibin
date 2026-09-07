@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiRequestError } from "../lib/api";
 import { Button, ErrorState, Field, LoadingScreen } from "../components/ui";
 import { InviteBox } from "../components/InviteBox";
-import { IconArrowLeft } from "../components/icons";
+import { PageHeader } from "../components/PageHeader";
 import type { GroupDTO, GroupSettingsDTO } from "@shared/types";
 import {
   ACTIVITY_CATEGORIES,
@@ -123,18 +123,11 @@ export function GroupConfig() {
 
   return (
     <div className="space-y-7 pb-40">
-      <div>
-        <Link
-          to={`/groups/${id}`}
-          className="-ml-2 mb-1 inline-flex h-9 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-navy-500 hover:bg-navy/5"
-        >
-          <IconArrowLeft size={18} /> {group.name}
-        </Link>
-        <h1 className="text-[22px] font-extrabold">Set the vibe</h1>
-        <p className="text-sm text-navy-400">
-          What, where and when. You can change this before you start swiping.
-        </p>
-      </div>
+      <PageHeader
+        back={{ to: `/groups/${id}`, label: group.name }}
+        title="Set the vibe"
+        subtitle="What, where and when. You can change this before you start swiping."
+      />
 
       <InviteBox code={group.inviteCode} url={group.inviteUrl} />
 

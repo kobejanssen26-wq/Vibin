@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { usePoll } from "../lib/usePoll";
 import { EmptyState, ErrorState, LinkButton, LoadingScreen } from "../components/ui";
+import { PageHeader } from "../components/PageHeader";
 import { IconPlus } from "../components/icons";
 import type { GroupSummaryDTO } from "@shared/types";
 import { formatWhen } from "../lib/format";
@@ -26,12 +27,19 @@ export function Dashboard() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-[22px] font-extrabold">Your groups</h1>
-        <LinkButton to="/groups/new" className="px-4 py-2 text-sm">
-          <IconPlus size={16} /> New group
-        </LinkButton>
-      </div>
+      <PageHeader
+        title="Your groups"
+        subtitle={
+          groups.length
+            ? `${groups.length} group${groups.length === 1 ? "" : "s"}`
+            : undefined
+        }
+        action={
+          <LinkButton to="/groups/new" className="px-4 py-2 text-sm">
+            <IconPlus size={16} /> New group
+          </LinkButton>
+        }
+      />
 
       {groups.length === 0 ? (
         <EmptyState

@@ -8,8 +8,8 @@ import {
   LoadingScreen,
   Modal,
 } from "../components/ui";
+import { PageHeader } from "../components/PageHeader";
 import {
-  IconArrowLeft,
   IconCalendar,
   IconChat,
   IconCheck,
@@ -77,42 +77,61 @@ export function PlanView() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <Link
-          to={`/groups/${plan.groupId}`}
-          className="-ml-2 inline-flex h-9 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-navy-500 hover:bg-navy/5"
-        >
-          <IconArrowLeft size={18} /> {plan.groupName}
-        </Link>
-        <div className="mt-1 flex items-center gap-2.5">
+      <PageHeader
+        back={{ to: `/groups/${plan.groupId}`, label: plan.groupName }}
+        title="It's a plan"
+        action={
           <span className="grid h-9 w-9 place-items-center rounded-xl bg-lime-400 text-navy">
             <IconCheck size={22} />
           </span>
-          <h1 className="text-[22px] font-extrabold">It's a plan</h1>
-        </div>
-      </div>
+        }
+      />
 
-      <div className="card overflow-hidden">
-        {a.imageUrl ? (
-          <img
-            src={a.imageUrl}
-            alt={a.title}
-            className="h-44 w-full object-cover"
-          />
-        ) : (
-          <div className="grid h-44 w-full place-items-center bg-vibin-blue">
-            <span className="grid h-16 w-16 place-items-center rounded-2xl bg-white/12 text-3xl ring-1 ring-white/20">
-              {a.categoryIcon}
-            </span>
-          </div>
-        )}
-        <div className="space-y-3 p-4">
-          <div>
-            <h2 className="text-lg font-extrabold leading-tight">{a.title}</h2>
+      <article className="card overflow-hidden">
+        <div className="relative h-48 w-full overflow-hidden">
+          {a.imageUrl ? (
+            <img
+              src={a.imageUrl}
+              alt={a.title}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="relative grid h-full w-full place-items-center bg-vibin-blue">
+              <div
+                className="absolute inset-0 opacity-[0.12]"
+                style={{
+                  backgroundImage:
+                    "radial-gradient(circle at 1px 1px, #fff 1px, transparent 0)",
+                  backgroundSize: "22px 22px",
+                }}
+              />
+              <span className="grid h-16 w-16 place-items-center rounded-2xl bg-white/12 text-3xl ring-1 ring-white/20">
+                {a.categoryIcon}
+              </span>
+            </div>
+          )}
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-navy/75 to-transparent" />
+          <span className="chip absolute left-3 top-3 border-white/20 bg-white/90 backdrop-blur">
+            {a.categoryIcon} {a.categoryLabel}
+          </span>
+          <div className="absolute inset-x-4 bottom-3 text-white">
+            <h2 className="text-xl font-extrabold leading-tight drop-shadow-sm">
+              {a.title}
+            </h2>
             {a.provider && (
-              <p className="text-sm text-navy-400">at {a.provider}</p>
+              <p className="text-sm text-white/85">at {a.provider}</p>
             )}
           </div>
+        </div>
+
+        {/* ticket-style perforation */}
+        <div className="relative">
+          <span className="absolute -left-2 top-0 h-4 w-4 -translate-y-1/2 rounded-full bg-paper" />
+          <span className="absolute -right-2 top-0 h-4 w-4 -translate-y-1/2 rounded-full bg-paper" />
+          <div className="mx-4 border-t-2 border-dashed border-paper-line" />
+        </div>
+
+        <div className="space-y-3 p-4">
           <p className="text-sm leading-relaxed text-navy-500">{a.description}</p>
           <div className="grid gap-2 border-t border-paper-line pt-3 text-sm">
             <Row icon={<IconMapPin size={16} />} text={plan.locationLabel} />
@@ -126,7 +145,7 @@ export function PlanView() {
             ) : null}
           </div>
         </div>
-      </div>
+      </article>
 
       <div className="card p-4">
         <p className="mb-2 text-sm font-bold">Everyone's going</p>

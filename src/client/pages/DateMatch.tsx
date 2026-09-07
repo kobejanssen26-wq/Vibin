@@ -3,7 +3,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiRequestError } from "../lib/api";
 import { AvatarStack, Button, ErrorState, LoadingScreen } from "../components/ui";
 import { Confetti } from "../components/Confetti";
-import { IconArrowLeft, IconCheck, IconPlus } from "../components/icons";
+import { PageHeader } from "../components/PageHeader";
+import { IconCheck, IconPlus } from "../components/icons";
 import { formatDay, formatTime } from "../lib/format";
 import type { DateMatchStateDTO } from "@shared/types";
 
@@ -107,19 +108,16 @@ export function DateMatch() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <Link
-          to={`/groups/${id}`}
-          className="-ml-2 inline-flex h-9 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-navy-500 hover:bg-navy/5"
-        >
-          <IconArrowLeft size={18} /> Group
-        </Link>
-        <h1 className="text-[22px] font-extrabold">When should we go?</h1>
-        <p className="text-sm text-navy-400">
-          For <strong className="text-navy">{state.activity.title}</strong>.
-          VIBIN picks the first slot everyone can make.
-        </p>
-      </div>
+      <PageHeader
+        back={{ to: `/groups/${id}`, label: "Group" }}
+        title="When should we go?"
+        subtitle={
+          <>
+            For <strong className="text-navy">{state.activity.title}</strong>.
+            VIBIN picks the first slot everyone can make.
+          </>
+        }
+      />
 
       <AvatarStack people={state.members} />
 

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { api, ApiRequestError } from "../lib/api";
 import { Avatar, Button, Field, Modal } from "../components/ui";
+import { PageHeader } from "../components/PageHeader";
 import type { Me } from "@shared/types";
 
 export function Profile() {
@@ -106,7 +107,10 @@ export function Profile() {
 
   return (
     <div className="space-y-7">
-      <h1 className="text-2xl font-extrabold">Profile & settings</h1>
+      <PageHeader
+        back={{ to: "/app", label: "Groups" }}
+        title="Profile & settings"
+      />
 
       <div className="flex items-center gap-4">
         <Avatar name={user.displayName} url={user.avatarUrl} size={64} />

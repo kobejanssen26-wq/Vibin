@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../lib/auth";
 import { api } from "../lib/api";
 import { ErrorState, LoadingScreen } from "../components/ui";
+import { PageHeader } from "../components/PageHeader";
 
 interface Stats {
   users: number;
@@ -73,7 +74,11 @@ export function Admin() {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-extrabold">Admin</h1>
+      <PageHeader
+        back={{ to: "/app", label: "Groups" }}
+        title="Admin"
+        subtitle="Catalogue, moderation and stats"
+      />
 
       <div className="flex gap-1 rounded-2xl bg-paper-soft p-1 text-sm font-semibold">
         {(["overview", "activities", "reports"] as const).map((t) => (

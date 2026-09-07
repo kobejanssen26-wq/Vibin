@@ -1,191 +1,282 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { LogoMark, Wordmark } from "../components/Logo";
 import { LinkButton } from "../components/ui";
+import { Reveal } from "../components/Reveal";
+import { SwipeCard } from "../components/SwipeCard";
+import { IconCheck } from "../components/icons";
+import { demoActivity } from "../lib/demo";
 import { ACTIVITY_CATEGORIES } from "@shared/constants";
 
+const CREW = [
+  { initials: "KJ", tone: "bg-brand-500" },
+  { initials: "LP", tone: "bg-brand-600" },
+  { initials: "SD", tone: "bg-navy-700" },
+  { initials: "MV", tone: "bg-brand-400" },
+  { initials: "EW", tone: "bg-navy-800" },
+];
+
 const STEPS = [
-  { n: 1, t: "Start a group", d: "Weekend crew, family, teammates — one group, one shared question: what are we doing?" },
-  { n: 2, t: "Set the vibe", d: "Pick categories, area, budget and — if you know it — a date. Or leave the date open." },
-  { n: 3, t: "Everyone swipes", d: "Each person swipes activities on their own phone. No group-chat back-and-forth." },
-  { n: 4, t: "It matches when everyone's in", d: "An activity only matches when every active member liked it. One pass and it's out." },
-  { n: 5, t: "Lock the plan", d: "If the date's open, VIBIN runs a quick vote on when. Then you get the full plan and a booking link." },
+  {
+    k: "01",
+    t: "Set the vibe",
+    d: "Categories, area, budget, and a date if you have one. Two taps if you don't care.",
+  },
+  {
+    k: "02",
+    t: "Everyone swipes",
+    d: "Each person swipes on their own phone. No group chat, no one dominating the plan.",
+  },
+  {
+    k: "03",
+    t: "It becomes a plan",
+    d: "A match needs everyone. Then VIBIN finds a time that works and hands you the booking link.",
+  },
 ];
 
-const GROUPS = [
-  { emoji: "🍻", name: "Weekend crew" },
-  { emoji: "👨‍👩‍👧", name: "Family day" },
-  { emoji: "❤️", name: "Date night" },
-  { emoji: "✈️", name: "City trip" },
-  { emoji: "🧑‍💻", name: "Team outing" },
-  { emoji: "🎂", name: "Birthday plan" },
-];
-
-const FEATURES = [
-  { icon: "🤝", t: "Unanimous by design", d: "No majority rules. If one person passes, it's not a match — nobody gets dragged along." },
-  { icon: "🙈", t: "Votes stay private", d: "VIBIN shows the group result, never who said no. So everyone swipes honestly." },
-  { icon: "📅", t: "Then it finds a time", d: "Second round lands on a slot that genuinely works for everyone, not just most." },
-  { icon: "⚡", t: "Built for the moment", d: "“Tonight”, “this weekend” or “no idea yet” — VIBIN handles all three." },
-  { icon: "💬", t: "One group chat", d: "Plans, matches and messages in one place. The boring coordination disappears." },
-  { icon: "🎟️", t: "Real venues", d: "A curated Belgian catalogue with real providers and booking links — no invented places." },
+const WHY = [
+  {
+    t: "Unanimous by design",
+    d: "Majority rules is how someone always ends up bailing. One pass and it's not a match, so the plan is one everyone actually chose.",
+  },
+  {
+    t: "Nobody sees who passed",
+    d: "VIBIN shows the group result, never the individual votes. So people swipe honestly instead of politely.",
+  },
+  {
+    t: "Real places, real prices",
+    d: "A curated Belgian catalogue with real providers, honest pricing and booking links. Nothing invented to fill a card.",
+  },
 ];
 
 const FAQ = [
-  { q: "Is VIBIN a dating app?", a: "No. VIBIN is for groups of friends, family or colleagues deciding what to do together. It matches activities and dates — never people." },
-  { q: "What if we can't agree on anything?", a: "You keep swiping. VIBIN keeps the deck going and shows collective progress. You can always widen the filters — more categories, bigger radius, higher budget." },
-  { q: "Do we need to know the date up front?", a: "No. Choose “We don't know yet” and VIBIN starts a second round to find a time once you've matched an activity." },
-  { q: "Can one person block everything?", a: "A match needs everyone active. If someone is genuinely flexible, the group creator can mark them inactive so they don't hold things up — a deliberate choice, never automatic." },
-  { q: "Is the activity availability live?", a: "No. VIBIN shows catalogue information. Prices and openings change — always confirm with the provider before you book. Each activity carries the date it was last checked." },
-  { q: "Where does VIBIN work?", a: "The first catalogue focuses on Belgium — Antwerp, Brussels, Ghent, Leuven, Bruges and around. It's built to expand to more providers and countries." },
+  {
+    q: "Is this a dating app?",
+    a: "No. VIBIN matches activities and dates for a group you already have. It never matches people.",
+  },
+  {
+    q: "Do we need to pick a date first?",
+    a: "No. Choose “we don't know yet” and VIBIN runs a quick second round to find a time once you've matched an activity.",
+  },
+  {
+    q: "What if we can't agree on anything?",
+    a: "You keep swiping, and you can widen the filters any time: more categories, bigger radius, higher budget. VIBIN never forces a match.",
+  },
+  {
+    q: "Can one person block the whole group?",
+    a: "A match needs every active member. If someone is genuinely flexible, the creator can mark them inactive so they don't hold things up. It's a deliberate choice, never automatic.",
+  },
+  {
+    q: "Where does it work?",
+    a: "The first catalogue covers Belgium: Antwerp, Brussels, Ghent, Leuven, Bruges and around. It's built to add more places and providers.",
+  },
 ];
 
 export function Landing() {
   return (
-    <div className="min-h-full bg-paper text-navy">
-      <div className="bg-vibin-hero">
-        {/* nav */}
-        <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
-          <Wordmark />
-          <nav className="flex items-center gap-2 text-sm font-semibold">
-            <Link to="/login" className="btn-ghost px-4 py-2">Log in</Link>
-            <Link to="/signup" className="btn-primary px-4 py-2">Get started</Link>
-          </nav>
-        </header>
+    <div className="min-h-full overflow-x-clip bg-paper text-navy">
+      {/* ---------- nav ---------- */}
+      <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
+        <Wordmark />
+        <nav className="flex items-center gap-2 text-sm font-semibold">
+          <Link to="/login" className="rounded-xl px-3 py-2 text-navy-500 hover:text-navy">
+            Log in
+          </Link>
+          <Link to="/signup" className="btn-primary px-4 py-2">
+            Get started
+          </Link>
+        </nav>
+      </header>
 
-        {/* hero */}
-        <section className="mx-auto grid max-w-5xl items-center gap-10 px-5 pb-16 pt-6 md:grid-cols-2 md:pb-24 md:pt-10">
-          <div className="animate-slide-up">
-            <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm font-semibold shadow-card">
-              <LogoMark className="h-4 w-4" /> Swipe together. Agree faster.
-            </p>
-            <h1 className="text-4xl font-extrabold leading-[1.03] tracking-tight md:text-6xl">
-              Find your vibe.
-              <br />
-              <span className="text-brand-500">Make a plan.</span>
+      {/* ---------- hero ---------- */}
+      <section className="relative">
+        <div className="pointer-events-none absolute inset-0 bg-vibin-hero" />
+        <div className="pointer-events-none absolute -left-24 top-40 h-72 w-72 rounded-full bg-brand-400/20 blur-3xl" />
+        <div className="pointer-events-none absolute -right-16 top-10 h-64 w-64 rounded-full bg-lime-400/25 blur-3xl" />
+
+        <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-5 pb-16 pt-8 md:grid-cols-[1.12fr_0.88fr] md:gap-14 md:pb-24 md:pt-12">
+          <div>
+            <span className="inline-flex items-center gap-2 rounded-full border border-navy/10 bg-white px-3 py-1.5 text-sm font-semibold shadow-sm">
+              <LogoMark className="h-4 w-4" />
+              Swipe together. Agree in minutes.
+            </span>
+
+            <h1 className="mt-6 text-5xl font-extrabold leading-[0.95] tracking-[-0.035em] [text-wrap:balance] sm:text-[3.4rem] md:text-[3.6rem] lg:text-[4.4rem]">
+              <span className="block">Find your vibe.</span>
+              <span className="block bg-gradient-to-r from-brand-500 to-brand-400 bg-clip-text text-transparent">
+                Make a plan.
+              </span>
             </h1>
-            <p className="mt-5 max-w-md text-lg text-navy-500">
-              VIBIN helps groups decide what to do together. Everyone swipes on
-              activities — it only matches when the whole group's in. Then you
-              find a time and lock the plan.
+
+            <p className="mt-5 max-w-md text-[17px] leading-relaxed text-navy-500">
+              Your group swipes on real activities. It only matches when everyone's
+              in. Then VIBIN locks the time and the booking.
             </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <LinkButton to="/signup">Create a group</LinkButton>
-              <LinkButton to="/login" variant="outline">
+
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <LinkButton to="/signup" className="px-6 text-base">
+                Create a group
+              </LinkButton>
+              <LinkButton to="/login" variant="outline" className="px-6 text-base">
                 Join a group
               </LinkButton>
             </div>
-            <p className="mt-3 text-xs text-navy-400">
-              Free to use · No card needed · Built in the EU, GDPR-friendly
+
+            <p className="mt-4 text-xs font-medium text-navy-400">
+              Free to use. No card. Built in the EU.
             </p>
           </div>
 
-          <PhoneDemo />
-        </section>
-      </div>
+          <HeroCard />
+        </div>
+      </section>
 
-      {/* how it works */}
-      <section className="mx-auto max-w-5xl px-5 py-16">
-        <h2 className="text-2xl font-extrabold md:text-3xl">How it works</h2>
-        <ol className="mt-8 grid gap-4 md:grid-cols-5">
-          {STEPS.map((s) => (
-            <li key={s.n} className="card p-5">
-              <div className="grid h-9 w-9 place-items-center rounded-xl bg-brand-500 font-extrabold text-white">
-                {s.n}
-              </div>
-              <h3 className="mt-3 text-base font-bold">{s.t}</h3>
-              <p className="mt-1 text-sm text-navy-400">{s.d}</p>
-            </li>
+      {/* ---------- the mechanism (differentiator, given weight) ---------- */}
+      <section className="bg-navy px-5 py-20 text-white md:py-28">
+        <div className="mx-auto max-w-4xl text-center">
+          <Reveal>
+            <p className="text-sm font-bold uppercase tracking-[0.2em] text-lime-400">
+              The whole idea
+            </p>
+            <h2 className="mx-auto mt-4 max-w-2xl text-3xl font-extrabold leading-tight md:text-5xl">
+              It doesn't count until{" "}
+              <span className="text-lime-400">everyone's in.</span>
+            </h2>
+            <p className="mx-auto mt-4 max-w-lg text-white/70">
+              No majority vote. No loudest voice. An activity matches only when
+              every person in the group liked it, so nobody gets talked into it.
+            </p>
+          </Reveal>
+
+          <CrewStrip />
+        </div>
+      </section>
+
+      {/* ---------- how it works (editorial 3-beat) ---------- */}
+      <section className="mx-auto max-w-6xl px-5 py-20 md:py-28">
+        <Reveal>
+          <h2 className="text-2xl font-extrabold md:text-4xl">Three steps, no chat chaos</h2>
+        </Reveal>
+        <ol className="mt-12 grid gap-px overflow-hidden rounded-3xl border border-paper-line bg-paper-line md:grid-cols-3">
+          {STEPS.map((s, i) => (
+            <Reveal as="li" key={s.k} delay={i * 90} className="bg-paper-card p-7">
+              <span className="text-sm font-black tracking-widest text-brand-300">
+                {s.k}
+              </span>
+              <h3 className="mt-3 text-lg font-extrabold">{s.t}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-navy-500">{s.d}</p>
+            </Reveal>
           ))}
         </ol>
       </section>
 
-      {/* why VIBIN */}
-      <section className="bg-navy px-5 py-20 text-white">
-        <div className="mx-auto max-w-5xl">
-          <h2 className="text-2xl font-extrabold md:text-3xl">
-            Why <span className="text-lime-400">VIBIN</span>
-          </h2>
-          <p className="mt-3 max-w-lg text-white/70">
-            Group plans die in the chat. VIBIN turns “idk, what do you want to
-            do?” into one clear, fair decision everyone actually agreed to.
-          </p>
-          <div className="mt-10 grid gap-4 md:grid-cols-3">
-            {FEATURES.map((f) => (
-              <div
-                key={f.t}
-                className="rounded-3xl bg-white/[0.06] p-6 ring-1 ring-white/10 transition hover:bg-white/[0.1]"
-              >
-                <div className="text-2xl">{f.icon}</div>
-                <h3 className="mt-3 font-bold">{f.t}</h3>
-                <p className="mt-1.5 text-sm text-white/70">{f.d}</p>
-              </div>
+      {/* ---------- category strip (horizontal scroll, not a grid) ---------- */}
+      <section className="py-4">
+        <div className="mx-auto max-w-6xl px-5">
+          <Reveal>
+            <h2 className="text-2xl font-extrabold md:text-4xl">Plan anything</h2>
+            <p className="mt-2 text-navy-500">
+              Twelve categories, or one tap for the whole catalogue.
+            </p>
+          </Reveal>
+        </div>
+        <div
+          className="mt-7 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          role="list"
+        >
+          <div className="shrink-0" style={{ width: "max(1.25rem, calc((100vw - 72rem) / 2))" }} />
+          {ACTIVITY_CATEGORIES.map((c, i) => (
+            <div
+              key={c.id}
+              role="listitem"
+              className={`flex w-40 shrink-0 snap-start flex-col justify-between rounded-3xl border border-paper-line bg-gradient-to-br p-5 ${
+                i % 3 === 0
+                  ? "from-brand-50 to-white"
+                  : i % 3 === 1
+                    ? "from-lime-50 to-white"
+                    : "from-paper-soft to-white"
+              }`}
+            >
+              <span className="text-3xl">{c.icon}</span>
+              <span className="mt-8 font-bold leading-tight">{c.label}</span>
+            </div>
+          ))}
+          <div className="shrink-0" style={{ width: "max(1.25rem, calc((100vw - 72rem) / 2))" }} />
+        </div>
+      </section>
+
+      {/* ---------- why it's different (asymmetric) ---------- */}
+      <section className="mx-auto max-w-6xl px-5 py-20 md:py-28">
+        <div className="grid gap-10 md:grid-cols-[0.8fr_1.2fr] md:gap-16">
+          <Reveal>
+            <h2 className="text-2xl font-extrabold leading-tight md:text-4xl">
+              Why groups stick with it
+            </h2>
+            <p className="mt-4 text-navy-500">
+              The mechanics are the point. Small choices that change how a group
+              decides.
+            </p>
+          </Reveal>
+          <div className="space-y-px overflow-hidden rounded-3xl border border-paper-line bg-paper-line">
+            {WHY.map((w, i) => (
+              <Reveal key={w.t} delay={i * 80} className="bg-paper-card p-7">
+                <div className="flex items-start gap-4">
+                  <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-500 text-white">
+                    <IconCheck size={16} />
+                  </span>
+                  <div>
+                    <h3 className="text-base font-extrabold">{w.t}</h3>
+                    <p className="mt-1.5 text-sm leading-relaxed text-navy-500">
+                      {w.d}
+                    </p>
+                  </div>
+                </div>
+              </Reveal>
             ))}
           </div>
         </div>
       </section>
 
-      {/* group examples */}
-      <section className="mx-auto max-w-5xl px-5 py-16">
-        <h2 className="text-2xl font-extrabold md:text-3xl">Made for every crew</h2>
-        <div className="mt-6 flex flex-wrap gap-3">
-          {GROUPS.map((g) => (
-            <span key={g.name} className="chip text-base">
-              <span className="text-xl">{g.emoji}</span> {g.name}
-            </span>
-          ))}
-        </div>
-      </section>
-
-      {/* categories */}
-      <section className="mx-auto max-w-5xl px-5 pb-8">
-        <h2 className="text-2xl font-extrabold md:text-3xl">Every kind of plan</h2>
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-          {ACTIVITY_CATEGORIES.map((c) => (
-            <div
-              key={c.id}
-              className="card flex items-center gap-3 p-4 transition hover:-translate-y-0.5 hover:shadow-pop"
-            >
-              <span className="text-2xl">{c.icon}</span>
-              <span className="font-semibold">{c.label}</span>
-            </div>
-          ))}
-        </div>
-        <p className="mt-3 text-sm text-navy-400">
-          Or choose <strong className="text-navy">All activities</strong> and let
-          the whole catalogue in.
-        </p>
-      </section>
-
-      {/* FAQ */}
+      {/* ---------- FAQ ---------- */}
       <section className="mx-auto max-w-3xl px-5 py-16">
-        <h2 className="text-2xl font-extrabold md:text-3xl">Good to know</h2>
-        <div className="mt-6 space-y-3">
-          {FAQ.map((f) => (
-            <Faq key={f.q} q={f.q} a={f.a} />
+        <Reveal>
+          <h2 className="text-2xl font-extrabold md:text-4xl">Good to know</h2>
+        </Reveal>
+        <div className="mt-8 space-y-3">
+          {FAQ.map((f, i) => (
+            <Reveal key={f.q} delay={i * 50}>
+              <Faq q={f.q} a={f.a} />
+            </Reveal>
           ))}
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="mx-auto max-w-5xl px-5 py-16">
-        <div className="card overflow-hidden bg-vibin-match p-10 text-center text-white">
-          <h2 className="text-3xl font-extrabold">
-            Stop planning. Start <span className="text-lime-400">doing</span>.
-          </h2>
-          <p className="mx-auto mt-3 max-w-md text-white/85">
-            Spin up a group in half a minute, share the invite link, and your
-            first match is a few swipes away.
-          </p>
-          <div className="mt-7 flex justify-center">
-            <Link to="/signup" className="btn bg-lime-400 text-navy shadow-lime hover:bg-lime-300">
+      {/* ---------- CTA ---------- */}
+      <section className="mx-auto max-w-6xl px-5 pb-20">
+        <Reveal>
+          <div className="relative overflow-hidden rounded-[2rem] bg-vibin-match p-10 text-center text-white md:p-16">
+            <div className="pointer-events-none absolute -right-10 -top-10 h-56 w-56 rounded-full bg-lime-400/25 blur-3xl" />
+            <h2 className="relative text-3xl font-extrabold md:text-5xl">
+              Stop planning. Start{" "}
+              <span className="text-lime-400">doing.</span>
+            </h2>
+            <p className="relative mx-auto mt-4 max-w-md text-white/85">
+              A group takes thirty seconds. Send the link, and your first match is
+              a few swipes away.
+            </p>
+            <Link
+              to="/signup"
+              className="relative mt-8 inline-flex bg-lime-400 text-navy shadow-lime hover:bg-lime-300 btn px-7 text-base"
+            >
               Create a group
             </Link>
           </div>
-        </div>
+        </Reveal>
       </section>
 
+      {/* ---------- footer ---------- */}
       <footer className="border-t border-paper-line px-5 py-10">
-        <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-4 text-sm text-navy-400 md:flex-row">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 text-sm text-navy-400 md:flex-row">
           <Wordmark />
           <div className="flex gap-5">
             <Link to="/privacy" className="hover:text-navy">Privacy</Link>
@@ -199,12 +290,102 @@ export function Landing() {
   );
 }
 
+/* ------------------------------------------------------------------ */
+
+function HeroCard() {
+  const activity = demoActivity();
+  return (
+    <div className="relative mx-auto w-full max-w-[280px] py-2">
+      {/* soft device shadow */}
+      <div className="absolute inset-x-6 bottom-0 top-10 rounded-[2.4rem] bg-navy/10 blur-2xl" />
+
+      <div className="relative aspect-[3/4.05] w-full animate-[heroDrift_7s_ease-in-out_infinite] motion-reduce:animate-none">
+        {/* back card peeking */}
+        <div className="absolute inset-0 translate-y-3 rotate-[5deg] rounded-[1.75rem] bg-white shadow-card" />
+        <div className="absolute inset-0 -rotate-2">
+          <SwipeCard activity={activity} interactive={false} />
+        </div>
+      </div>
+
+      <span className="absolute right-0 -top-2 z-10 inline-flex rotate-6 items-center gap-1.5 rounded-2xl bg-lime-400 px-3 py-1.5 text-sm font-extrabold text-navy shadow-lime">
+        <IconCheck size={16} /> Everyone's in
+      </span>
+
+      <style>{`
+        @keyframes heroDrift {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          50% { transform: translateY(-8px) rotate(-1deg); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function CrewStrip() {
+  const [lit, setLit] = useState(0);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const reduce = window.matchMedia?.(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const io = new IntersectionObserver((entries) => {
+      if (!entries[0]?.isIntersecting) return;
+      io.disconnect();
+      if (reduce) {
+        setLit(CREW.length);
+        return;
+      }
+      CREW.forEach((_, i) =>
+        window.setTimeout(() => setLit(i + 1), 260 + i * 260),
+      );
+    }, { threshold: 0.5 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className="mt-12 flex items-center justify-center gap-3">
+      {CREW.map((m, i) => {
+        const on = i < lit;
+        return (
+          <div key={m.initials} className="relative">
+            <span
+              className={`grid h-12 w-12 place-items-center rounded-full text-sm font-bold text-white ring-2 transition-all duration-300 ${m.tone} ${
+                on ? "ring-lime-400 scale-100 opacity-100" : "ring-white/15 scale-95 opacity-40"
+              }`}
+            >
+              {m.initials}
+            </span>
+            <span
+              className={`absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-lime-400 text-navy ring-2 ring-navy transition-all duration-300 ${
+                on ? "scale-100 opacity-100" : "scale-0 opacity-0"
+              }`}
+            >
+              <IconCheck size={12} />
+            </span>
+          </div>
+        );
+      })}
+      <span
+        className={`ml-2 text-lg font-extrabold transition-opacity duration-500 ${
+          lit >= CREW.length ? "text-lime-400 opacity-100" : "opacity-0"
+        }`}
+      >
+        Match.
+      </span>
+    </div>
+  );
+}
+
 function Faq({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="card overflow-hidden">
+    <div className="overflow-hidden rounded-2xl border border-paper-line bg-paper-card">
       <button
-        className="flex w-full items-center justify-between gap-4 p-4 text-left font-semibold"
+        className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left font-bold"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
@@ -213,47 +394,16 @@ function Faq({ q, a }: { q: string; a: string }) {
           className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-paper-soft text-navy-400 transition-transform"
           style={{ transform: open ? "rotate(45deg)" : "none" }}
         >
-          +
+          <span className="text-lg leading-none">+</span>
         </span>
       </button>
-      {open && <p className="px-4 pb-4 text-sm leading-relaxed text-navy-400">{a}</p>}
-    </div>
-  );
-}
-
-function PhoneDemo() {
-  return (
-    <div className="relative mx-auto w-full max-w-[300px] animate-float-up">
-      <div className="overflow-hidden rounded-[2.5rem] border-[10px] border-navy bg-navy shadow-card">
-        <div className="bg-paper-soft p-4">
-          <div className="mb-3 flex items-center justify-between text-xs font-bold text-navy-400">
-            <span>Weekend crew</span>
-            <span className="rounded-full bg-white px-2 py-0.5">3 / 4 in</span>
-          </div>
-          <div className="relative aspect-[3/4] w-full">
-            <div className="card absolute inset-0 rotate-3 bg-brand-100" />
-            <div className="card absolute inset-0 -rotate-2 overflow-hidden">
-              <div className="grid h-3/5 place-items-center bg-vibin-blue text-6xl">
-                🎳
-              </div>
-              <div className="p-3">
-                <p className="text-lg font-extrabold">Bowling &amp; Hyperbowling</p>
-                <p className="text-xs text-navy-400">📍 Antwerp · From €20 / person</p>
-              </div>
-            </div>
-          </div>
-          <div className="mt-4 flex justify-center gap-6">
-            <span className="grid h-12 w-12 place-items-center rounded-full bg-white text-xl text-navy shadow-card">
-              ✕
-            </span>
-            <span className="grid h-12 w-12 place-items-center rounded-full bg-brand-500 text-xl text-white shadow-pop">
-              ♥
-            </span>
-          </div>
+      <div
+        className="grid transition-[grid-template-rows] duration-300 ease-out"
+        style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
+      >
+        <div className="overflow-hidden">
+          <p className="px-5 pb-4 text-sm leading-relaxed text-navy-500">{a}</p>
         </div>
-      </div>
-      <div className="absolute -right-3 -top-3 rotate-6 rounded-2xl bg-lime-400 px-3 py-1.5 text-sm font-extrabold text-navy shadow-lime">
-        Everyone's in! ✓
       </div>
     </div>
   );
