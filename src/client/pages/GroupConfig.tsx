@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiRequestError } from "../lib/api";
 import { Button, ErrorState, Field, LoadingScreen } from "../components/ui";
 import { InviteBox } from "../components/InviteBox";
+import { IconArrowLeft } from "../components/icons";
 import type { GroupDTO, GroupSettingsDTO } from "@shared/types";
 import {
   ACTIVITY_CATEGORIES,
@@ -121,10 +122,18 @@ export function GroupConfig() {
     );
 
   return (
-    <div className="space-y-7 pb-4">
+    <div className="space-y-7 pb-40">
       <div>
-        <h1 className="text-2xl font-extrabold">{group.name}</h1>
-        <p className="text-sm text-navy-400">Set what, where and when.</p>
+        <Link
+          to={`/groups/${id}`}
+          className="-ml-2 mb-1 inline-flex h-9 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-navy-500 hover:bg-navy/5"
+        >
+          <IconArrowLeft size={18} /> {group.name}
+        </Link>
+        <h1 className="text-[22px] font-extrabold">Set the vibe</h1>
+        <p className="text-sm text-navy-400">
+          What, where and when. You can change this before you start swiping.
+        </p>
       </div>
 
       <InviteBox code={group.inviteCode} url={group.inviteUrl} />
@@ -283,25 +292,35 @@ export function GroupConfig() {
         </section>
       )}
 
-      {err && <p className="text-sm font-medium text-danger-600">{err}</p>}
+      {err && (
+        <p className="rounded-xl bg-danger-50 px-3 py-2 text-sm font-medium text-danger-700">
+          {err}
+        </p>
+      )}
 
-      <div className="sticky bottom-4 space-y-2 rounded-2xl bg-paper/80 p-1 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-paper-line bg-paper-card/95 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur">
         <Button
           className="w-full"
           loading={starting || saving}
           disabled={!canStart}
           onClick={startSwiping}
         >
-          Save & start swiping →
+          Save &amp; start swiping →
         </Button>
         <button
-          className="w-full text-center text-sm text-navy-400"
+          type="button"
+          className="mt-1.5 w-full py-1.5 text-center text-sm font-medium text-navy-500 hover:text-navy"
           onClick={async () => {
             if (await save()) nav(`/groups/${id}`);
           }}
         >
           Save and come back later
         </button>
+        {!canStart && (
+          <p className="mt-1 text-center text-xs text-navy-400">
+            Pick at least one category, or choose “All activities”.
+          </p>
+        )}
       </div>
     </div>
   );

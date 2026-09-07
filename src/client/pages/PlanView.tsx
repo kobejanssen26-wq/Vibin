@@ -1,8 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, ApiRequestError } from "../lib/api";
-import { AvatarStack, ErrorState, LoadingScreen } from "../components/ui";
-import { formatWhen } from "../lib/format";
+import {
+  AvatarStack,
+  Button,
+  ErrorState,
+  LoadingScreen,
+  Modal,
+} from "../components/ui";
+import {
+  IconArrowLeft,
+  IconCalendar,
+  IconChat,
+  IconCheck,
+  IconClock,
+  IconExternal,
+  IconInfo,
+  IconMapPin,
+  IconShare,
+  IconTag,
+} from "../components/icons";
+import { formatDay, formatDuration, formatWhen } from "../lib/format";
 import type { PlanDTO } from "@shared/types";
 
 export function PlanView() {
@@ -60,90 +78,115 @@ export function PlanView() {
   return (
     <div className="space-y-5">
       <div>
-        <Link to={`/groups/${plan.groupId}`} className="text-sm text-navy-400">
-          ← {plan.groupName}
+        <Link
+          to={`/groups/${plan.groupId}`}
+          className="-ml-2 inline-flex h-9 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-navy-500 hover:bg-navy/5"
+        >
+          <IconArrowLeft size={18} /> {plan.groupName}
         </Link>
-        <div className="mt-1 flex items-center gap-2">
-          <span className="text-3xl">🎉</span>
-          <h1 className="text-2xl font-extrabold">It’s a plan!</h1>
+        <div className="mt-1 flex items-center gap-2.5">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-lime-400 text-navy">
+            <IconCheck size={22} />
+          </span>
+          <h1 className="text-[22px] font-extrabold">It's a plan</h1>
         </div>
       </div>
 
       <div className="card overflow-hidden">
         {a.imageUrl ? (
-          <img src={a.imageUrl} alt="" className="h-44 w-full object-cover" />
+          <img
+            src={a.imageUrl}
+            alt={a.title}
+            className="h-44 w-full object-cover"
+          />
         ) : (
-          <div className="grid h-44 w-full place-items-center bg-vibin-blue text-6xl">
-            {a.categoryIcon}
+          <div className="grid h-44 w-full place-items-center bg-vibin-blue">
+            <span className="grid h-16 w-16 place-items-center rounded-2xl bg-white/12 text-3xl ring-1 ring-white/20">
+              {a.categoryIcon}
+            </span>
           </div>
         )}
-        <div className="space-y-2 p-4">
-          <h2 className="text-xl font-extrabold">{a.title}</h2>
-          <p className="text-sm text-navy-400">{a.description}</p>
-          <div className="grid grid-cols-1 gap-1 pt-1 text-sm">
-            <Row icon="📍" text={plan.locationLabel} />
-            <Row icon="📅" text={formatWhen(plan.startsAt)} />
-            <Row icon="💰" text={a.priceLabel} />
-            {a.durationMin && <Row icon="⏱️" text={`${a.durationMin} min`} />}
-            {a.minAge && <Row icon="🔞" text={`${a.minAge}+`} />}
+        <div className="space-y-3 p-4">
+          <div>
+            <h2 className="text-lg font-extrabold leading-tight">{a.title}</h2>
+            {a.provider && (
+              <p className="text-sm text-navy-400">at {a.provider}</p>
+            )}
+          </div>
+          <p className="text-sm leading-relaxed text-navy-500">{a.description}</p>
+          <div className="grid gap-2 border-t border-paper-line pt-3 text-sm">
+            <Row icon={<IconMapPin size={16} />} text={plan.locationLabel} />
+            <Row icon={<IconCalendar size={16} />} text={formatWhen(plan.startsAt)} />
+            <Row icon={<IconTag size={16} />} text={a.priceLabel} />
+            {a.durationMin ? (
+              <Row icon={<IconClock size={16} />} text={formatDuration(a.durationMin)} />
+            ) : null}
+            {a.minAge ? (
+              <Row icon={<IconInfo size={16} />} text={`Minimum age ${a.minAge}`} />
+            ) : null}
           </div>
         </div>
       </div>
 
       <div className="card p-4">
-        <p className="mb-2 text-sm font-bold">Everyone’s going</p>
+        <p className="mb-2 text-sm font-bold">Everyone's going</p>
         <AvatarStack people={plan.members} size={40} max={10} />
       </div>
 
       <div className="grid grid-cols-2 gap-2">
         {booking ? (
-          <a href={booking} target="_blank" rel="noreferrer" className="btn-primary">
-            {a.ticketUrl ? "Get tickets" : "Book now"}
+          <a
+            href={booking}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-primary col-span-2"
+          >
+            <IconExternal size={18} />
+            {a.ticketUrl ? "Get tickets" : "Book with the provider"}
           </a>
         ) : (
-          <button
-            className="btn-ghost cursor-not-allowed opacity-60"
-            title="No booking link for this activity"
-            disabled
-          >
-            Booking not available
-          </button>
+          <div className="col-span-2 rounded-2xl bg-paper-soft px-4 py-3 text-center text-sm text-navy-400">
+            No online booking — {a.websiteUrl ? "check the provider's site" : "contact the venue directly"}.
+          </div>
         )}
         {a.websiteUrl && (
           <a
             href={a.websiteUrl}
             target="_blank"
             rel="noreferrer"
-            className="btn-ghost"
+            className="btn-outline"
           >
-            Open website
+            <IconExternal size={16} /> Website
           </a>
         )}
         {plan.startsAt && (
-          <>
-            <a
-              href={plan.calendar.googleUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="btn-ghost"
-            >
-              Google Calendar
-            </a>
-            <a href={plan.calendar.icsUrl} className="btn-ghost" download>
-              Download .ics
-            </a>
-          </>
+          <a
+            href={plan.calendar.googleUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-outline"
+          >
+            <IconCalendar size={16} /> Calendar
+          </a>
         )}
-        <button className="btn-ghost" onClick={share}>
-          Share
+        {plan.startsAt && (
+          <a href={plan.calendar.icsUrl} className="btn-outline" download>
+            .ics file
+          </a>
+        )}
+        <button className="btn-outline" onClick={share}>
+          <IconShare size={16} /> Share
         </button>
-        <Link to={`/groups/${plan.groupId}`} className="btn-dark">
-          Group chat
+        <Link to={`/groups/${plan.groupId}`} className="btn-dark col-span-2">
+          <IconChat size={16} /> Open group chat
         </Link>
       </div>
 
       <p className="rounded-2xl bg-paper-soft px-4 py-3 text-xs text-navy-400">
         {a.availabilityNote}
+        {a.lastVerifiedAt && (
+          <> Last checked {formatDay(a.lastVerifiedAt)}.</>
+        )}
       </p>
 
       <ReportLink targetType="activity" targetId={a.id} />
@@ -151,14 +194,21 @@ export function PlanView() {
   );
 }
 
-function Row({ icon, text }: { icon: string; text: string }) {
+function Row({ icon, text }: { icon: ReactNode; text: string }) {
   return (
-    <p className="flex items-center gap-2">
-      <span>{icon}</span>
+    <p className="flex items-center gap-2.5 text-navy">
+      <span className="shrink-0 text-navy-400">{icon}</span>
       <span>{text}</span>
     </p>
   );
 }
+
+const REPORT_REASONS = [
+  { id: "incorrect_info", label: "Details are wrong (price, address, hours…)" },
+  { id: "inappropriate", label: "Inappropriate or unsafe" },
+  { id: "spam", label: "Spam or not a real activity" },
+  { id: "other", label: "Something else" },
+] as const;
 
 function ReportLink({
   targetType,
@@ -167,29 +217,85 @@ function ReportLink({
   targetType: string;
   targetId: string;
 }) {
+  const [open, setOpen] = useState(false);
   const [sent, setSent] = useState(false);
-  return sent ? (
-    <p className="text-center text-xs text-navy-400">
-      Thanks — we’ll review it.
-    </p>
-  ) : (
-    <button
-      className="w-full text-center text-xs text-navy-400 underline"
-      onClick={async () => {
-        const detail = prompt("What's wrong with this activity’s info?");
-        if (detail == null) return;
-        try {
-          await api("/reports", {
-            method: "POST",
-            body: { targetType, targetId, reason: "incorrect_info", detail },
-          });
-          setSent(true);
-        } catch {
-          alert("Could not send the report.");
-        }
-      }}
-    >
-      Report incorrect information
-    </button>
+  const [reason, setReason] = useState<string>("incorrect_info");
+  const [detail, setDetail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  if (sent) {
+    return (
+      <p className="text-center text-xs text-navy-400">
+        Thanks — our team will take a look.
+      </p>
+    );
+  }
+
+  const submit = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await api("/reports", {
+        method: "POST",
+        body: { targetType, targetId, reason, detail: detail.trim() },
+      });
+      setSent(true);
+      setOpen(false);
+    } catch (e) {
+      setErr(
+        e instanceof ApiRequestError ? e.message : "Could not send the report.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        className="w-full text-center text-xs font-medium text-navy-400 underline underline-offset-2 hover:text-navy"
+        onClick={() => setOpen(true)}
+      >
+        Report a problem with this activity
+      </button>
+      {open && (
+        <Modal title="Report this activity" onClose={() => setOpen(false)}>
+          <fieldset className="space-y-2">
+            <legend className="mb-1 text-sm font-semibold text-navy-700">
+              What's the issue?
+            </legend>
+            {REPORT_REASONS.map((r) => (
+              <label
+                key={r.id}
+                className="flex cursor-pointer items-center gap-3 rounded-xl border border-paper-line px-3 py-2.5 text-sm has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50"
+              >
+                <input
+                  type="radio"
+                  name="reason"
+                  className="h-4 w-4 accent-brand-500"
+                  checked={reason === r.id}
+                  onChange={() => setReason(r.id)}
+                />
+                {r.label}
+              </label>
+            ))}
+          </fieldset>
+          <textarea
+            className="field mt-3 min-h-[80px] resize-none"
+            placeholder="Add any detail that helps (optional)"
+            maxLength={1000}
+            value={detail}
+            onChange={(e) => setDetail(e.target.value)}
+          />
+          {err && (
+            <p className="mt-2 text-sm font-medium text-danger-600">{err}</p>
+          )}
+          <Button className="mt-3 w-full" loading={busy} onClick={submit}>
+            Send report
+          </Button>
+        </Modal>
+      )}
+    </>
   );
 }

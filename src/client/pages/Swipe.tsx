@@ -1,9 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { api, ApiRequestError } from "../lib/api";
 import { SwipeCard, type SwipeDir } from "../components/SwipeCard";
 import { MatchCelebration } from "../components/MatchCelebration";
-import { Button, EmptyState, ErrorState, LoadingScreen } from "../components/ui";
+import { Button, EmptyState, ErrorState } from "../components/ui";
+import { SwipeSkeleton } from "../components/SwipeSkeleton";
+import {
+  IconArrowLeft,
+  IconClose,
+  IconHeart,
+  IconStar,
+  IconUndo,
+} from "../components/icons";
 import type { MatchDTO, SwipeStateDTO } from "@shared/types";
 
 export function Swipe() {
@@ -80,7 +88,7 @@ export function Swipe() {
     }
   };
 
-  if (loading && !state) return <LoadingScreen label="Shuffling the deck…" />;
+  if (loading && !state) return <SwipeSkeleton />;
   if (err && !state) return <ErrorState message={err} onRetry={load} />;
   if (!state) return null;
 
@@ -106,12 +114,30 @@ export function Swipe() {
   return (
     <div className="flex min-h-[calc(100vh-8rem)] flex-col">
       <div className="mb-3 flex items-center justify-between">
-        <Link to={`/groups/${id}`} className="text-sm text-navy-400">
-          ← Group
+        <Link
+          to={`/groups/${id}`}
+          className="-ml-2 inline-flex h-10 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-navy-500 hover:bg-navy/5"
+        >
+          <IconArrowLeft size={18} /> Group
         </Link>
-        {state.currentProgress && (
-          <span className="rounded-full bg-paper-soft px-3 py-1 text-xs font-bold">
-            {state.currentProgress.voted} / {state.currentProgress.total} voted
+        {state.currentProgress && state.currentProgress.total > 1 && (
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full bg-paper-soft px-3 py-1.5 text-xs font-bold text-navy"
+            aria-label={`${state.currentProgress.voted} of ${state.currentProgress.total} members voted on this card`}
+          >
+            <span className="flex gap-1">
+              {Array.from({ length: state.currentProgress.total }).map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    i < state.currentProgress!.voted
+                      ? "bg-brand-500"
+                      : "bg-navy/15"
+                  }`}
+                />
+              ))}
+            </span>
+            {state.currentProgress.voted}/{state.currentProgress.total} in
           </span>
         )}
       </div>
@@ -173,7 +199,7 @@ export function Swipe() {
 
           <div className="mt-5 flex items-center justify-center gap-4">
             <CircleBtn label="Pass" tone="pass" onClick={() => vote("nope")} disabled={busy}>
-              <IconX />
+              <IconClose size={26} />
             </CircleBtn>
             <CircleBtn
               label="Undo last swipe"
@@ -182,7 +208,7 @@ export function Swipe() {
               onClick={undo}
               disabled={busy || !state.lastVoted}
             >
-              <IconUndo />
+              <IconUndo size={18} />
             </CircleBtn>
             <CircleBtn
               label="Love it"
@@ -191,7 +217,7 @@ export function Swipe() {
               onClick={() => vote("superlike")}
               disabled={busy}
             >
-              <IconStar />
+              <IconStar size={18} />
             </CircleBtn>
             <CircleBtn
               label="Yes"
@@ -199,7 +225,7 @@ export function Swipe() {
               onClick={() => vote("like")}
               disabled={busy}
             >
-              <IconHeart />
+              <IconHeart size={24} />
             </CircleBtn>
           </div>
           <p className="mt-3 text-center text-xs text-navy-400">
@@ -234,7 +260,7 @@ function CircleBtn({
   tone = "plain",
   small,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   label: string;
   onClick: () => void;
   disabled?: boolean;
@@ -263,20 +289,3 @@ function CircleBtn({
   );
 }
 
-const S = ({ d, w = 22 }: { d: string; w?: number }) => (
-  <svg width={w} height={w} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <path d={d} stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-const IconX = () => <S d="M6 6l12 12M18 6L6 18" />;
-const IconUndo = () => <S d="M9 14l-4-4 4-4M5 10h9a5 5 0 0 1 0 10h-3" w={18} />;
-const IconStar = () => (
-  <svg width={18} height={18} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-    <path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.9 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9L12 2.5Z" />
-  </svg>
-);
-const IconHeart = () => (
-  <svg width={24} height={24} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-    <path d="M12 21s-7.5-4.7-9.7-9C.9 8.6 2.5 5 6 5c2.1 0 3.6 1.2 4.5 2.6l1.5 2.2 1.5-2.2C15.4 6.2 16.9 5 19 5c3.5 0 5.1 3.6 3.7 7-2.2 4.3-9.7 9-9.7 9Z" />
-  </svg>
-);

@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { api, ApiRequestError } from "../lib/api";
-import { Avatar, Button, Field } from "../components/ui";
+import { Avatar, Button, Field, Modal } from "../components/ui";
 import type { Me } from "@shared/types";
 
 export function Profile() {
@@ -81,17 +81,24 @@ export function Profile() {
     URL.revokeObjectURL(url);
   };
 
+  const [delOpen, setDelOpen] = useState(false);
+  const [delPw, setDelPw] = useState("");
+  const [delBusy, setDelBusy] = useState(false);
+  const [delErr, setDelErr] = useState<string | null>(null);
+
   const deleteAccount = async () => {
-    const password = prompt(
-      "This permanently deletes your account and data. Enter your password to confirm:",
-    );
-    if (!password) return;
+    setDelBusy(true);
+    setDelErr(null);
     try {
-      await api("/me/delete", { method: "POST", body: { password } });
+      await api("/me/delete", { method: "POST", body: { password: delPw } });
       await logout();
       nav("/");
     } catch (e) {
-      alert(e instanceof ApiRequestError ? e.message : "Could not delete.");
+      setDelErr(
+        e instanceof ApiRequestError ? e.message : "Could not delete your account.",
+      );
+    } finally {
+      setDelBusy(false);
     }
   };
 
@@ -184,22 +191,72 @@ export function Profile() {
 
       <section>
         <h2 className="mb-2 font-bold">Your data</h2>
+        <p className="mb-3 text-sm text-navy-400">
+          Account: {user.email}
+          {user.emailVerified ? " · verified" : " · not verified"}
+        </p>
         <div className="flex flex-wrap gap-2">
-          <button className="btn-ghost" onClick={exportData}>
+          <button className="btn-outline" onClick={exportData}>
             Export my data (JSON)
           </button>
           <button
-            className="btn-ghost text-danger-600"
-            onClick={deleteAccount}
+            className="btn-outline !border-danger-200 text-danger-600 hover:!border-danger-400"
+            onClick={() => {
+              setDelPw("");
+              setDelErr(null);
+              setDelOpen(true);
+            }}
           >
             Delete my account
           </button>
         </div>
-        <p className="mt-2 text-xs text-navy-400">
-          Account: {user.email}
-          {user.emailVerified ? " · verified" : " · not verified"}
-        </p>
       </section>
+
+      {delOpen && (
+        <Modal title="Delete your account" onClose={() => setDelOpen(false)}>
+          <p className="text-sm text-navy-500">
+            This permanently removes your profile, group memberships, votes and
+            messages. Groups you created are handed to another active member, or
+            archived if there is none. This can't be undone.
+          </p>
+          <form
+            className="mt-4 space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void deleteAccount();
+            }}
+          >
+            <Field
+              label="Confirm your password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={delPw}
+              onChange={(e) => setDelPw(e.target.value)}
+              error={delErr ?? undefined}
+            />
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                className="flex-1"
+                onClick={() => setDelOpen(false)}
+              >
+                Keep my account
+              </Button>
+              <Button
+                type="submit"
+                variant="dark"
+                loading={delBusy}
+                disabled={!delPw}
+                className="flex-1 !bg-danger-600 hover:!bg-danger-700"
+              >
+                Delete forever
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }

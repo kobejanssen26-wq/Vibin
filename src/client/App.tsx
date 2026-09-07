@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./lib/auth";
 import { AppShell } from "./components/AppShell";
@@ -38,7 +39,12 @@ function GuestOnly({ children }: { children: JSX.Element }) {
   return children;
 }
 
-export function App() {
+export function App({ onReady }: { onReady?: () => void }) {
+  const { loading } = useAuth();
+  useEffect(() => {
+    if (!loading) onReady?.();
+  }, [loading, onReady]);
+
   return (
     <Routes>
       <Route path="/" element={<Landing />} />

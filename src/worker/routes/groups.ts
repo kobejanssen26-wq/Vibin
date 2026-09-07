@@ -20,6 +20,7 @@ import {
 } from "../lib/access";
 import { buildGroupDTO, matchCountFor, settingsToDTO } from "../lib/group-view";
 import { chunk, rowsPerInsert } from "../lib/chunk";
+import { rateLimit } from "../lib/ratelimit";
 import { systemMessage, notifyGroup } from "../lib/notify";
 import { buildDeck } from "../engine/deck";
 import { activityVoteProgress } from "../engine/match";
@@ -41,9 +42,10 @@ const uid = (c: { get: (k: "userId") => string | null }) => c.get("userId")!;
 
 /* ------------------------------- create -------------------------------- */
 app.post("/", async (c) => {
+  const userId = uid(c);
+  await rateLimit(c.env, "group-create", userId, 20, 3600); // 20 / hour / user
   const { name } = await parseBody(c, z.object({ name: groupNameSchema }));
   const db = createDb(c.env);
-  const userId = uid(c);
   const now = Math.floor(Date.now() / 1000);
   const groupId = newId();
   const code = newInviteCode();

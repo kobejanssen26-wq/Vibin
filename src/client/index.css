@@ -23,10 +23,12 @@
     @apply bg-paper text-navy font-sans antialiased;
     -webkit-tap-highlight-color: transparent;
   }
+  /* Weight + tracking only — colour is inherited so headings work on dark
+     surfaces (match screen, plan header) where a parent sets text-white. */
   h1,
   h2,
   h3 {
-    @apply font-extrabold tracking-tight text-navy;
+    @apply font-extrabold tracking-tight;
   }
   ::selection {
     background: var(--vibin-lime);
@@ -63,8 +65,8 @@
     @apply btn border border-paper-line bg-white text-navy hover:border-brand-300 hover:text-brand-600;
   }
   .field {
-    @apply w-full rounded-2xl border border-paper-line bg-white px-4 py-3 text-navy
-      placeholder:text-navy-400 transition
+    @apply w-full rounded-2xl border border-paper-line bg-white px-4 py-3 text-[15px] text-navy
+      placeholder:text-navy-300 transition
       focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400/25;
   }
   .card {

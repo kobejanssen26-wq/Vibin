@@ -13,7 +13,10 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
-    sourcemap: true,
+    // No public source maps in production. Set to "hidden" locally if you need
+    // to debug a prod build without shipping the .map files.
+    sourcemap: false,
+    target: "es2020",
   },
   server: {
     port: 5173,

@@ -1,6 +1,8 @@
+import { forwardRef, useEffect } from "react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { LogoMark } from "./Logo";
+import { IconClose } from "./icons";
 
 /* ------------------------------- Button ------------------------------- */
 type Variant = "primary" | "lime" | "ghost" | "dark" | "outline";
@@ -12,18 +14,19 @@ const VARIANT: Record<Variant, string> = {
   outline: "btn-outline",
 };
 
-export function Button({
-  variant = "primary",
-  loading,
-  className = "",
-  children,
-  ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: Variant;
-  loading?: boolean;
-}) {
+export const Button = forwardRef<
+  HTMLButtonElement,
+  ButtonHTMLAttributes<HTMLButtonElement> & {
+    variant?: Variant;
+    loading?: boolean;
+  }
+>(function Button(
+  { variant = "primary", loading, className = "", children, ...rest },
+  ref,
+) {
   return (
     <button
+      ref={ref}
       className={`${VARIANT[variant]} ${className}`}
       disabled={loading || rest.disabled}
       {...rest}
@@ -32,7 +35,7 @@ export function Button({
       {children}
     </button>
   );
-}
+});
 
 export function LinkButton({
   to,
@@ -178,6 +181,53 @@ export function EmptyState({
       <h2 className="text-lg font-bold">{title}</h2>
       {message && <p className="mt-1 text-sm text-navy-400">{message}</p>}
       {action && <div className="mt-5">{action}</div>}
+    </div>
+  );
+}
+
+/* ------------------------------- Modal ------------------------------ */
+export function Modal({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    const { overflow } = document.body.style;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = overflow;
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-navy/50 p-4 backdrop-blur-sm sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="card w-full max-w-sm animate-slide-up p-5">
+        <div className="mb-3 flex items-start justify-between gap-4">
+          <h2 className="text-lg font-bold">{title}</h2>
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={onClose}
+            className="-mr-1 -mt-1 grid h-8 w-8 place-items-center rounded-full text-navy-400 hover:bg-navy/5"
+          >
+            <IconClose size={18} />
+          </button>
+        </div>
+        {children}
+      </div>
     </div>
   );
 }

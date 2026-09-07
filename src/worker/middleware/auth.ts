@@ -5,6 +5,7 @@ import {
   SESSION_COOKIE,
 } from "@shared/constants";
 import type { Env, Vars } from "../env";
+import { createDb } from "../db/client";
 import { forbidden, unauthorized } from "../lib/errors";
 import { getSession } from "../lib/session";
 
@@ -44,13 +45,14 @@ export function requireAdmin(): MiddlewareHandler<Ctx> {
   return async (c, next) => {
     const userId = c.get("userId");
     if (!userId) throw unauthorized();
-    const { createDb } = await import("../db/client");
     const db = createDb(c.env);
     const user = await db.query.users.findFirst({
       where: (u, { eq }) => eq(u.id, userId),
-      columns: { role: true },
+      columns: { role: true, status: true },
     });
-    if (user?.role !== "admin") throw forbidden("Admin access required.");
+    if (user?.role !== "admin" || user.status !== "active") {
+      throw forbidden("Admin access required.");
+    }
     await next();
   };
 }

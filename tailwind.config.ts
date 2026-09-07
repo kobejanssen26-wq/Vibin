@@ -50,9 +50,10 @@ export default {
           800: "#1b2138",
           700: "#28304c",
           600: "#3a4468",
-          500: "#5b6488",
-          400: "#8b93b0",
-          300: "#b9bfd4",
+          500: "#4c5578", // emphasis secondary text (AAA on Soft White)
+          400: "#5e6789", // muted / metadata text — still AA on Soft White
+          300: "#9aa1bd", // decorative only: borders, dividers, disabled
+          200: "#c3c8db",
         },
         // --- Soft White: light background ---
         paper: {

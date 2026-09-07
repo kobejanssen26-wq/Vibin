@@ -23,19 +23,45 @@ type Ctx = { Bindings: Env; Variables: Vars };
 const api = new Hono<Ctx>();
 
 api.use("*", async (c, next) => {
-  // Same-origin app: only allow the configured APP_URL origin for CORS
-  // (mostly relevant to the split dev setup on :5173).
-  const mw = cors({
-    origin: [c.env.APP_URL, "http://localhost:5173"],
+  // The SPA and API are served from the same origin, so CORS is only really
+  // exercised by the split dev setup (Vite :5173 → Worker). In production the
+  // configured APP_URL is the only allowed origin.
+  const allowed =
+    c.env.APP_ENV === "development"
+      ? [c.env.APP_URL, "http://localhost:5173", "http://127.0.0.1:5173"]
+      : [c.env.APP_URL];
+  return cors({
+    origin: allowed,
     credentials: true,
     allowHeaders: ["content-type", "x-vibin-csrf"],
-  });
-  return mw(c, next);
+    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    maxAge: 600,
+  })(c, next);
 });
-api.use("*", secureHeaders());
+
+api.use(
+  "*",
+  secureHeaders({
+    contentSecurityPolicy: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      connectSrc: ["'self'"],
+      frameAncestors: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      objectSrc: ["'none'"],
+    },
+    crossOriginEmbedderPolicy: false,
+    referrerPolicy: "strict-origin-when-cross-origin",
+  }),
+);
 api.use("*", withSession);
 
-api.get("/health", (c) => c.json({ ok: true, env: c.env.APP_ENV }));
+// Liveness probe only — no environment details.
+api.get("/health", (c) => c.json({ ok: true }));
 
 api.route("/auth", authRoutes);
 api.route("/media", mediaRoutes);

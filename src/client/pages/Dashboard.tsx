@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { usePoll } from "../lib/usePoll";
 import { EmptyState, ErrorState, LinkButton, LoadingScreen } from "../components/ui";
+import { IconPlus } from "../components/icons";
 import type { GroupSummaryDTO } from "@shared/types";
 import { formatWhen } from "../lib/format";
 
@@ -26,18 +27,18 @@ export function Dashboard() {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold">Your groups</h1>
+        <h1 className="text-[22px] font-extrabold">Your groups</h1>
         <LinkButton to="/groups/new" className="px-4 py-2 text-sm">
-          + New group
+          <IconPlus size={16} /> New group
         </LinkButton>
       </div>
 
       {groups.length === 0 ? (
         <EmptyState
           emoji="👋"
-          title="No groups yet"
-          message="Create one and share the invite link with your crew."
-          action={<LinkButton to="/groups/new">Create a group</LinkButton>}
+          title="Nothing planned yet"
+          message="Start a group, add your friends, and swipe on what to do together."
+          action={<LinkButton to="/groups/new">Create your first group</LinkButton>}
         />
       ) : (
         <ul className="space-y-3">
@@ -45,36 +46,51 @@ export function Dashboard() {
             const s = STATUS_LABEL[g.status] ?? STATUS_LABEL.configuring!;
             return (
               <li key={g.id}>
-                <Link to={`/groups/${g.id}`} className="card block p-4 transition hover:shadow-pop">
-                  <div className="flex items-center justify-between">
-                    <h2 className="font-bold">{g.name}</h2>
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${s.tone}`}>
+                <Link
+                  to={`/groups/${g.id}`}
+                  className="card block p-4 transition hover:-translate-y-0.5 hover:shadow-pop"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <h2 className="text-[17px] font-bold leading-tight">{g.name}</h2>
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${s.tone}`}
+                    >
                       {s.label}
                     </span>
                   </div>
                   <p className="mt-1 text-sm text-navy-400">
                     {g.activeMemberCount} member{g.activeMemberCount === 1 ? "" : "s"}
-                    {g.matchCount > 0 && ` · ${g.matchCount} match${g.matchCount === 1 ? "" : "es"}`}
-                    {!g.dateKnown && g.status === "swiping" && " · date TBD"}
+                    {g.matchCount > 0 &&
+                      ` · ${g.matchCount} match${g.matchCount === 1 ? "" : "es"}`}
                   </p>
-                  {g.progress && (
+
+                  {g.progress && g.progress.total > 1 && (
                     <div className="mt-3">
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-navy/10">
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-navy/10">
                         <div
-                          className="h-full rounded-full bg-vibin-blue transition-all"
+                          className="h-full rounded-full bg-brand-500 transition-all"
                           style={{
-                            width: `${g.progress.total ? (g.progress.voted / g.progress.total) * 100 : 0}%`,
+                            width: `${Math.round((g.progress.voted / g.progress.total) * 100)}%`,
                           }}
                         />
                       </div>
                       <p className="mt-1 text-xs text-navy-400">
-                        {g.progress.voted} / {g.progress.total} voted on the current card
+                        {g.progress.voted} of {g.progress.total} voted on the
+                        current card
                       </p>
                     </div>
                   )}
+
+                  {g.status === "swiping" && (!g.progress || g.progress.total <= 1) && (
+                    <p className="mt-2 text-xs font-medium text-brand-600">
+                      Ready to swipe →
+                    </p>
+                  )}
+
                   {g.upcomingPlan && (
-                    <p className="mt-2 rounded-xl bg-lime-400/15 px-3 py-2 text-xs font-semibold text-lime-700">
-                      Next: {g.upcomingPlan.activity.title} ·{" "}
+                    <p className="mt-3 flex items-center gap-1.5 rounded-xl bg-lime-400/20 px-3 py-2 text-xs font-semibold text-lime-800">
+                      <span className="h-1.5 w-1.5 rounded-full bg-lime-600" />
+                      {g.upcomingPlan.activity.title} ·{" "}
                       {formatWhen(g.upcomingPlan.startsAt)}
                     </p>
                   )}

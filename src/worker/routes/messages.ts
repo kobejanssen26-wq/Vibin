@@ -7,6 +7,7 @@ import { messages, profiles } from "../db/schema";
 import { parseBody, parseQuery } from "../lib/validate";
 import { requireActiveMember, requireGroupMember } from "../lib/access";
 import { newId } from "../lib/id";
+import { rateLimit } from "../lib/ratelimit";
 import { notifyGroup } from "../lib/notify";
 import { toPublicUser } from "../lib/dto";
 import { LIMITS } from "@shared/constants";
@@ -79,6 +80,7 @@ app.post("/:id/messages", async (c) => {
   const db = createDb(c.env);
   const groupId = c.req.param("id");
   await requireActiveMember(db, groupId, uid(c));
+  await rateLimit(c.env, "chat", `${groupId}:${uid(c)}`, 30, 60); // 30 / min
   const body = await parseBody(
     c,
     z.object({

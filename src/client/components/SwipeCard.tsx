@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState } from "react";
 import type { ActivityDTO } from "@shared/types";
 import { CATEGORY_ICON } from "@shared/constants";
+import { IconMapPin } from "./icons";
+import { formatDuration } from "../lib/format";
 
 export type SwipeDir = "like" | "nope" | "superlike";
 
@@ -36,9 +38,11 @@ export function SwipeCard({
   offset?: number;
 }) {
   const [drag, setDrag] = useState({ x: 0, y: 0, active: false });
+  const [imgOk, setImgOk] = useState(true);
   const [exit, setExit] = useState<{ x: number; y: number; r: number } | null>(
     null,
   );
+  const showImage = Boolean(activity.imageUrl) && imgOk;
   const start = useRef<{ x: number; y: number; t: number } | null>(null);
   const last = useRef<{ x: number; t: number } | null>(null);
   const vx = useRef(0);
@@ -130,21 +134,32 @@ export function SwipeCard({
         />
 
         <div className="relative h-[56%] w-full overflow-hidden">
-          {activity.imageUrl ? (
+          {showImage ? (
             <img
-              src={activity.imageUrl}
+              src={activity.imageUrl!}
               alt={activity.title}
               className="h-full w-full object-cover"
               draggable={false}
               loading="lazy"
+              onError={() => setImgOk(false)}
             />
           ) : (
             <div
-              className={`grid h-full w-full place-items-center bg-gradient-to-br ${
+              className={`relative grid h-full w-full place-items-center bg-gradient-to-br ${
                 CATEGORY_BG[activity.category] ?? CATEGORY_BG.other
-              } text-7xl`}
+              }`}
             >
-              {CATEGORY_ICON[activity.category] ?? "✨"}
+              <div
+                className="absolute inset-0 opacity-[0.14]"
+                style={{
+                  backgroundImage:
+                    "radial-gradient(circle at 1px 1px, #fff 1px, transparent 0)",
+                  backgroundSize: "22px 22px",
+                }}
+              />
+              <span className="grid h-20 w-20 place-items-center rounded-full bg-white/12 text-4xl ring-1 ring-white/20 backdrop-blur-sm">
+                {CATEGORY_ICON[activity.category] ?? "✨"}
+              </span>
             </div>
           )}
           <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-navy via-navy/70 to-transparent" />
@@ -157,48 +172,71 @@ export function SwipeCard({
           <Stamp text="LOVE IT" cls="text-lime-500 border-lime-500" op={superOp} rotate={-7} pos="left-1/2 -translate-x-1/2 bottom-6" />
 
           <div className="absolute bottom-3 left-3 right-3 text-white">
-            <h2 className="text-2xl font-extrabold leading-tight drop-shadow-sm">
+            <h2 className="text-[22px] font-extrabold leading-tight drop-shadow-sm">
               {activity.title}
             </h2>
-            <p className="text-sm opacity-90">
-              📍 {activity.locationLabel}
-              {activity.distanceKm != null && ` · ${activity.distanceKm} km`}
+            <p className="mt-0.5 flex items-center gap-1 text-sm text-white/90">
+              <IconMapPin size={15} className="shrink-0" />
+              <span className="truncate">
+                {activity.locationLabel}
+                {activity.distanceKm != null && ` · ${activity.distanceKm} km`}
+              </span>
             </p>
           </div>
         </div>
 
-        <div className="flex h-[44%] flex-col gap-2 p-4">
-          <div className="flex flex-wrap gap-2 text-sm font-medium text-navy-700">
-            <span className="chip">💶 {activity.priceLabel}</span>
-            {activity.durationMin && (
-              <span className="chip">⏱️ {formatDuration(activity.durationMin)}</span>
-            )}
-            {activity.indoorOutdoor && (
-              <span className="chip">
-                {activity.indoorOutdoor === "indoor" ? "🏠 Indoor" : activity.indoorOutdoor === "outdoor" ? "🌳 Outdoor" : "🏠🌳 Both"}
+        <div className="flex h-[44%] flex-col gap-2.5 p-4">
+          <div className="flex flex-wrap gap-1.5 text-[13px] font-semibold">
+            <span className="rounded-full bg-brand-50 px-2.5 py-1 text-brand-700">
+              {activity.priceLabel}
+            </span>
+            {activity.durationMin ? (
+              <span className="rounded-full bg-paper-soft px-2.5 py-1 text-navy-600">
+                {formatDuration(activity.durationMin)}
               </span>
-            )}
-            {activity.minAge ? <span className="chip">🔞 {activity.minAge}+</span> : null}
+            ) : null}
+            {activity.indoorOutdoor ? (
+              <span className="rounded-full bg-paper-soft px-2.5 py-1 text-navy-600">
+                {activity.indoorOutdoor === "indoor"
+                  ? "Indoor"
+                  : activity.indoorOutdoor === "outdoor"
+                    ? "Outdoor"
+                    : "Indoor & outdoor"}
+              </span>
+            ) : null}
+            {activity.minAge ? (
+              <span className="rounded-full bg-paper-soft px-2.5 py-1 text-navy-600">
+                {activity.minAge}+
+              </span>
+            ) : null}
           </div>
-          <p className="line-clamp-4 text-sm leading-relaxed text-navy-400">
+          <p className="line-clamp-4 text-sm leading-relaxed text-navy-500">
             {activity.description}
           </p>
+          {activity.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {activity.tags.slice(0, 3).map((t) => (
+                <span
+                  key={t}
+                  className="rounded-md bg-paper-soft px-2 py-0.5 text-[11px] font-medium text-navy-400"
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
           {activity.provider && (
-            <p className="mt-auto text-xs text-navy-400">
-              by <span className="font-semibold text-navy-700">{activity.provider}</span>
+            <p className="mt-auto pt-1 text-xs text-navy-400">
+              at{" "}
+              <span className="font-semibold text-navy-600">
+                {activity.provider}
+              </span>
             </p>
           )}
         </div>
       </article>
     </div>
   );
-}
-
-function formatDuration(min: number): string {
-  if (min < 60) return `${min} min`;
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return m ? `${h} h ${m} min` : `${h} h`;
 }
 
 function Stamp({

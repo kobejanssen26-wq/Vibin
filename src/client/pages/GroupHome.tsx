@@ -4,7 +4,6 @@ import { usePoll } from "../lib/usePoll";
 import { api, ApiRequestError } from "../lib/api";
 import {
   Avatar,
-  Button,
   EmptyState,
   ErrorState,
   LinkButton,
@@ -12,13 +11,17 @@ import {
 } from "../components/ui";
 import { InviteBox } from "../components/InviteBox";
 import { GroupChat } from "../components/GroupChat";
+import { useConfirm } from "../components/Confirm";
+import { IconArrowLeft } from "../components/icons";
 import { formatWhen } from "../lib/format";
 import type { GroupDTO, MatchDTO, PlanDTO } from "@shared/types";
 
 export function GroupHome() {
   const { id = "" } = useParams();
   const nav = useNavigate();
-  const [tab, setTab] = useState<"overview" | "chat">("overview");
+  const confirm = useConfirm();
+  const [tab, setTab] = useState<"plan" | "chat">("plan");
+  const [actionErr, setActionErr] = useState<string | null>(null);
   const { data, loading, error, refetch } = usePoll<{ group: GroupDTO }>(
     `/groups/${id}`,
     6000,
@@ -35,25 +38,33 @@ export function GroupHome() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between">
-        <div>
-          <Link to="/app" className="text-sm text-navy-400">
-            ← Groups
-          </Link>
-          <h1 className="text-2xl font-extrabold">{group.name}</h1>
-          <p className="text-sm text-navy-400">
-            {group.activeMemberCount} active ·{" "}
-            {group.settings?.dateKnown ? "date set" : "date TBD"}
-          </p>
-        </div>
+      <div>
+        <Link
+          to="/app"
+          className="-ml-2 inline-flex h-9 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-navy-500 hover:bg-navy/5"
+        >
+          <IconArrowLeft size={18} /> Groups
+        </Link>
+        <h1 className="text-[22px] font-extrabold">{group.name}</h1>
+        <p className="text-sm text-navy-400">
+          {group.activeMemberCount} active member
+          {group.activeMemberCount === 1 ? "" : "s"} ·{" "}
+          {group.settings?.dateKnown ? "date set" : "date to decide"}
+        </p>
       </div>
 
+      {actionErr && (
+        <p className="rounded-xl bg-danger-50 px-3 py-2 text-sm font-medium text-danger-700">
+          {actionErr}
+        </p>
+      )}
+
       <div className="flex gap-1 rounded-2xl bg-paper-soft p-1 text-sm font-semibold">
-        {(["overview", "chat"] as const).map((t) => (
+        {(["plan", "chat"] as const).map((t) => (
           <button
             key={t}
-            className={`flex-1 rounded-xl py-2 capitalize ${
-              tab === t ? "bg-white shadow-card" : "text-navy-400"
+            className={`flex-1 rounded-xl py-2 capitalize transition ${
+              tab === t ? "bg-white text-navy shadow-card" : "text-navy-400"
             }`}
             onClick={() => setTab(t)}
           >
@@ -108,6 +119,7 @@ export function GroupHome() {
                     <MemberActions
                       groupId={id}
                       memberId={m.id}
+                      memberName={m.displayName}
                       status={m.status}
                       onDone={refetch}
                     />
@@ -184,11 +196,24 @@ export function GroupHome() {
 
           {group.isCreator && group.status !== "archived" && (
             <button
-              className="w-full py-3 text-center text-sm text-danger-600"
+              className="w-full rounded-xl py-3 text-center text-sm font-medium text-danger-600 hover:bg-danger-50"
               onClick={async () => {
-                if (!confirm("Archive this group for everyone?")) return;
-                await api(`/groups/${id}`, { method: "DELETE" });
-                nav("/app");
+                const ok = await confirm({
+                  title: "Archive this group?",
+                  message:
+                    "It disappears for everyone. Plans and chat history stay saved but the group can't be used again.",
+                  confirmLabel: "Archive",
+                  tone: "danger",
+                });
+                if (!ok) return;
+                try {
+                  await api(`/groups/${id}`, { method: "DELETE" });
+                  nav("/app");
+                } catch (e) {
+                  setActionErr(
+                    e instanceof ApiRequestError ? e.message : "Could not archive the group.",
+                  );
+                }
               }}
             >
               Archive group
@@ -196,15 +221,21 @@ export function GroupHome() {
           )}
           {!group.isCreator && (
             <button
-              className="w-full py-3 text-center text-sm text-navy-400"
+              className="w-full rounded-xl py-3 text-center text-sm font-medium text-navy-500 hover:bg-navy/5"
               onClick={async () => {
-                if (!confirm("Leave this group?")) return;
+                const ok = await confirm({
+                  title: "Leave this group?",
+                  message: "You'll stop counting toward matches and lose access to the plan.",
+                  confirmLabel: "Leave",
+                  tone: "danger",
+                });
+                if (!ok) return;
                 try {
                   await api(`/groups/${id}/leave`, { method: "POST", body: {} });
                   nav("/app");
                 } catch (e) {
-                  alert(
-                    e instanceof ApiRequestError ? e.message : "Could not leave.",
+                  setActionErr(
+                    e instanceof ApiRequestError ? e.message : "Could not leave the group.",
                   );
                 }
               }}
@@ -263,14 +294,17 @@ function primaryCta(g: GroupDTO) {
 function MemberActions({
   groupId,
   memberId,
+  memberName,
   status,
   onDone,
 }: {
   groupId: string;
   memberId: string;
+  memberName: string;
   status: string;
   onDone: () => void;
 }) {
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
   const set = async (s: "active" | "inactive" | "removed") => {
     setBusy(true);
@@ -285,29 +319,31 @@ function MemberActions({
     }
   };
   return (
-    <div className="flex gap-1">
-      {status === "active" ? (
-        <button
-          className="btn-ghost px-2 py-1 text-xs"
-          disabled={busy}
-          onClick={() => set("inactive")}
-          title="Won't hold up matches"
-        >
-          Set inactive
-        </button>
-      ) : (
-        <button
-          className="btn-ghost px-2 py-1 text-xs"
-          disabled={busy}
-          onClick={() => set("active")}
-        >
-          Set active
-        </button>
-      )}
+    <div className="flex shrink-0 gap-1">
       <button
-        className="btn-ghost px-2 py-1 text-xs text-danger-600"
+        className="btn-ghost px-2.5 py-1.5 text-xs"
         disabled={busy}
-        onClick={() => confirm("Remove this member?") && set("removed")}
+        onClick={() => set(status === "active" ? "inactive" : "active")}
+        title={
+          status === "active"
+            ? "Inactive members don't hold up a match"
+            : "Count this member toward matches again"
+        }
+      >
+        {status === "active" ? "Set inactive" : "Set active"}
+      </button>
+      <button
+        className="btn-ghost px-2.5 py-1.5 text-xs text-danger-600"
+        disabled={busy}
+        onClick={async () => {
+          const ok = await confirm({
+            title: `Remove ${memberName}?`,
+            message: "They lose access to this group and stop counting toward matches.",
+            confirmLabel: "Remove",
+            tone: "danger",
+          });
+          if (ok) void set("removed");
+        }}
       >
         Remove
       </button>

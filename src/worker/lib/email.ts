@@ -17,9 +17,19 @@ export interface OutboundEmail {
 
 export async function sendEmail(env: Env, msg: OutboundEmail): Promise<void> {
   if (!env.EMAIL_API_KEY) {
-    console.log(
-      `\n[email:dev] To: ${msg.to}\n[email:dev] Subject: ${msg.subject}\n[email:dev] ${msg.text}\n`,
-    );
+    if (env.APP_ENV === "development") {
+      // Dev convenience: the verification / reset link is printed to the
+      // Worker console so you can copy it. Never do this in production.
+      console.log(
+        `\n[email:dev] To: ${msg.to}\n[email:dev] Subject: ${msg.subject}\n[email:dev] ${msg.text}\n`,
+      );
+    } else {
+      // Production with no provider configured: do NOT log the link (it could
+      // contain a reset token). Surface a warning for the operator instead.
+      console.warn(
+        `Email not sent to ${msg.to} ("${msg.subject}") — EMAIL_API_KEY is not set.`,
+      );
+    }
     return;
   }
   // Example: Resend. Replace with your provider of choice.
