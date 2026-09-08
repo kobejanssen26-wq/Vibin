@@ -10,6 +10,9 @@ export interface Env {
   // --- vars ---
   APP_ENV: "development" | "staging" | "production";
   APP_URL: string;
+  /** Optional deploy marker (git sha / CI build number) shown in the Command
+   *  Center version panel. Falls back to "dev" when unset. */
+  BUILD_ID?: string;
 
   // --- secrets (wrangler secret put / .dev.vars) ---
   /** Reserved for signed tokens (not yet used — sessions are opaque + KV-backed). */

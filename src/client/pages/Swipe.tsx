@@ -5,6 +5,7 @@ import { SwipeCard, type SwipeDir } from "../components/SwipeCard";
 import { MatchCelebration } from "../components/MatchCelebration";
 import { Button, EmptyState, ErrorState } from "../components/ui";
 import { SwipeSkeleton } from "../components/SwipeSkeleton";
+import { track } from "../lib/track";
 import {
   IconArrowLeft,
   IconClose,
@@ -51,6 +52,18 @@ export function Swipe() {
     }, 5000);
     return () => clearInterval(t);
   }, [load]);
+
+  // Record an impression once per (group, activity) when a card reaches the top.
+  const topActivityId = state?.queue[0]?.activity.id;
+  useEffect(() => {
+    if (!topActivityId) return;
+    track({
+      name: "activity_viewed",
+      groupId: id,
+      activityId: topActivityId,
+      dedupeKey: `${id}:${topActivityId}:view`,
+    });
+  }, [id, topActivityId]);
 
   const vote = async (dir: SwipeDir) => {
     if (!state || busy || state.queue.length === 0) return;

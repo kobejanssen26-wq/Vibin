@@ -1084,4 +1084,312 @@ app.get("/providers/:id", async (c) => {
   return c.json({ provider: p, activities: perActivity, totals });
 });
 
+/* -------------------------------- funnel -------------------------------- */
+/**
+ * Cohort funnel: users who signed up in the range, then how many of *those*
+ * users reached each later step (≥1 matching event). Conversion is measured
+ * against the signup count; drop-off against the previous step.
+ */
+app.get("/funnel", async (c) => {
+  const r = parseRange(new URL(c.req.url).searchParams);
+  const cohort = await c.env.DB.prepare(
+    `SELECT id FROM users WHERE created_at >= ?1 AND created_at < ?2`,
+  )
+    .bind(r.from, r.to)
+    .all<{ id: string }>();
+  const ids = cohort.results.map((x) => x.id);
+  const signups = ids.length;
+
+  const STEPS: { key: string; label: string; events: string[] }[] = [
+    { key: "signup", label: "Signed up", events: [] },
+    { key: "group", label: "In a group", events: ["group_created", "group_joined"] },
+    { key: "swipe", label: "Started swiping", events: ["swiping_started"] },
+    { key: "like", label: "First like", events: ["activity_liked", "activity_superliked"] },
+    { key: "match", label: "Activity match", events: ["activity_matched"] },
+    { key: "date_start", label: "Date matching", events: ["date_match_started"] },
+    { key: "date_done", label: "Date matched", events: ["date_matched"] },
+    { key: "plan", label: "Plan created", events: ["plan_created"] },
+    { key: "booking", label: "Booking click", events: ["booking_clicked"] },
+  ];
+
+  const counts: Record<string, number> = { signup: signups };
+  if (signups > 0) {
+    const placeholders = ids.map((_, i) => `?${i + 1}`).join(",");
+    for (const s of STEPS) {
+      if (s.key === "signup") continue;
+      const evPlaceholders = s.events
+        .map((_, i) => `?${ids.length + i + 1}`)
+        .join(",");
+      const row = await c.env.DB.prepare(
+        `SELECT COUNT(DISTINCT user_id) AS n FROM analytics_events
+         WHERE user_id IN (${placeholders})
+           AND name IN (${evPlaceholders})`,
+      )
+        .bind(...ids, ...s.events)
+        .first<{ n: number }>();
+      counts[s.key] = row?.n ?? 0;
+    }
+  } else {
+    for (const s of STEPS) counts[s.key] = 0;
+  }
+
+  let prev = signups;
+  const steps = STEPS.map((s) => {
+    const n = counts[s.key] ?? 0;
+    const conv = signups > 0 ? n / signups : null;
+    const drop = prev > 0 ? (prev - n) / prev : null;
+    const out = {
+      key: s.key,
+      label: s.label,
+      count: n,
+      conversion: conv,
+      dropoff: s.key === "signup" ? null : drop,
+    };
+    prev = n;
+    return out;
+  });
+
+  return c.json({
+    range: { from: r.from, to: r.to, label: r.label },
+    signups,
+    steps,
+    enough: signups >= 5,
+  });
+});
+
+/* ------------------------------ retention ------------------------------ */
+/**
+ * Aggregate D1 / D7 / D30: of users whose (signup + N days) window has fully
+ * elapsed, the share who produced any tracked event inside that window.
+ */
+app.get("/retention", async (c) => {
+  const nowSec = Math.floor(Date.now() / 1000);
+  const DAY = 86400;
+
+  async function bucket(days: number) {
+    const cutoff = nowSec - days * DAY;
+    const eligible = await c.env.DB.prepare(
+      `SELECT id, created_at FROM users WHERE created_at <= ?1`,
+    )
+      .bind(cutoff)
+      .all<{ id: string; created_at: number }>();
+    if (eligible.results.length === 0)
+      return { eligible: 0, retained: 0, rate: null as number | null };
+
+    const ids = eligible.results.map((u) => u.id);
+    const byId = new Map(eligible.results.map((u) => [u.id, u.created_at]));
+    const ph = ids.map((_, i) => `?${i + 1}`).join(",");
+    const evs = await c.env.DB.prepare(
+      `SELECT DISTINCT user_id, created_at FROM analytics_events
+       WHERE user_id IN (${ph}) AND name != 'user_registered'`,
+    )
+      .bind(...ids)
+      .all<{ user_id: string; created_at: number }>();
+
+    const retainedSet = new Set<string>();
+    for (const e of evs.results) {
+      const signup = byId.get(e.user_id);
+      if (signup == null) continue;
+      const lo = signup + (days === 1 ? 0 : 1) * DAY;
+      const hi = signup + days * DAY;
+      if (e.created_at > signup && e.created_at >= lo && e.created_at <= hi)
+        retainedSet.add(e.user_id);
+    }
+    return {
+      eligible: ids.length,
+      retained: retainedSet.size,
+      rate: ids.length > 0 ? retainedSet.size / ids.length : null,
+    };
+  }
+
+  const [d1, d7, d30] = await Promise.all([bucket(1), bucket(7), bucket(30)]);
+  const enough = d1.eligible >= 10;
+  return c.json({ d1, d7, d30, enough });
+});
+
+/* ------------------------------- errors ------------------------------- */
+
+app.get("/errors", async (c) => {
+  const url = new URL(c.req.url);
+  const r = parseRange(url.searchParams);
+  const rows = await c.env.DB.prepare(
+    `SELECT props, created_at FROM analytics_events
+     WHERE name IN ('server_error','client_error')
+       AND created_at >= ?1 AND created_at < ?2
+     ORDER BY created_at DESC LIMIT 2000`,
+  )
+    .bind(r.from, r.to)
+    .all<{ props: string; created_at: number }>();
+
+  const groups = new Map<
+    string,
+    {
+      source: string;
+      route: string;
+      message: string;
+      env: string;
+      count: number;
+      lastSeenAt: number;
+      statuses: Set<number>;
+    }
+  >();
+  for (const row of rows.results) {
+    let p: Record<string, unknown> = {};
+    try {
+      p = JSON.parse(row.props) as Record<string, unknown>;
+    } catch {
+      /* skip */
+    }
+    const source = String(p.source ?? (p.route ? "backend" : "frontend"));
+    const route = String(p.route ?? p.path ?? "—").slice(0, 120);
+    const message = String(p.message ?? p.error ?? "unknown").slice(0, 200);
+    const env = String(p.env ?? "—");
+    const key = `${source}|${route}|${message}`;
+    let g = groups.get(key);
+    if (!g) {
+      g = { source, route, message, env, count: 0, lastSeenAt: 0, statuses: new Set() };
+      groups.set(key, g);
+    }
+    g.count++;
+    g.lastSeenAt = Math.max(g.lastSeenAt, row.created_at);
+    if (typeof p.status === "number") g.statuses.add(p.status);
+  }
+
+  const list = [...groups.values()]
+    .map((g) => ({
+      source: g.source,
+      route: g.route,
+      message: g.message,
+      env: g.env,
+      count: g.count,
+      lastSeenAt: g.lastSeenAt,
+      statuses: [...g.statuses],
+    }))
+    .sort((a, b) => b.lastSeenAt - a.lastSeenAt);
+
+  return c.json({
+    range: { from: r.from, to: r.to, label: r.label },
+    total: rows.results.length,
+    groups: list,
+  });
+});
+
+/* ---------------------------- system health --------------------------- */
+
+app.get("/system", async (c) => {
+  const db = createDb(c.env);
+
+  const timed = async (fn: () => Promise<unknown>) => {
+    const t0 = Date.now();
+    try {
+      await fn();
+      return { ok: true, ms: Date.now() - t0 };
+    } catch {
+      return { ok: false, ms: Date.now() - t0 };
+    }
+  };
+
+  const dbCheck = await timed(() =>
+    c.env.DB.prepare("SELECT 1").first(),
+  );
+  const kvCheck = await timed(() => c.env.KV.get("__cc_health"));
+
+  const services = [
+    {
+      name: "Database (D1)",
+      status: dbCheck.ok ? "operational" : "down",
+      detail: `${dbCheck.ms} ms`,
+      latencyMs: dbCheck.ms,
+    },
+    {
+      name: "KV store",
+      status: kvCheck.ok ? "operational" : "down",
+      detail: `${kvCheck.ms} ms`,
+      latencyMs: kvCheck.ms,
+    },
+    {
+      name: "Encryption key",
+      status: hasEncryptionKey(c.env) ? "operational" : "down",
+      detail: hasEncryptionKey(c.env) ? "configured" : "ENCRYPTION_KEY missing",
+    },
+    {
+      name: "Break-glass recovery",
+      status: c.env.OWNER_RECOVERY_SECRET ? "operational" : "unknown",
+      detail: c.env.OWNER_RECOVERY_SECRET ? "configured" : "not configured",
+    },
+    {
+      name: "Email provider",
+      status: c.env.EMAIL_API_KEY ? "operational" : "unknown",
+      detail: c.env.EMAIL_API_KEY
+        ? "API key set (delivery not probed)"
+        : "not configured — dev logs only",
+    },
+    {
+      name: "Object storage (R2)",
+      status: c.env.MEDIA ? "operational" : "unknown",
+      detail: c.env.MEDIA ? "bound" : "not enabled",
+    },
+  ];
+
+  const tableNames = [
+    "users",
+    "groups",
+    "group_members",
+    "activities",
+    "providers",
+    "activity_votes",
+    "matches",
+    "plans",
+    "messages",
+    "analytics_events",
+    "audit_log",
+    "admin_sessions",
+  ];
+  const tables: { name: string; rows: number }[] = [];
+  for (const t of tableNames) {
+    const row = await c.env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM ${t}`,
+    ).first<{ n: number }>();
+    tables.push({ name: t, rows: row?.n ?? 0 });
+  }
+
+  let migrationsApplied = 0;
+  try {
+    const m = await c.env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM d1_migrations`,
+    ).first<{ n: number }>();
+    migrationsApplied = m?.n ?? 0;
+  } catch {
+    /* table name differs between wrangler versions — best effort */
+  }
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const evTotal = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(analyticsEvents);
+  const ev24 = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(analyticsEvents)
+    .where(gte(analyticsEvents.createdAt, nowSec - 86400));
+  const evByName = await c.env.DB.prepare(
+    `SELECT name, COUNT(*) AS n FROM analytics_events GROUP BY name ORDER BY n DESC`,
+  ).all<{ name: string; n: number }>();
+
+  return c.json({
+    version: {
+      env: c.env.APP_ENV,
+      appUrl: c.env.APP_URL,
+      buildId: c.env.BUILD_ID ?? "dev",
+      serverTime: nowSec,
+    },
+    services,
+    database: { tables, migrationsApplied },
+    events: {
+      total: evTotal.at(0)?.n ?? 0,
+      last24h: ev24.at(0)?.n ?? 0,
+      byName: evByName.results,
+    },
+  });
+});
+
 export default app;

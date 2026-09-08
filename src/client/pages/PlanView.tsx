@@ -21,6 +21,7 @@ import {
   IconTag,
 } from "../components/icons";
 import { formatDay, formatDuration, formatWhen } from "../lib/format";
+import { track } from "../lib/track";
 import type { PlanDTO } from "@shared/types";
 
 export function PlanView() {
@@ -159,6 +160,14 @@ export function PlanView() {
             target="_blank"
             rel="noreferrer"
             className="btn-primary col-span-2"
+            onClick={() =>
+              track({
+                name: "booking_clicked",
+                groupId: plan.groupId,
+                activityId: a.id,
+                props: { kind: a.ticketUrl ? "ticket" : "booking" },
+              })
+            }
           >
             <IconExternal size={18} />
             {a.ticketUrl ? "Get tickets" : "Book with the provider"}
@@ -184,6 +193,14 @@ export function PlanView() {
             target="_blank"
             rel="noreferrer"
             className="btn-outline"
+            onClick={() =>
+              track({
+                name: "calendar_action",
+                groupId: plan.groupId,
+                activityId: a.id,
+                props: { kind: "google" },
+              })
+            }
           >
             <IconCalendar size={16} /> Calendar
           </a>

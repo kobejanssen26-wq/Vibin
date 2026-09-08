@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import type { Env, Vars } from "./env";
-import { toResponse } from "./lib/errors";
+import { AppError, toResponse } from "./lib/errors";
+import { trackNow } from "./lib/analytics";
 import { withSession, requireAuth } from "./middleware/auth";
 import { withAdminSession, requireOwner } from "./middleware/admin";
 
@@ -108,7 +109,30 @@ authed.route("/reports", reportRoutes);
 authed.route("/events", eventRoutes);
 api.route("/", authed);
 
-api.onError((err, c) => toResponse(err, c));
+api.onError((err, c) => {
+  // Record genuine server faults (unhandled exceptions / explicit 5xx) for the
+  // Command Center error centre. Never store the request body, headers or any
+  // secret — just where it happened and a truncated message.
+  const status = err instanceof AppError ? err.status : 500;
+  if (status >= 500) {
+    const p = trackNow(c.env, "server_error", {
+      userId: c.get("userId"),
+      props: {
+        route: new URL(c.req.url).pathname.slice(0, 120),
+        method: c.req.method,
+        status,
+        message: (err instanceof Error ? err.message : String(err)).slice(0, 200),
+        env: c.env.APP_ENV,
+      },
+    });
+    const ctx = c.executionCtx as
+      | { waitUntil?: (p: Promise<unknown>) => void }
+      | undefined;
+    if (ctx?.waitUntil) ctx.waitUntil(p);
+    else void p;
+  }
+  return toResponse(err, c);
+});
 api.notFound((c) => c.json({ error: "not_found", message: "Unknown endpoint." }, 404));
 
 /* ------------------------------------------------------------------ */

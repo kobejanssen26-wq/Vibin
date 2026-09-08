@@ -4,7 +4,10 @@ import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./lib/auth";
 import { ConfirmProvider } from "./components/Confirm";
 import { App } from "./App";
+import { installErrorTracking } from "./lib/track";
 import "./index.css";
+
+installErrorTracking();
 
 const rootEl = document.getElementById("root")!;
 

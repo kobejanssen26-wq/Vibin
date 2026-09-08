@@ -13,6 +13,9 @@ import { ActivityDetail } from "./pages/ActivityDetail";
 import { Providers } from "./pages/Providers";
 import { ProviderDetail } from "./pages/ProviderDetail";
 import { Analytics } from "./pages/Analytics";
+import { Funnel } from "./pages/Funnel";
+import { Errors } from "./pages/Errors";
+import { System } from "./pages/System";
 
 /** Placeholder for sections that land in a later phase. Keeps the nav honest. */
 function Soon({ title }: { title: string }) {
@@ -52,9 +55,9 @@ function AdminRoutes() {
         <Route path="/providers" element={<Providers />} />
         <Route path="/providers/:id" element={<ProviderDetail />} />
         <Route path="/analytics" element={<Analytics />} />
-        <Route path="/funnel" element={<Soon title="Funnel & retention" />} />
-        <Route path="/errors" element={<Soon title="Errors" />} />
-        <Route path="/system" element={<Soon title="System health" />} />
+        <Route path="/funnel" element={<Funnel />} />
+        <Route path="/errors" element={<Errors />} />
+        <Route path="/system" element={<System />} />
         <Route path="/flags" element={<Soon title="Feature flags" />} />
         <Route path="/audit" element={<Soon title="Audit log" />} />
         <Route path="/sessions" element={<Soon title="Admin sessions" />} />
