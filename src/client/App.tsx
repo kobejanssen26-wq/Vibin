@@ -1,8 +1,9 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./lib/auth";
 import { AppShell } from "./components/AppShell";
 import { LoadingScreen } from "./components/ui";
+import { LogoMark } from "./components/Logo";
 
 import { Landing } from "./pages/Landing";
 import { Login } from "./pages/Login";
@@ -44,11 +45,55 @@ function GuestOnly({ children }: { children: JSX.Element }) {
   return children;
 }
 
+/**
+ * Full-screen maintenance notice for normal users. The Command Center
+ * (/admin) stays reachable so the owner can turn it back off.
+ */
+function MaintenanceScreen({ message }: { message: string }) {
+  return (
+    <div className="grid min-h-full place-items-center bg-paper px-6 text-center">
+      <div className="max-w-sm">
+        <LogoMark className="mx-auto h-10 w-10" />
+        <h1 className="mt-4 text-xl font-extrabold tracking-[-0.02em]">
+          Back shortly
+        </h1>
+        <p className="mt-2 text-sm text-navy-400">
+          {message || "VIBIN is briefly down for maintenance."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function App({ onReady }: { onReady?: () => void }) {
   const { loading } = useAuth();
+  const loc = useLocation();
+  const [maint, setMaint] = useState<{ on: boolean; message: string } | null>(
+    null,
+  );
+
   useEffect(() => {
     if (!loading) onReady?.();
   }, [loading, onReady]);
+
+  useEffect(() => {
+    let live = true;
+    fetch("/api/status", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((d: { maintenance?: boolean; message?: string }) => {
+        if (live) setMaint({ on: !!d.maintenance, message: d.message ?? "" });
+      })
+      .catch(() => {
+        if (live) setMaint({ on: false, message: "" });
+      });
+    return () => {
+      live = false;
+    };
+  }, [loc.pathname]);
+
+  if (maint?.on && !loc.pathname.startsWith("/admin")) {
+    return <MaintenanceScreen message={maint.message} />;
+  }
 
   return (
     <Routes>

@@ -4,6 +4,7 @@ import { secureHeaders } from "hono/secure-headers";
 import type { Env, Vars } from "./env";
 import { AppError, toResponse } from "./lib/errors";
 import { trackNow } from "./lib/analytics";
+import { getSetting, SETTINGS } from "./lib/system-settings";
 import { withSession, requireAuth } from "./middleware/auth";
 import { withAdminSession, requireOwner } from "./middleware/admin";
 
@@ -67,6 +68,49 @@ api.use("*", withSession);
 
 // Liveness probe only — no environment details.
 api.get("/health", (c) => c.json({ ok: true }));
+
+/* Public status: lets the SPA render a maintenance screen before it hits a
+   protected route. Never reveals anything sensitive. */
+let maintCache: { at: number; on: boolean; msg: string } | null = null;
+async function maintenanceState(env: Env) {
+  if (maintCache && Date.now() - maintCache.at < 15_000) return maintCache;
+  const [on, msg] = await Promise.all([
+    getSetting(env, SETTINGS.maintenanceMode),
+    getSetting(env, SETTINGS.maintenanceMessage),
+  ]);
+  maintCache = {
+    at: Date.now(),
+    on: on === "1",
+    msg: msg ?? "",
+  };
+  return maintCache;
+}
+api.get("/status", async (c) => {
+  const m = await maintenanceState(c.env);
+  return c.json({ maintenance: m.on, message: m.msg });
+});
+
+/* When maintenance mode is on, the whole normal-user API returns 503. The
+   Owner Command Center (/admin/*), the liveness probe and this status route
+   stay reachable so the owner can still work and turn it back off. */
+api.use("*", async (c, next) => {
+  const path = new URL(c.req.url).pathname;
+  if (
+    path === "/api/health" ||
+    path === "/api/status" ||
+    path.startsWith("/api/admin/")
+  ) {
+    return next();
+  }
+  const m = await maintenanceState(c.env);
+  if (m.on) {
+    return c.json(
+      { error: "maintenance", message: m.msg || "VIBIN is briefly down for maintenance." },
+      503,
+    );
+  }
+  return next();
+});
 
 api.route("/auth", authRoutes);
 api.route("/media", mediaRoutes);

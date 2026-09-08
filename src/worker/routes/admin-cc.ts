@@ -24,9 +24,13 @@ import {
   reports,
   users,
 } from "../db/schema";
+import { z } from "zod";
 import { parseRange, pctDelta } from "../lib/range";
 import { hasEncryptionKey } from "../lib/crypto-box";
-import { notFound } from "../lib/errors";
+import { badRequest, notFound } from "../lib/errors";
+import { parseBody } from "../lib/validate";
+import { audit } from "../lib/audit";
+import { SETTINGS, getSetting, setSetting } from "../lib/system-settings";
 
 type Ctx = { Bindings: Env; Variables: Vars };
 const app = new Hono<Ctx>();
@@ -1390,6 +1394,203 @@ app.get("/system", async (c) => {
       byName: evByName.results,
     },
   });
+});
+
+/* ------------------------------- audit log ------------------------------- */
+
+app.get("/audit/actions", async (c) => {
+  const rows = await c.env.DB.prepare(
+    `SELECT DISTINCT action FROM audit_log ORDER BY action`,
+  ).all<{ action: string }>();
+  return c.json({ actions: rows.results.map((r) => r.action) });
+});
+
+app.get("/audit", async (c) => {
+  const url = new URL(c.req.url);
+  const { page, pageSize, offset } = listParams(url, ["created"], "created");
+  const r = parseRange(url.searchParams);
+  const action = url.searchParams.get("action") || "";
+  const actor = url.searchParams.get("actor") || "";
+
+  const where: string[] = ["l.created_at >= ?1 AND l.created_at < ?2"];
+  const args: unknown[] = [r.from, r.to];
+  if (action) {
+    args.push(action);
+    where.push(`l.action = ?${args.length}`);
+  }
+  if (actor) {
+    args.push(`%${actor.toLowerCase()}%`, actor);
+    where.push(
+      `(l.actor_id = ?${args.length} OR lower(u.email_normalized) LIKE ?${args.length - 1})`,
+    );
+  }
+  const whereSql = `WHERE ${where.join(" AND ")}`;
+
+  const total = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM audit_log l LEFT JOIN users u ON u.id = l.actor_id ${whereSql}`,
+  )
+    .bind(...(args as never[]))
+    .first<{ n: number }>();
+
+  const rows = await c.env.DB.prepare(
+    `SELECT l.id, l.actor_type AS actorType, l.actor_id AS actorId,
+            u.email AS actorEmail, l.action, l.target_type AS targetType,
+            l.target_id AS targetId, l.meta, l.ip, l.user_agent AS userAgent,
+            l.created_at AS createdAt
+     FROM audit_log l LEFT JOIN users u ON u.id = l.actor_id
+     ${whereSql} ORDER BY l.created_at DESC LIMIT ${pageSize} OFFSET ${offset}`,
+  )
+    .bind(...(args as never[]))
+    .all<Record<string, unknown>>();
+
+  return c.json({
+    rows: rows.results.map((r2) => ({
+      ...r2,
+      meta: safeParse(r2.meta as string),
+    })),
+    ...pageMeta(total?.n ?? 0, page, pageSize),
+  });
+});
+
+function safeParse(s: string): unknown {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return {};
+  }
+}
+
+/* ------------------------------ feature flags ------------------------------ */
+
+app.get("/flags", async (c) => {
+  const rows = await c.env.DB.prepare(
+    `SELECT f.key, f.enabled, f.description, f.updated_at AS updatedAt,
+            u.email AS updatedByEmail
+     FROM feature_flags f LEFT JOIN users u ON u.id = f.updated_by
+     ORDER BY f.key`,
+  ).all<{
+    key: string;
+    enabled: number;
+    description: string;
+    updatedAt: number;
+    updatedByEmail: string | null;
+  }>();
+  return c.json({
+    flags: rows.results.map((r) => ({
+      key: r.key,
+      enabled: !!r.enabled,
+      description: r.description,
+      updatedAt: r.updatedAt,
+      updatedByEmail: r.updatedByEmail,
+    })),
+  });
+});
+
+const flagKey = z
+  .string()
+  .trim()
+  .min(2)
+  .max(60)
+  .regex(/^[a-z0-9_]+$/, "lowercase letters, digits and underscores only");
+
+app.put("/flags/:key", async (c) => {
+  const key = flagKey.parse(c.req.param("key"));
+  const body = await parseBody(
+    c,
+    z.object({
+      enabled: z.boolean(),
+      description: z.string().trim().max(200).optional(),
+    }),
+  );
+  const nowS = Math.floor(Date.now() / 1000);
+  await c.env.DB.prepare(
+    `INSERT INTO feature_flags (key, enabled, description, updated_at, updated_by)
+     VALUES (?1, ?2, ?3, ?4, ?5)
+     ON CONFLICT(key) DO UPDATE SET
+       enabled = ?2,
+       description = COALESCE(?3, feature_flags.description),
+       updated_at = ?4, updated_by = ?5`,
+  )
+    .bind(
+      key,
+      body.enabled ? 1 : 0,
+      body.description ?? null,
+      nowS,
+      c.get("adminUserId"),
+    )
+    .run();
+  await audit(c, {
+    action: "flag.updated",
+    targetType: "feature_flag",
+    targetId: key,
+    meta: { enabled: body.enabled },
+  });
+  return c.json({ ok: true });
+});
+
+app.delete("/flags/:key", async (c) => {
+  const key = c.req.param("key");
+  await c.env.DB.prepare(`DELETE FROM feature_flags WHERE key = ?1`)
+    .bind(key)
+    .run();
+  await audit(c, {
+    action: "flag.deleted",
+    targetType: "feature_flag",
+    targetId: key,
+  });
+  return c.json({ ok: true });
+});
+
+/* -------------------------------- settings ------------------------------- */
+
+const SETTABLE = new Set<string>([
+  SETTINGS.maintenanceMode,
+  SETTINGS.maintenanceMessage,
+]);
+
+app.get("/settings", async (c) => {
+  const [maint, msg] = await Promise.all([
+    getSetting(c.env, SETTINGS.maintenanceMode),
+    getSetting(c.env, SETTINGS.maintenanceMessage),
+  ]);
+  return c.json({
+    maintenanceMode: maint === "1",
+    maintenanceMessage: msg ?? "",
+    encryptionConfigured: hasEncryptionKey(c.env),
+    recoveryConfigured: !!c.env.OWNER_RECOVERY_SECRET,
+    emailConfigured: !!c.env.EMAIL_API_KEY,
+  });
+});
+
+app.put("/settings", async (c) => {
+  const body = await parseBody(
+    c,
+    z.object({
+      key: z.string(),
+      value: z.string().max(500),
+    }),
+  );
+  if (!SETTABLE.has(body.key)) throw badRequest("That setting is not writable.");
+  // maintenance mode is boolean-ish
+  const value =
+    body.key === SETTINGS.maintenanceMode
+      ? body.value === "1" || body.value === "true"
+        ? "1"
+        : "0"
+      : body.value;
+  await setSetting(c.env, body.key, value, c.get("adminUserId"));
+  await audit(c, {
+    action:
+      body.key === SETTINGS.maintenanceMode
+        ? value === "1"
+          ? "maintenance.enabled"
+          : "maintenance.disabled"
+        : "settings.updated",
+    targetType: "setting",
+    targetId: body.key,
+    meta: body.key === SETTINGS.maintenanceMode ? { value } : {},
+  });
+  return c.json({ ok: true });
 });
 
 export default app;

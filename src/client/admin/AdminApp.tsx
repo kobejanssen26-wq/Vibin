@@ -16,6 +16,10 @@ import { Analytics } from "./pages/Analytics";
 import { Funnel } from "./pages/Funnel";
 import { Errors } from "./pages/Errors";
 import { System } from "./pages/System";
+import { AuditLog } from "./pages/AuditLog";
+import { Sessions } from "./pages/Sessions";
+import { Flags } from "./pages/Flags";
+import { Settings } from "./pages/Settings";
 
 /** Placeholder for sections that land in a later phase. Keeps the nav honest. */
 function Soon({ title }: { title: string }) {
@@ -58,11 +62,11 @@ function AdminRoutes() {
         <Route path="/funnel" element={<Funnel />} />
         <Route path="/errors" element={<Errors />} />
         <Route path="/system" element={<System />} />
-        <Route path="/flags" element={<Soon title="Feature flags" />} />
-        <Route path="/audit" element={<Soon title="Audit log" />} />
-        <Route path="/sessions" element={<Soon title="Admin sessions" />} />
+        <Route path="/flags" element={<Flags />} />
+        <Route path="/audit" element={<AuditLog />} />
+        <Route path="/sessions" element={<Sessions />} />
         <Route path="/vault" element={<Soon title="Credential vault" />} />
-        <Route path="/settings" element={<Soon title="Settings" />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Soon title="Not found" />} />
       </Routes>
     </Shell>
