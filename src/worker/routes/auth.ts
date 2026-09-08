@@ -168,6 +168,7 @@ app.get("/session", async (c) => {
 
 /* ---------------------------- verify email ----------------------------- */
 app.post("/verify-email", async (c) => {
+  await rateLimit(c.env, "verify-email", clientIp(c.req.raw), 20, 10 * 60);
   const body = await parseBody(c, z.object({ token: z.string().min(10) }));
   const db = createDb(c.env);
   const hash = await sha256Hex(body.token);
@@ -220,6 +221,7 @@ app.post("/request-reset", async (c) => {
 
 /* ---------------------------- reset password -------------------------- */
 app.post("/reset", async (c) => {
+  await rateLimit(c.env, "reset", clientIp(c.req.raw), 15, 15 * 60);
   const body = await parseBody(
     c,
     z.object({ token: z.string().min(10), password: passwordSchema }),
