@@ -5,9 +5,9 @@ export function NotFound() {
   return (
     <div className="relative min-h-full bg-paper">
       <div className="pointer-events-none absolute inset-0 bg-vibin-hero" />
-      <div className="route-fade relative mx-auto flex min-h-full max-w-md flex-col items-center justify-center px-5 py-20 text-center">
+      <div className="relative mx-auto flex min-h-full max-w-md flex-col items-center justify-center px-5 py-20 text-center">
         <span className="grid h-16 w-16 place-items-center rounded-3xl border border-paper-line bg-paper-card">
-          <LogoMark className="h-9 w-9" animated />
+          <LogoMark className="h-9 w-9" />
         </span>
         <h1 className="mt-5 text-3xl font-extrabold tracking-[-0.02em]">
           Nothing here
