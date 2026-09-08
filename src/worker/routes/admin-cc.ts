@@ -595,4 +595,493 @@ app.get("/groups/:id", async (c) => {
   });
 });
 
+/* ------------------------------ activities ------------------------------ */
+/**
+ * Real per-activity behaviour. Impressions/views/booking-clicks come from
+ * analytics_events; likes/passes/matches/plans come from the relational
+ * tables so the numbers are complete for data that predates event tracking.
+ */
+async function activityMetrics(
+  env: Env,
+  where: string,
+  args: unknown[],
+): Promise<Map<string, ActMetric>> {
+  const bind = (sql: string) => env.DB.prepare(sql).bind(...(args as never[]));
+  const [votes, matchRows, planRows, viewRows, bookRows, poolRows] =
+    await Promise.all([
+      bind(
+        `SELECT av.activity_id AS id, av.value, COUNT(*) AS n
+         FROM activity_votes av JOIN activities a ON a.id = av.activity_id
+         ${where} GROUP BY av.activity_id, av.value`,
+      ).all<{ id: string; value: string; n: number }>(),
+      bind(
+        `SELECT m.activity_id AS id, COUNT(*) AS n
+         FROM matches m JOIN activities a ON a.id = m.activity_id
+         ${where} GROUP BY m.activity_id`,
+      ).all<{ id: string; n: number }>(),
+      bind(
+        `SELECT p.activity_id AS id, COUNT(*) AS n
+         FROM plans p JOIN activities a ON a.id = p.activity_id
+         ${where} GROUP BY p.activity_id`,
+      ).all<{ id: string; n: number }>(),
+      bind(
+        `SELECT e.activity_id AS id, COUNT(*) AS n
+         FROM analytics_events e JOIN activities a ON a.id = e.activity_id
+         ${where} ${where ? "AND" : "WHERE"} e.name IN ('activity_viewed')
+         GROUP BY e.activity_id`,
+      ).all<{ id: string; n: number }>(),
+      bind(
+        `SELECT e.activity_id AS id, COUNT(*) AS n
+         FROM analytics_events e JOIN activities a ON a.id = e.activity_id
+         ${where} ${where ? "AND" : "WHERE"} e.name = 'booking_clicked'
+         GROUP BY e.activity_id`,
+      ).all<{ id: string; n: number }>(),
+      bind(
+        `SELECT gap.activity_id AS id, COUNT(*) AS n
+         FROM group_activity_pool gap JOIN activities a ON a.id = gap.activity_id
+         ${where} GROUP BY gap.activity_id`,
+      ).all<{ id: string; n: number }>(),
+    ]);
+
+  const m = new Map<string, ActMetric>();
+  const get = (id: string) => {
+    let x = m.get(id);
+    if (!x) {
+      x = {
+        likes: 0,
+        passes: 0,
+        superlikes: 0,
+        matches: 0,
+        plans: 0,
+        views: 0,
+        bookingClicks: 0,
+        pooled: 0,
+      };
+      m.set(id, x);
+    }
+    return x;
+  };
+  for (const v of votes.results) {
+    const x = get(v.id);
+    if (v.value === "like") x.likes = v.n;
+    else if (v.value === "nope") x.passes = v.n;
+    else if (v.value === "superlike") x.superlikes = v.n;
+  }
+  for (const r of matchRows.results) get(r.id).matches = r.n;
+  for (const r of planRows.results) get(r.id).plans = r.n;
+  for (const r of viewRows.results) get(r.id).views = r.n;
+  for (const r of bookRows.results) get(r.id).bookingClicks = r.n;
+  for (const r of poolRows.results) get(r.id).pooled = r.n;
+  return m;
+}
+
+interface ActMetric {
+  likes: number;
+  passes: number;
+  superlikes: number;
+  matches: number;
+  plans: number;
+  views: number;
+  bookingClicks: number;
+  pooled: number;
+}
+
+function derive(x: ActMetric) {
+  const swipes = x.likes + x.passes + x.superlikes;
+  return {
+    ...x,
+    swipes,
+    likeRate: swipes > 0 ? (x.likes + x.superlikes) / swipes : null,
+    matchRate: x.pooled > 0 ? x.matches / x.pooled : null,
+    planConversion: x.matches > 0 ? x.plans / x.matches : null,
+  };
+}
+
+const ACT_SORT = new Set([
+  "updated",
+  "title",
+  "status",
+  "views",
+  "likes",
+  "passes",
+  "likeRate",
+  "matches",
+  "plans",
+  "bookingClicks",
+]);
+
+app.get("/activities", async (c) => {
+  const url = new URL(c.req.url);
+  const { page, pageSize, q, offset } = listParams(url, ["updated"], "updated");
+  const sortReq = url.searchParams.get("sort") || "updated";
+  const sort = ACT_SORT.has(sortReq) ? sortReq : "updated";
+  const order =
+    (url.searchParams.get("order") || "desc").toLowerCase() === "asc"
+      ? "ASC"
+      : "DESC";
+  const status = url.searchParams.get("status");
+  const category = url.searchParams.get("category");
+  const activeParam = url.searchParams.get("active");
+
+  const where: string[] = [];
+  const args: unknown[] = [];
+  if (q) {
+    args.push(`%${q}%`, q);
+    where.push(`(a.title LIKE ?${args.length - 1} OR a.id = ?${args.length})`);
+  }
+  if (
+    status &&
+    ["verified", "needs_review", "outdated", "inactive"].includes(status)
+  ) {
+    args.push(status);
+    where.push(`a.status = ?${args.length}`);
+  }
+  if (category) {
+    args.push(category);
+    where.push(`a.category_id = ?${args.length}`);
+  }
+  if (activeParam === "1" || activeParam === "0") {
+    args.push(Number(activeParam));
+    where.push(`a.active = ?${args.length}`);
+  }
+  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+  const total = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM activities a ${whereSql}`,
+  )
+    .bind(...(args as never[]))
+    .first<{ n: number }>();
+
+  // For behavioural sorts we need metrics for the whole filtered set, then
+  // sort + paginate in JS. Catalogue is small (hundreds), so this is fine.
+  const behavioural = [
+    "views",
+    "likes",
+    "passes",
+    "likeRate",
+    "matches",
+    "plans",
+    "bookingClicks",
+  ].includes(sort);
+
+  const baseRows = await c.env.DB.prepare(
+    `SELECT a.id, a.title, a.category_id AS category, a.city, a.status,
+            a.active, a.price_type AS priceType, a.price_cents AS priceCents,
+            a.provider, a.last_verified_at AS lastVerifiedAt,
+            a.image_url AS imageUrl, a.updated_at AS updatedAt
+     FROM activities a ${whereSql}
+     ${behavioural ? "" : `ORDER BY a.${sqlCol(sort)} ${order} LIMIT ${pageSize} OFFSET ${offset}`}`,
+  )
+    .bind(...(args as never[]))
+    .all<Record<string, unknown>>();
+
+  const metrics = await activityMetrics(c.env, whereSql, args);
+  let rows = baseRows.results.map((r) => {
+    const m = derive(
+      metrics.get(r.id as string) ?? {
+        likes: 0,
+        passes: 0,
+        superlikes: 0,
+        matches: 0,
+        plans: 0,
+        views: 0,
+        bookingClicks: 0,
+        pooled: 0,
+      },
+    );
+    return { ...r, metrics: m };
+  });
+
+  if (behavioural) {
+    const key = sort as keyof ReturnType<typeof derive>;
+    rows.sort((a, b) => {
+      const av = (a.metrics[key] as number) ?? -1;
+      const bv = (b.metrics[key] as number) ?? -1;
+      return order === "ASC" ? av - bv : bv - av;
+    });
+    rows = rows.slice(offset, offset + pageSize);
+  }
+
+  return c.json({ rows, ...pageMeta(total?.n ?? 0, page, pageSize) });
+});
+
+function sqlCol(sort: string): string {
+  return sort === "title"
+    ? "title"
+    : sort === "status"
+      ? "status"
+      : "updated_at";
+}
+
+app.get("/activities/:id", async (c) => {
+  const id = c.req.param("id");
+  const a = await c.env.DB.prepare(`SELECT * FROM activities WHERE id = ?1`)
+    .bind(id)
+    .first<Record<string, unknown>>();
+  if (!a) throw notFound("Activity not found.");
+
+  const metrics = derive(
+    (await activityMetrics(c.env, "WHERE a.id = ?1", [id])).get(id) ?? {
+      likes: 0,
+      passes: 0,
+      superlikes: 0,
+      matches: 0,
+      plans: 0,
+      views: 0,
+      bookingClicks: 0,
+      pooled: 0,
+    },
+  );
+
+  const provider = a.provider_id
+    ? await c.env.DB.prepare(`SELECT * FROM providers WHERE id = ?1`)
+        .bind(a.provider_id)
+        .first()
+    : null;
+
+  const recentGroups = await c.env.DB.prepare(
+    `SELECT DISTINCT g.id, g.name, g.status
+     FROM matches m JOIN groups g ON g.id = m.group_id
+     WHERE m.activity_id = ?1 ORDER BY m.matched_at DESC LIMIT 10`,
+  )
+    .bind(id)
+    .all();
+
+  /* internal quality score — factual completeness only, never shown to users */
+  const q = qualityScore(a);
+
+  return c.json({ activity: a, metrics, provider, matchedGroups: recentGroups.results, quality: q });
+});
+
+/** Internal completeness score (0–100). Not an editorial rating; not exposed
+ *  to end users. */
+function qualityScore(a: Record<string, unknown>) {
+  const checks = [
+    { k: "has provider", ok: !!a.provider },
+    { k: "valid website", ok: isUrl(a.provider_website) || isUrl(a.website_url) },
+    { k: "booking or ticket url", ok: isUrl(a.booking_url) || isUrl(a.ticket_url) },
+    { k: "price set", ok: a.price_type === "free" || a.price_cents != null },
+    { k: "image", ok: isUrl(a.image_url) },
+    { k: "coordinates", ok: a.lat != null && a.lng != null },
+    { k: "address", ok: !!a.address },
+    {
+      k: "verified in last 180d",
+      ok:
+        a.status === "verified" &&
+        a.last_verified_at != null &&
+        (a.last_verified_at as number) > Math.floor(Date.now() / 1000) - 180 * 86400,
+    },
+  ];
+  const score = Math.round(
+    (checks.filter((c) => c.ok).length / checks.length) * 100,
+  );
+  return { score, checks };
+}
+function isUrl(v: unknown): boolean {
+  return typeof v === "string" && /^https?:\/\//.test(v);
+}
+
+app.get("/rankings/activities", async (c) => {
+  const url = new URL(c.req.url);
+  const r = parseRange(url.searchParams);
+  const limit = Math.min(
+    50,
+    Math.max(5, Number(url.searchParams.get("limit")) || 20),
+  );
+
+  const scoped = await activityMetricsRanged(c.env, r.from, r.to);
+  const titles = await c.env.DB.prepare(
+    `SELECT id, title, category_id AS category, city FROM activities`,
+  ).all<{ id: string; title: string; category: string; city: string | null }>();
+  const tmap = new Map(titles.results.map((t) => [t.id, t]));
+
+  const rows = [...scoped.entries()]
+    .map(([id, m]) => ({ id, ...tmap.get(id), ...derive(m) }))
+    .filter((x) => x.title);
+
+  const rank = (key: string) =>
+    [...rows]
+      .filter((x) => (x as never as Record<string, number>)[key] != null)
+      .sort(
+        (a, b) =>
+          ((b as never as Record<string, number>)[key] ?? -1) -
+          ((a as never as Record<string, number>)[key] ?? -1),
+      )
+      .slice(0, limit);
+
+  return c.json({
+    range: { from: r.from, to: r.to, label: r.label },
+    mostViewed: rank("views"),
+    mostLiked: rank("likes"),
+    highestLikeRate: rank("likeRate").filter((x) => x.swipes >= 3),
+    mostMatched: rank("matches"),
+    highestPlanConversion: rank("planConversion").filter((x) => x.matches >= 1),
+    mostBookingClicks: rank("bookingClicks"),
+    mostPassed: rank("passes"),
+  });
+});
+
+async function activityMetricsRanged(env: Env, from: number, to: number) {
+  const b = (s: string) => env.DB.prepare(s).bind(from, to);
+  const [votes, matchRows, planRows, viewRows, bookRows, poolRows] =
+    await Promise.all([
+      b(
+        `SELECT activity_id AS id, value, COUNT(*) AS n FROM activity_votes
+         WHERE created_at >= ?1 AND created_at < ?2 GROUP BY activity_id, value`,
+      ).all<{ id: string; value: string; n: number }>(),
+      b(
+        `SELECT activity_id AS id, COUNT(*) AS n FROM matches
+         WHERE matched_at >= ?1 AND matched_at < ?2 GROUP BY activity_id`,
+      ).all<{ id: string; n: number }>(),
+      b(
+        `SELECT activity_id AS id, COUNT(*) AS n FROM plans
+         WHERE created_at >= ?1 AND created_at < ?2 GROUP BY activity_id`,
+      ).all<{ id: string; n: number }>(),
+      b(
+        `SELECT activity_id AS id, COUNT(*) AS n FROM analytics_events
+         WHERE name = 'activity_viewed' AND created_at >= ?1 AND created_at < ?2
+         AND activity_id IS NOT NULL GROUP BY activity_id`,
+      ).all<{ id: string; n: number }>(),
+      b(
+        `SELECT activity_id AS id, COUNT(*) AS n FROM analytics_events
+         WHERE name = 'booking_clicked' AND created_at >= ?1 AND created_at < ?2
+         AND activity_id IS NOT NULL GROUP BY activity_id`,
+      ).all<{ id: string; n: number }>(),
+      env.DB.prepare(
+        `SELECT activity_id AS id, COUNT(*) AS n FROM group_activity_pool GROUP BY activity_id`,
+      ).all<{ id: string; n: number }>(),
+    ]);
+  const m = new Map<string, ActMetric>();
+  const g = (id: string) => {
+    let x = m.get(id);
+    if (!x) {
+      x = { likes: 0, passes: 0, superlikes: 0, matches: 0, plans: 0, views: 0, bookingClicks: 0, pooled: 0 };
+      m.set(id, x);
+    }
+    return x;
+  };
+  for (const v of votes.results) {
+    const x = g(v.id);
+    if (v.value === "like") x.likes = v.n;
+    else if (v.value === "nope") x.passes = v.n;
+    else if (v.value === "superlike") x.superlikes = v.n;
+  }
+  for (const r of matchRows.results) g(r.id).matches = r.n;
+  for (const r of planRows.results) g(r.id).plans = r.n;
+  for (const r of viewRows.results) g(r.id).views = r.n;
+  for (const r of bookRows.results) g(r.id).bookingClicks = r.n;
+  for (const r of poolRows.results) g(r.id).pooled = r.n;
+  return m;
+}
+
+/* --------------------------- category analytics --------------------------- */
+
+app.get("/rankings/categories", async (c) => {
+  const r = parseRange(new URL(c.req.url).searchParams);
+  const scoped = await activityMetricsRanged(c.env, r.from, r.to);
+  const cats = await c.env.DB.prepare(
+    `SELECT id, category_id AS category FROM activities`,
+  ).all<{ id: string; category: string }>();
+  const byCat = new Map<string, ActMetric>();
+  const g = (k: string) => {
+    let x = byCat.get(k);
+    if (!x) {
+      x = { likes: 0, passes: 0, superlikes: 0, matches: 0, plans: 0, views: 0, bookingClicks: 0, pooled: 0 };
+      byCat.set(k, x);
+    }
+    return x;
+  };
+  for (const row of cats.results) {
+    const m = scoped.get(row.id);
+    if (!m) continue;
+    const x = g(row.category);
+    x.likes += m.likes;
+    x.passes += m.passes;
+    x.superlikes += m.superlikes;
+    x.matches += m.matches;
+    x.plans += m.plans;
+    x.views += m.views;
+    x.bookingClicks += m.bookingClicks;
+    x.pooled += m.pooled;
+  }
+  return c.json({
+    range: { from: r.from, to: r.to, label: r.label },
+    categories: [...byCat.entries()].map(([category, m]) => ({
+      category,
+      ...derive(m),
+    })),
+  });
+});
+
+/* ------------------------------- providers ------------------------------ */
+
+app.get("/providers", async (c) => {
+  const rows = await c.env.DB.prepare(
+    `SELECT p.id, p.name, p.kind, p.enabled,
+            (SELECT COUNT(*) FROM activities a WHERE a.provider_id = p.id) AS activity_count,
+            (SELECT COUNT(*) FROM activities a WHERE a.provider_id = p.id AND a.status = 'verified') AS verified_count
+     FROM providers p ORDER BY activity_count DESC`,
+  ).all<{
+    id: string;
+    name: string;
+    kind: string;
+    enabled: number;
+    activity_count: number;
+    verified_count: number;
+  }>();
+  return c.json({
+    rows: rows.results.map((r) => ({
+      id: r.id,
+      name: r.name,
+      kind: r.kind,
+      enabled: !!r.enabled,
+      activityCount: r.activity_count,
+      verifiedCount: r.verified_count,
+    })),
+  });
+});
+
+app.get("/providers/:id", async (c) => {
+  const id = c.req.param("id");
+  const p = await c.env.DB.prepare(`SELECT * FROM providers WHERE id = ?1`)
+    .bind(id)
+    .first<Record<string, unknown>>();
+  if (!p) throw notFound("Provider not found.");
+
+  const acts = await c.env.DB.prepare(
+    `SELECT id, title, category_id AS category, city, status, active,
+            price_type AS priceType, price_cents AS priceCents,
+            last_verified_at AS lastVerifiedAt, booking_url AS bookingUrl,
+            website_url AS websiteUrl
+     FROM activities WHERE provider_id = ?1 ORDER BY title`,
+  )
+    .bind(id)
+    .all<Record<string, unknown>>();
+
+  const metrics = await activityMetrics(c.env, "WHERE a.provider_id = ?1", [id]);
+  const perActivity = acts.results.map((a) => ({
+    ...a,
+    metrics: derive(
+      metrics.get(a.id as string) ?? {
+        likes: 0, passes: 0, superlikes: 0, matches: 0, plans: 0,
+        views: 0, bookingClicks: 0, pooled: 0,
+      },
+    ),
+  }));
+  const totals = perActivity.reduce(
+    (t, a) => {
+      t.views += a.metrics.views;
+      t.likes += a.metrics.likes + a.metrics.superlikes;
+      t.passes += a.metrics.passes;
+      t.matches += a.metrics.matches;
+      t.plans += a.metrics.plans;
+      t.bookingClicks += a.metrics.bookingClicks;
+      return t;
+    },
+    { views: 0, likes: 0, passes: 0, matches: 0, plans: 0, bookingClicks: 0 },
+  );
+
+  return c.json({ provider: p, activities: perActivity, totals });
+});
+
 export default app;
