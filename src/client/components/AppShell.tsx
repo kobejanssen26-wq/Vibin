@@ -50,7 +50,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="mx-auto flex min-h-full max-w-md flex-col bg-paper">
       <header
         ref={wrapRef}
-        className="safe-t sticky top-0 z-40 border-b border-paper-line bg-paper/85 backdrop-blur"
+        className="safe-t sticky top-0 z-40 border-b border-paper-line bg-paper"
       >
         <div className="flex items-center justify-between px-4 py-3">
           <NavLink
@@ -76,7 +76,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               {!!data?.unread && (
                 <span
                   key={data.unread}
-                  className="absolute right-1.5 top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand-500 px-1 text-[10px] font-bold text-white ring-2 ring-paper motion-safe:animate-check-pop"
+                  className="absolute right-1.5 top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand-500 px-1 text-[10px] font-bold text-white ring-2 ring-paper"
                 >
                   {data.unread > 9 ? "9+" : data.unread}
                 </span>

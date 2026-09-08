@@ -1,29 +1,19 @@
 import { useCallback, useRef, useState } from "react";
 import type { ActivityDTO } from "@shared/types";
-import { CATEGORY_ICON } from "@shared/constants";
-import { IconMapPin } from "./icons";
+import { CategoryIcon, IconMapPin } from "./icons";
 import { formatDuration } from "../lib/format";
 
 export type SwipeDir = "like" | "nope" | "superlike";
 
-const CATEGORY_BG: Record<string, string> = {
-  sport: "from-brand-500 to-brand-700",
-  adventure: "from-brand-600 to-navy-800",
-  food_drinks: "from-brand-500 to-navy-700",
-  nightlife: "from-navy-800 to-brand-700",
-  creative: "from-brand-500 to-brand-400",
-  relaxation: "from-brand-400 to-brand-600",
-  culture: "from-navy-700 to-brand-600",
-  nature: "from-brand-600 to-lime-500",
-  gaming: "from-navy-800 to-brand-600",
-  entertainment: "from-brand-500 to-navy-800",
-  learning: "from-brand-600 to-brand-400",
-  other: "from-brand-500 to-navy-700",
-};
+const THRESHOLD = 104;
+const VELOCITY = 0.5; // px per ms
 
-const THRESHOLD = 108;
-const VELOCITY = 0.55; // px per ms
-
+/**
+ * A single activity card. Drag behaviour is deliberately plain: the card
+ * follows the pointer with a small rotation, springs back if you let go
+ * early, and flings off if you pass the threshold. No perspective tilt, no
+ * gloss — it should feel like moving a real card, not a 3D panel.
+ */
 export function SwipeCard({
   activity,
   onSwipe,
@@ -43,25 +33,25 @@ export function SwipeCard({
     null,
   );
   const showImage = Boolean(activity.imageUrl) && imgOk;
-  const start = useRef<{ x: number; y: number; t: number } | null>(null);
+  const start = useRef<{ x: number; y: number } | null>(null);
   const last = useRef<{ x: number; t: number } | null>(null);
   const vx = useRef(0);
 
   const fling = useCallback(
     (dir: SwipeDir) => {
-      const dx = dir === "nope" ? -700 : dir === "like" ? 700 : 0;
-      const dy = dir === "superlike" ? -800 : -40;
-      setExit({ x: dx, y: dy, r: dx / 12 });
+      const dx = dir === "nope" ? -640 : dir === "like" ? 640 : 0;
+      const dy = dir === "superlike" ? -760 : -32;
+      setExit({ x: dx, y: dy, r: dx / 14 });
       setDrag({ x: 0, y: 0, active: false });
-      window.setTimeout(() => onSwipe?.(dir), 220);
+      window.setTimeout(() => onSwipe?.(dir), 200);
     },
     [onSwipe],
   );
 
   const onDown = (e: React.PointerEvent) => {
     if (!interactive || exit) return;
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    start.current = { x: e.clientX, y: e.clientY, t: performance.now() };
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    start.current = { x: e.clientX, y: e.clientY };
     last.current = { x: e.clientX, t: performance.now() };
     setDrag((d) => ({ ...d, active: true }));
   };
@@ -86,37 +76,30 @@ export function SwipeCard({
     const fast = Math.abs(vx.current) > VELOCITY;
     if (x > THRESHOLD || (fast && vx.current > 0)) fling("like");
     else if (x < -THRESHOLD || (fast && vx.current < 0)) fling("nope");
-    else if (y < -THRESHOLD * 1.3) fling("superlike");
-    else setDrag({ x: 0, y: 0, active: false }); // spring back
+    else if (y < -THRESHOLD * 1.35) fling("superlike");
+    else setDrag({ x: 0, y: 0, active: false });
   };
 
   const pos = exit ?? drag;
-  const rot = exit ? exit.r : drag.x / 16;
+  const rot = exit ? exit.r : drag.x / 22;
   const likeOp = Math.max(0, Math.min(1, pos.x / THRESHOLD));
   const nopeOp = Math.max(0, Math.min(1, -pos.x / THRESHOLD));
-  const superOp = Math.max(0, Math.min(1, -pos.y / (THRESHOLD * 1.3)));
+  const superOp = Math.max(0, Math.min(1, -pos.y / (THRESHOLD * 1.35)));
 
   const transition = exit
-    ? "transform 0.26s cubic-bezier(0.4, 0, 1, 1), opacity 0.26s ease"
+    ? "transform 0.22s cubic-bezier(0.4, 0, 1, 1), opacity 0.22s ease"
     : drag.active
       ? "none"
-      : "transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)"; // springy snap-back
+      : "transform 0.36s cubic-bezier(0.22, 1, 0.36, 1)";
 
-  // 3D perspective while the top card is handled: yaw toward the drag
-  // direction, pitch against vertical drag, and lift off the stack. Clamped so
-  // it stays a hint, never a flip. Peek cards (interactive:false) stay flat.
-  const clamp = (v: number, m: number) => Math.max(-m, Math.min(m, v));
-  const yaw = interactive && !exit ? clamp(drag.x / 14, 12) : 0;
-  const pitch = interactive && !exit ? clamp(-drag.y / 22, 8) : 0;
-  const lift = drag.active ? 1.03 : 1 - offset / 1100;
-  const depth = drag.active ? 40 : 0;
+  const scale = interactive ? 1 : 1 - offset / 900;
 
   return (
     <div
       className="gpu absolute inset-0 select-none"
       style={{
         zIndex: z,
-        transform: `translate3d(${pos.x}px, ${pos.y + offset}px, ${depth}px) rotate(${rot}deg) rotateY(${yaw}deg) rotateX(${pitch}deg) scale(${lift})`,
+        transform: `translate3d(${pos.x}px, ${pos.y + offset}px, 0) rotate(${rot}deg) scale(${scale})`,
         opacity: exit ? 0 : 1,
         transition,
         touchAction: "none",
@@ -127,159 +110,123 @@ export function SwipeCard({
       onPointerUp={onUp}
       onPointerCancel={onUp}
     >
-      <article
-        className="card-raised relative h-full overflow-hidden transition-shadow duration-200"
-        style={{
-          boxShadow: drag.active
-            ? "0 40px 80px -24px rgba(16,20,38,0.45)"
-            : undefined,
-        }}
-      >
-        {/* moving light — sells the perspective tilt */}
+      <article className="card-raised relative flex h-full flex-col overflow-hidden">
+        {/* like / pass feedback — a clean edge, no glow */}
         <div
-          className="pointer-events-none absolute inset-0 z-10 opacity-0 transition-opacity duration-200"
-          style={{
-            opacity: drag.active ? 0.5 : 0,
-            background: `linear-gradient(${105 + drag.x / 6}deg, rgba(255,255,255,0) 40%, rgba(255,255,255,0.35) 50%, rgba(255,255,255,0) 60%)`,
-          }}
-        />
-        {/* edge glow feedback */}
-        <div
-          className="pointer-events-none absolute inset-0 z-10 rounded-3xl ring-4 ring-inset ring-brand-500 transition-opacity"
-          style={{ opacity: likeOp * 0.9 }}
+          className="pointer-events-none absolute inset-0 z-20 rounded-2xl border-2 border-brand-500"
+          style={{ opacity: likeOp }}
         />
         <div
-          className="pointer-events-none absolute inset-0 z-10 rounded-3xl ring-4 ring-inset ring-navy transition-opacity"
-          style={{ opacity: nopeOp * 0.9 }}
+          className="pointer-events-none absolute inset-0 z-20 rounded-2xl border-2 border-navy"
+          style={{ opacity: nopeOp }}
         />
         <div
-          className="pointer-events-none absolute inset-0 z-10 rounded-3xl ring-4 ring-inset ring-lime-400 transition-opacity"
-          style={{ opacity: superOp * 0.9 }}
+          className="pointer-events-none absolute inset-0 z-20 rounded-2xl border-2 border-lime-500"
+          style={{ opacity: superOp }}
         />
 
-        <div className="relative h-[56%] w-full overflow-hidden">
+        {/* image */}
+        <div className="relative h-[58%] w-full shrink-0 overflow-hidden bg-navy">
           {showImage ? (
             <img
               src={activity.imageUrl!}
-              alt={activity.title}
+              alt=""
               className="h-full w-full object-cover"
               draggable={false}
               loading="lazy"
               onError={() => setImgOk(false)}
             />
           ) : (
-            <div
-              className={`relative grid h-full w-full place-items-center bg-gradient-to-br ${
-                CATEGORY_BG[activity.category] ?? CATEGORY_BG.other
-              }`}
-            >
-              <div
-                className="absolute inset-0 opacity-[0.14]"
-                style={{
-                  backgroundImage:
-                    "radial-gradient(circle at 1px 1px, #fff 1px, transparent 0)",
-                  backgroundSize: "22px 22px",
-                }}
-              />
-              <span className="grid h-20 w-20 place-items-center rounded-full bg-white/12 text-4xl ring-1 ring-white/20 backdrop-blur-sm">
-                {CATEGORY_ICON[activity.category] ?? "✨"}
-              </span>
+            <div className="grid h-full w-full place-items-center bg-navy text-white/25">
+              <CategoryIcon id={activity.category} size={56} />
             </div>
           )}
-          <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-navy via-navy/70 to-transparent" />
-          <span className="chip absolute left-3 top-3 border-white/20 bg-white/90 backdrop-blur">
-            {activity.categoryIcon} {activity.categoryLabel}
+          <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-navy/85 to-transparent" />
+
+          <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-lg bg-white/95 px-2 py-1 text-[12px] font-semibold text-navy">
+            <CategoryIcon id={activity.category} size={14} />
+            {activity.categoryLabel}
           </span>
 
-          <Stamp text="YES" cls="text-brand-500 border-brand-500" op={likeOp} rotate={-13} pos="left-4 top-6" />
-          <Stamp text="PASS" cls="text-navy border-navy" op={nopeOp} rotate={13} pos="right-4 top-6" />
-          <Stamp text="LOVE IT" cls="text-lime-500 border-lime-500" op={superOp} rotate={-7} pos="left-1/2 -translate-x-1/2 bottom-6" />
+          <Stamp text="YES" tone="text-brand-500 border-brand-500" op={likeOp} rot={-10} pos="left-4 top-5" />
+          <Stamp text="PASS" tone="text-navy border-navy" op={nopeOp} rot={10} pos="right-4 top-5" />
+          <Stamp text="LOVE IT" tone="text-lime-600 border-lime-600" op={superOp} rot={-5} pos="left-1/2 -translate-x-1/2 bottom-5" />
 
-          <div className="absolute bottom-3 left-3 right-3 text-white">
-            <h2 className="text-[22px] font-extrabold leading-tight drop-shadow-sm">
+          <div className="absolute inset-x-4 bottom-3 text-white">
+            <h2 className="text-[21px] font-bold leading-tight tracking-[-0.01em]">
               {activity.title}
             </h2>
-            <p className="mt-0.5 flex items-center gap-1 text-sm text-white/90">
-              <IconMapPin size={15} className="shrink-0" />
+            <p className="mt-0.5 flex items-center gap-1 text-[13px] text-white/80">
+              <IconMapPin size={13} className="shrink-0" />
               <span className="truncate">
-                {activity.locationLabel}
+                {activity.provider || activity.locationLabel}
                 {activity.distanceKm != null && ` · ${activity.distanceKm} km`}
               </span>
             </p>
           </div>
         </div>
 
-        <div className="flex h-[44%] flex-col gap-2.5 p-4">
-          <div className="flex flex-wrap gap-1.5 text-[13px] font-semibold">
-            <span className="rounded-full bg-brand-50 px-2.5 py-1 text-brand-700">
-              {activity.priceLabel}
-            </span>
+        {/* meta */}
+        <div className="flex flex-1 flex-col gap-2.5 p-4">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-semibold text-navy">
+            <span className="text-brand-600">{activity.priceLabel}</span>
             {activity.durationMin ? (
-              <span className="rounded-full bg-paper-soft px-2.5 py-1 text-navy-600">
-                {formatDuration(activity.durationMin)}
-              </span>
+              <>
+                <Dot />
+                <span className="text-navy-500">
+                  {formatDuration(activity.durationMin)}
+                </span>
+              </>
             ) : null}
             {activity.indoorOutdoor ? (
-              <span className="rounded-full bg-paper-soft px-2.5 py-1 text-navy-600">
-                {activity.indoorOutdoor === "indoor"
-                  ? "Indoor"
-                  : activity.indoorOutdoor === "outdoor"
-                    ? "Outdoor"
-                    : "Indoor & outdoor"}
-              </span>
+              <>
+                <Dot />
+                <span className="text-navy-500">
+                  {activity.indoorOutdoor === "indoor"
+                    ? "Indoor"
+                    : activity.indoorOutdoor === "outdoor"
+                      ? "Outdoor"
+                      : "Indoor / outdoor"}
+                </span>
+              </>
             ) : null}
             {activity.minAge ? (
-              <span className="rounded-full bg-paper-soft px-2.5 py-1 text-navy-600">
-                {activity.minAge}+
-              </span>
+              <>
+                <Dot />
+                <span className="text-navy-500">{activity.minAge}+</span>
+              </>
             ) : null}
           </div>
-          <p className="line-clamp-4 text-sm leading-relaxed text-navy-500">
+          <p className="line-clamp-4 text-[13px] leading-relaxed text-navy-500">
             {activity.description}
           </p>
-          {activity.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {activity.tags.slice(0, 3).map((t) => (
-                <span
-                  key={t}
-                  className="rounded-md bg-paper-soft px-2 py-0.5 text-[11px] font-medium text-navy-400"
-                >
-                  {t}
-                </span>
-              ))}
-            </div>
-          )}
-          {activity.provider && (
-            <p className="mt-auto pt-1 text-xs text-navy-400">
-              at{" "}
-              <span className="font-semibold text-navy-600">
-                {activity.provider}
-              </span>
-            </p>
-          )}
         </div>
       </article>
     </div>
   );
 }
 
+function Dot() {
+  return <span className="h-1 w-1 rounded-full bg-navy-300" aria-hidden="true" />;
+}
+
 function Stamp({
   text,
-  cls,
+  tone,
   op,
-  rotate,
+  rot,
   pos,
 }: {
   text: string;
-  cls: string;
+  tone: string;
   op: number;
-  rotate: number;
+  rot: number;
   pos: string;
 }) {
   return (
     <span
-      className={`pointer-events-none absolute ${pos} z-20 rounded-xl border-[3px] bg-white/80 px-3 py-1 text-2xl font-extrabold uppercase tracking-wider backdrop-blur ${cls}`}
-      style={{ opacity: op, transform: `rotate(${rotate}deg)` }}
+      className={`pointer-events-none absolute ${pos} z-30 rounded-md border-2 bg-white/90 px-2.5 py-0.5 text-lg font-extrabold uppercase tracking-wide ${tone}`}
+      style={{ opacity: op, transform: `rotate(${rot}deg)` }}
     >
       {text}
     </span>

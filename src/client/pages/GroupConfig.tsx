@@ -4,6 +4,7 @@ import { api, ApiRequestError } from "../lib/api";
 import { Button, ErrorState, Field, LoadingScreen } from "../components/ui";
 import { InviteBox } from "../components/InviteBox";
 import { PageHeader } from "../components/PageHeader";
+import { CategoryIcon } from "../components/icons";
 import type { GroupDTO, GroupSettingsDTO } from "@shared/types";
 import {
   ACTIVITY_CATEGORIES,
@@ -156,7 +157,8 @@ export function GroupConfig() {
               className={draft.categories.includes(c.id as never) ? "chip-on" : "chip"}
               onClick={() => toggleCat(c.id)}
             >
-              {c.icon} {c.label}
+              <CategoryIcon id={c.id} size={14} />
+              {c.label}
             </button>
           ))}
         </div>

@@ -37,7 +37,7 @@ export function VerifyEmail() {
     <AuthLayout
       title={
         state === "ok"
-          ? "Email verified 🎉"
+          ? "Email verified"
           : state === "error"
             ? "Verification failed"
             : "Verifying…"

@@ -62,7 +62,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       {children}
       {state && (
         <div
-          className="fixed inset-0 z-[60] flex items-end justify-center bg-navy/50 p-4 backdrop-blur-sm sm:items-center"
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-navy/45 p-4 motion-safe:animate-enter-fade sm:items-center"
           role="dialog"
           aria-modal="true"
           aria-labelledby="confirm-title"

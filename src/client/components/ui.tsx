@@ -1,7 +1,6 @@
 import { forwardRef, useEffect } from "react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { LogoMark } from "./Logo";
 import { IconClose } from "./icons";
 
 /* ------------------------------- Button ------------------------------- */
@@ -80,7 +79,7 @@ export function Field({
         <span className="mt-1 block text-xs text-navy-400">{hint}</span>
       )}
       {error && (
-        <span className="mt-1 block text-xs font-medium text-danger-600 motion-safe:animate-shake">
+        <span className="mt-1 block text-xs font-medium text-danger-600">
           {error}
         </span>
       )}
@@ -118,19 +117,12 @@ export function Spinner({ className = "h-6 w-6" }: { className?: string }) {
 export function LoadingScreen({ label = "Loading…" }: { label?: string }) {
   return (
     <div
-      className="flex min-h-[55vh] flex-col items-center justify-center gap-3 text-navy-400"
+      className="flex min-h-[55vh] flex-col items-center justify-center gap-4 text-navy-400"
       role="status"
       aria-live="polite"
     >
-      <span className="relative grid h-12 w-12 place-items-center">
-        <span className="absolute inset-0 animate-ring-pulse rounded-full bg-brand-500/25 motion-reduce:hidden" />
-        <span
-          className="absolute inset-0 animate-ring-pulse rounded-full bg-lime-400/20 motion-reduce:hidden"
-          style={{ animationDelay: "0.7s" }}
-        />
-        <LogoMark className="h-10 w-10" animated />
-      </span>
-      <p className="animate-enter-fade text-sm">{label}</p>
+      <Spinner className="h-6 w-6 text-brand-500" />
+      <p className="text-sm">{label}</p>
     </div>
   );
 }
@@ -158,9 +150,9 @@ export function ErrorState({
   onRetry?: () => void;
 }) {
   return (
-    <div className="mx-auto max-w-sm animate-float-up py-16 text-center">
-      <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-danger-50 text-danger-500">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <div className="mx-auto max-w-sm py-16 text-center">
+      <div className="mx-auto mb-4 grid h-11 w-11 place-items-center rounded-xl border border-danger-100 bg-danger-50 text-danger-500">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path
             d="M12 8v5M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"
             stroke="currentColor"
@@ -170,7 +162,7 @@ export function ErrorState({
           />
         </svg>
       </div>
-      <h2 className="text-lg font-bold">{title}</h2>
+      <h2 className="text-[15px] font-bold">{title}</h2>
       {message && <p className="mt-1.5 text-sm text-navy-400">{message}</p>}
       {onRetry && (
         <Button variant="outline" className="mt-5" onClick={onRetry}>
@@ -182,23 +174,17 @@ export function ErrorState({
 }
 
 export function EmptyState({
-  emoji = "✨",
   title,
   message,
   action,
 }: {
-  emoji?: string;
   title: string;
   message?: string;
   action?: ReactNode;
 }) {
   return (
-    <div className="mx-auto max-w-sm animate-float-up py-14 text-center">
-      <div className="relative mx-auto mb-4 grid h-16 w-16 place-items-center overflow-hidden rounded-3xl bg-brand-500 text-3xl text-white">
-        <span className="dot-grid absolute inset-0 opacity-[0.14]" />
-        <span className="relative">{emoji}</span>
-      </div>
-      <h2 className="text-lg font-bold">{title}</h2>
+    <div className="mx-auto max-w-sm py-16 text-center">
+      <h2 className="text-[15px] font-bold">{title}</h2>
       {message && (
         <p className="mx-auto mt-1.5 max-w-xs text-sm text-navy-400">{message}</p>
       )}
@@ -255,7 +241,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-navy/50 p-4 backdrop-blur-sm motion-safe:animate-enter-fade sm:items-center"
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-navy/45 p-4 motion-safe:animate-enter-fade sm:items-center"
       role="dialog"
       aria-modal="true"
       aria-label={title}

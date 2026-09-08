@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button, ErrorState, LoadingScreen } from "../components/ui";
+import { IconUsers } from "../components/icons";
 import { api, ApiRequestError } from "../lib/api";
 import type { GroupDTO } from "@shared/types";
 
@@ -58,9 +59,11 @@ export function JoinGroup() {
   if (!preview) return null;
 
   return (
-    <div className="stagger py-8 text-center">
-      <div className="mb-3 text-4xl motion-safe:animate-pop-in">🎟️</div>
-      <h1 className="text-2xl font-extrabold">You’re invited to</h1>
+    <div className="py-10 text-center">
+      <div className="mx-auto mb-4 grid h-11 w-11 place-items-center rounded-xl border border-paper-line bg-paper-soft">
+        <IconUsers size={20} className="text-navy-500" />
+      </div>
+      <h1 className="text-xl font-extrabold tracking-[-0.02em]">You're invited to</h1>
       <p className="mt-1 text-lg font-bold text-brand-600">
         {preview.groupName}
       </p>

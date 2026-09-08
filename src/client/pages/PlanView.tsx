@@ -10,6 +10,7 @@ import {
 } from "../components/ui";
 import { PageHeader } from "../components/PageHeader";
 import {
+  CategoryIcon,
   IconCalendar,
   IconChat,
   IconCheck,
@@ -76,50 +77,40 @@ export function PlanView() {
   };
 
   return (
-    <div className="stagger space-y-5">
+    <div className="space-y-4">
       <PageHeader
         back={{ to: `/groups/${plan.groupId}`, label: plan.groupName }}
         title="It's a plan"
         action={
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-lime-400 text-navy shadow-lime motion-safe:animate-check-pop">
-            <IconCheck size={22} />
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-lime-400 text-navy">
+            <IconCheck size={18} />
           </span>
         }
       />
 
       <article className="card overflow-hidden">
-        <div className="relative h-48 w-full overflow-hidden">
+        <div className="relative h-44 w-full overflow-hidden bg-navy">
           {a.imageUrl ? (
             <img
               src={a.imageUrl}
-              alt={a.title}
+              alt=""
               className="h-full w-full object-cover"
             />
           ) : (
-            <div className="relative grid h-full w-full place-items-center bg-vibin-blue">
-              <div
-                className="absolute inset-0 opacity-[0.12]"
-                style={{
-                  backgroundImage:
-                    "radial-gradient(circle at 1px 1px, #fff 1px, transparent 0)",
-                  backgroundSize: "22px 22px",
-                }}
-              />
-              <span className="grid h-16 w-16 place-items-center rounded-2xl bg-white/12 text-3xl ring-1 ring-white/20">
-                {a.categoryIcon}
-              </span>
+            <div className="grid h-full w-full place-items-center text-white/25">
+              <CategoryIcon id={a.category} size={48} />
             </div>
           )}
-          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-navy/75 to-transparent" />
-          <span className="chip absolute left-3 top-3 border-white/20 bg-white/90 backdrop-blur">
-            {a.categoryIcon} {a.categoryLabel}
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-navy/80 to-transparent" />
+          <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-lg bg-white/95 px-2 py-1 text-[12px] font-semibold text-navy">
+            <CategoryIcon id={a.category} size={13} /> {a.categoryLabel}
           </span>
           <div className="absolute inset-x-4 bottom-3 text-white">
-            <h2 className="text-xl font-extrabold leading-tight drop-shadow-sm">
+            <h2 className="text-lg font-bold leading-tight tracking-[-0.01em]">
               {a.title}
             </h2>
             {a.provider && (
-              <p className="text-sm text-white/85">at {a.provider}</p>
+              <p className="text-[13px] text-white/75">at {a.provider}</p>
             )}
           </div>
         </div>
@@ -133,7 +124,7 @@ export function PlanView() {
 
         <div className="space-y-3 p-4">
           <p className="text-sm leading-relaxed text-navy-500">{a.description}</p>
-          <div className="stagger grid gap-2 border-t border-paper-line pt-3 text-sm">
+          <div className="grid gap-2 border-t border-paper-line pt-3 text-sm">
             <Row icon={<IconMapPin size={16} />} text={plan.locationLabel} />
             <Row icon={<IconCalendar size={16} />} text={formatWhen(plan.startsAt)} />
             <Row icon={<IconTag size={16} />} text={a.priceLabel} />

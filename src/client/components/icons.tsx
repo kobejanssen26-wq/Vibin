@@ -1,7 +1,7 @@
 /**
  * The VIBIN icon set — one consistent stroke style (1.75, round caps/joins),
- * 24×24 grid, `currentColor`. Used for app chrome and controls. Category
- * identity intentionally stays emoji (see @shared/constants).
+ * 24×24 grid, `currentColor`. Used for app chrome, controls and category
+ * identity (see `CategoryIcon` at the foot of this file).
  */
 type P = { className?: string; size?: number };
 
@@ -141,3 +141,86 @@ export const IconUsers = (p: P) => (
     <path d="M16 6.2a3 3 0 0 1 0 5.6M15.5 19a5.5 5.5 0 0 1 5-5.4" />
   </Svg>
 );
+
+/* ---------------------------- category icons ---------------------------- *
+ * One line-drawn glyph per activity category — replaces the emoji set so the
+ * whole product speaks in a single visual language.                        */
+const CAT_PATHS: Record<string, React.ReactNode> = {
+  sport: (
+    <>
+      <path d="M4 9v6M20 9v6M6 8v8M18 8v8" />
+      <path d="M8 12h8" />
+    </>
+  ),
+  adventure: (
+    <>
+      <path d="M3 19h18L14 6l-4 7-2-3-5 9Z" />
+    </>
+  ),
+  food_drinks: (
+    <>
+      <path d="M7 3v8a2 2 0 0 0 4 0V3M9 11v10" />
+      <path d="M16 3c-1.5 1-2 3-2 5s1 3 2 3 2-1 2-3-.5-4-2-5Zm0 8v10" />
+    </>
+  ),
+  nightlife: (
+    <>
+      <path d="M5 4h14l-7 8-7-8ZM12 12v7M8 19h8" />
+    </>
+  ),
+  creative: (
+    <>
+      <path d="M4 20c0-3 1-4 3-4s3 2 3 4c0 1-1 1-3 1s-3 0-3-1Z" />
+      <path d="M9.5 15.5 19 6a2 2 0 0 0-3-3l-9.5 9.5" />
+    </>
+  ),
+  relaxation: (
+    <>
+      <path d="M12 3c3 3.5 4.5 6 4.5 9A4.5 4.5 0 0 1 12 21a4.5 4.5 0 0 1-4.5-4.5c0-3 1.5-5.5 4.5-9Z" />
+    </>
+  ),
+  culture: (
+    <>
+      <path d="M3 9 12 4l9 5M5 9v9M19 9v9M9.5 9v9M14.5 9v9M3.5 21h17" />
+    </>
+  ),
+  nature: (
+    <>
+      <path d="M12 3 6 12h3l-3 5h12l-3-5h3L12 3ZM12 17v4" />
+    </>
+  ),
+  gaming: (
+    <>
+      <rect x="3" y="8" width="18" height="9" rx="4.5" />
+      <path d="M8 11v3M6.5 12.5h3M15 12h.01M17.5 13.5h.01" />
+    </>
+  ),
+  entertainment: (
+    <>
+      <rect x="3" y="6" width="18" height="12" rx="2" />
+      <path d="M3 10h18M8 6l-2 4M14 6l-2 4M20 6l-2 4" />
+    </>
+  ),
+  learning: (
+    <>
+      <path d="M12 6c-2-1.5-5-2-8-1.5v13c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5v-13c-3-.5-6 0-8 1.5ZM12 6v13" />
+    </>
+  ),
+  other: (
+    <>
+      <path d="M12 3v6M12 15v6M3 12h6M15 12h6M6.5 6.5 9 9M15 15l2.5 2.5M17.5 6.5 15 9M9 15l-2.5 2.5" />
+    </>
+  ),
+};
+
+export function CategoryIcon({
+  id,
+  size = 20,
+  className,
+}: {
+  id: string;
+  size?: number;
+  className?: string;
+}) {
+  return <Svg size={size} className={className}>{CAT_PATHS[id] ?? CAT_PATHS.other}</Svg>;
+}
