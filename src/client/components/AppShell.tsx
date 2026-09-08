@@ -123,11 +123,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             <MenuLink to="/settings" onClick={() => setPanel("none")}>
               Profile &amp; settings
             </MenuLink>
-            {user?.role === "admin" && (
-              <MenuLink to="/admin" onClick={() => setPanel("none")}>
-                Admin
-              </MenuLink>
-            )}
             <button
               type="button"
               className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left font-medium text-danger-600 hover:bg-danger-50"
