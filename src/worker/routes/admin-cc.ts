@@ -28,6 +28,7 @@ import { z } from "zod";
 import { parseRange, pctDelta } from "../lib/range";
 import { hasEncryptionKey } from "../lib/crypto-box";
 import { badRequest, notFound } from "../lib/errors";
+import { newId } from "../lib/id";
 import { parseBody } from "../lib/validate";
 import { audit } from "../lib/audit";
 import { SETTINGS, getSetting, setSetting } from "../lib/system-settings";
@@ -1021,17 +1022,22 @@ app.get("/rankings/categories", async (c) => {
 
 app.get("/providers", async (c) => {
   const rows = await c.env.DB.prepare(
-    `SELECT p.id, p.name, p.kind, p.enabled,
+    `SELECT p.id, p.name, p.kind, p.enabled, p.crm_status AS crmStatus,
             (SELECT COUNT(*) FROM activities a WHERE a.provider_id = p.id) AS activity_count,
-            (SELECT COUNT(*) FROM activities a WHERE a.provider_id = p.id AND a.status = 'verified') AS verified_count
+            (SELECT COUNT(*) FROM activities a WHERE a.provider_id = p.id AND a.status = 'verified') AS verified_count,
+            (SELECT COUNT(*) FROM provider_contacts pc WHERE pc.provider_id = p.id) AS contact_count,
+            (SELECT MAX(occurred_at) FROM provider_communications co WHERE co.provider_id = p.id) AS last_contact_at
      FROM providers p ORDER BY activity_count DESC`,
   ).all<{
     id: string;
     name: string;
     kind: string;
     enabled: number;
+    crmStatus: string;
     activity_count: number;
     verified_count: number;
+    contact_count: number;
+    last_contact_at: number | null;
   }>();
   return c.json({
     rows: rows.results.map((r) => ({
@@ -1039,10 +1045,174 @@ app.get("/providers", async (c) => {
       name: r.name,
       kind: r.kind,
       enabled: !!r.enabled,
+      crmStatus: r.crmStatus,
       activityCount: r.activity_count,
       verifiedCount: r.verified_count,
+      contactCount: r.contact_count,
+      lastContactAt: r.last_contact_at,
     })),
   });
+});
+
+const CRM_STATUSES = [
+  "not_contacted",
+  "contacted",
+  "interested",
+  "partner",
+  "not_interested",
+  "follow_up",
+  "needs_review",
+  "outdated",
+  "inactive",
+] as const;
+
+app.put("/providers/:id/crm-status", async (c) => {
+  const id = c.req.param("id");
+  const { status } = await parseBody(
+    c,
+    z.object({ status: z.enum(CRM_STATUSES) }),
+  );
+  const res = await c.env.DB.prepare(
+    `UPDATE providers SET crm_status = ?1 WHERE id = ?2`,
+  )
+    .bind(status, id)
+    .run();
+  if (!res.meta.changes) throw notFound("Provider not found.");
+  await audit(c, {
+    action: "provider.crm_status",
+    targetType: "provider",
+    targetId: id,
+    meta: { status },
+  });
+  return c.json({ ok: true });
+});
+
+/* ------------------------- provider contacts (CRM) ---------------------- */
+
+const contactInput = z.object({
+  businessName: z.string().trim().max(160).nullable().optional(),
+  email: z.string().trim().email().max(200).nullable().optional().or(z.literal("")),
+  phone: z.string().trim().max(60).nullable().optional(),
+  website: z.string().trim().url().max(300).nullable().optional().or(z.literal("")),
+  contactPage: z.string().trim().url().max(300).nullable().optional().or(z.literal("")),
+  address: z.string().trim().max(300).nullable().optional(),
+  contactPerson: z.string().trim().max(160).nullable().optional(),
+  role: z.string().trim().max(120).nullable().optional(),
+  preferredMethod: z.string().trim().max(40).nullable().optional(),
+  notes: z.string().trim().max(4000).optional(),
+  nextFollowUpAt: z.number().int().positive().nullable().optional(),
+});
+const clean = (v: unknown) => (v === "" ? null : (v ?? null));
+
+app.post("/providers/:id/contacts", async (c) => {
+  const providerId = c.req.param("id");
+  const prov = await c.env.DB.prepare(`SELECT id FROM providers WHERE id = ?1`)
+    .bind(providerId)
+    .first();
+  if (!prov) throw notFound("Provider not found.");
+  const b = await parseBody(c, contactInput);
+  const id = newId();
+  const nowS = Math.floor(Date.now() / 1000);
+  await c.env.DB.prepare(
+    `INSERT INTO provider_contacts
+       (id, provider_id, business_name, email, phone, website, contact_page,
+        address, contact_person, role, preferred_method, notes,
+        next_follow_up_at, created_at, updated_at)
+     VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?14)`,
+  )
+    .bind(
+      id, providerId, clean(b.businessName), clean(b.email), clean(b.phone),
+      clean(b.website), clean(b.contactPage), clean(b.address),
+      clean(b.contactPerson), clean(b.role), clean(b.preferredMethod),
+      b.notes ?? "", b.nextFollowUpAt ?? null, nowS,
+    )
+    .run();
+  await audit(c, {
+    action: "provider.contact_added",
+    targetType: "provider",
+    targetId: providerId,
+    meta: { contactId: id },
+  });
+  return c.json({ id }, 201);
+});
+
+app.put("/contacts/:id", async (c) => {
+  const id = c.req.param("id");
+  const b = await parseBody(c, contactInput);
+  const res = await c.env.DB.prepare(
+    `UPDATE provider_contacts SET
+       business_name=?1, email=?2, phone=?3, website=?4, contact_page=?5,
+       address=?6, contact_person=?7, role=?8, preferred_method=?9,
+       notes=?10, next_follow_up_at=?11, updated_at=?12
+     WHERE id=?13`,
+  )
+    .bind(
+      clean(b.businessName), clean(b.email), clean(b.phone), clean(b.website),
+      clean(b.contactPage), clean(b.address), clean(b.contactPerson),
+      clean(b.role), clean(b.preferredMethod), b.notes ?? "",
+      b.nextFollowUpAt ?? null, Math.floor(Date.now() / 1000), id,
+    )
+    .run();
+  if (!res.meta.changes) throw notFound("Contact not found.");
+  await audit(c, { action: "provider.contact_updated", targetType: "provider_contact", targetId: id });
+  return c.json({ ok: true });
+});
+
+app.delete("/contacts/:id", async (c) => {
+  const id = c.req.param("id");
+  await c.env.DB.prepare(`DELETE FROM provider_contacts WHERE id = ?1`)
+    .bind(id)
+    .run();
+  await audit(c, { action: "provider.contact_deleted", targetType: "provider_contact", targetId: id });
+  return c.json({ ok: true });
+});
+
+/* ---------------------- provider communications (CRM) ------------------- */
+
+const commInput = z.object({
+  contactId: z.string().max(40).nullable().optional(),
+  kind: z.enum(["email", "call", "meeting", "note", "other"]).default("note"),
+  occurredAt: z.number().int().positive().optional(),
+  subject: z.string().trim().max(200).optional(),
+  status: z.string().trim().max(60).optional(),
+  notes: z.string().trim().max(8000).optional(),
+});
+
+app.post("/providers/:id/communications", async (c) => {
+  const providerId = c.req.param("id");
+  const prov = await c.env.DB.prepare(`SELECT id FROM providers WHERE id = ?1`)
+    .bind(providerId)
+    .first();
+  if (!prov) throw notFound("Provider not found.");
+  const b = await parseBody(c, commInput);
+  const id = newId();
+  const nowS = Math.floor(Date.now() / 1000);
+  await c.env.DB.prepare(
+    `INSERT INTO provider_communications
+       (id, provider_id, contact_id, kind, occurred_at, subject, status, notes, created_by, created_at)
+     VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)`,
+  )
+    .bind(
+      id, providerId, b.contactId ?? null, b.kind, b.occurredAt ?? nowS,
+      b.subject ?? "", b.status ?? "", b.notes ?? "", c.get("adminUserId"), nowS,
+    )
+    .run();
+  await audit(c, {
+    action: "provider.communication_logged",
+    targetType: "provider",
+    targetId: providerId,
+    meta: { kind: b.kind },
+  });
+  return c.json({ id }, 201);
+});
+
+app.delete("/communications/:id", async (c) => {
+  const id = c.req.param("id");
+  await c.env.DB.prepare(`DELETE FROM provider_communications WHERE id = ?1`)
+    .bind(id)
+    .run();
+  await audit(c, { action: "provider.communication_deleted", targetType: "provider_communication", targetId: id });
+  return c.json({ ok: true });
 });
 
 app.get("/providers/:id", async (c) => {
@@ -1085,7 +1255,40 @@ app.get("/providers/:id", async (c) => {
     { views: 0, likes: 0, passes: 0, matches: 0, plans: 0, bookingClicks: 0 },
   );
 
-  return c.json({ provider: p, activities: perActivity, totals });
+  const contacts = await c.env.DB.prepare(
+    `SELECT id, business_name AS businessName, email, phone, website,
+            contact_page AS contactPage, address, contact_person AS contactPerson,
+            role, preferred_method AS preferredMethod, notes,
+            next_follow_up_at AS nextFollowUpAt, updated_at AS updatedAt
+     FROM provider_contacts WHERE provider_id = ?1 ORDER BY created_at`,
+  )
+    .bind(id)
+    .all();
+
+  const comms = await c.env.DB.prepare(
+    `SELECT co.id, co.contact_id AS contactId, co.kind, co.occurred_at AS occurredAt,
+            co.subject, co.status, co.notes, u.email AS byEmail
+     FROM provider_communications co LEFT JOIN users u ON u.id = co.created_by
+     WHERE co.provider_id = ?1 ORDER BY co.occurred_at DESC LIMIT 100`,
+  )
+    .bind(id)
+    .all();
+
+  const lastContactAt = comms.results[0]?.occurredAt ?? null;
+  const nextFollowUp = (contacts.results as { nextFollowUpAt: number | null }[])
+    .map((x) => x.nextFollowUpAt)
+    .filter((x): x is number => x != null)
+    .sort((a, b) => a - b)[0] ?? null;
+
+  return c.json({
+    provider: p,
+    activities: perActivity,
+    totals,
+    contacts: contacts.results,
+    communications: comms.results,
+    lastContactAt,
+    nextFollowUp,
+  });
 });
 
 /* -------------------------------- funnel -------------------------------- */

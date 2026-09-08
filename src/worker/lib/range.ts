@@ -25,7 +25,9 @@ export function parseRange(qs: URLSearchParams): Range {
   const todayStart = startOfUtcDay(nowSec);
 
   let from: number;
-  let to = nowSec;
+  // +1s so a row written in the current second is still inside a range whose
+  // upper bound is "now" (queries use `created_at < to`).
+  let to = nowSec + 1;
   let label: string;
 
   switch (id) {

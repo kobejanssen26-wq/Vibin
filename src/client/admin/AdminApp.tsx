@@ -20,6 +20,7 @@ import { AuditLog } from "./pages/AuditLog";
 import { Sessions } from "./pages/Sessions";
 import { Flags } from "./pages/Flags";
 import { Settings } from "./pages/Settings";
+import { Vault } from "./pages/Vault";
 
 /** Placeholder for sections that land in a later phase. Keeps the nav honest. */
 function Soon({ title }: { title: string }) {
@@ -65,7 +66,7 @@ function AdminRoutes() {
         <Route path="/flags" element={<Flags />} />
         <Route path="/audit" element={<AuditLog />} />
         <Route path="/sessions" element={<Sessions />} />
-        <Route path="/vault" element={<Soon title="Credential vault" />} />
+        <Route path="/vault" element={<Vault />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Soon title="Not found" />} />
       </Routes>

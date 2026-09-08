@@ -247,6 +247,22 @@ export const providers = sqliteTable("providers", {
     .notNull()
     .default("seed"),
   enabled: integer("enabled").notNull().default(1),
+  /** Owner CRM pipeline status (internal). */
+  crmStatus: text("crm_status", {
+    enum: [
+      "not_contacted",
+      "contacted",
+      "interested",
+      "partner",
+      "not_interested",
+      "follow_up",
+      "needs_review",
+      "outdated",
+      "inactive",
+    ],
+  })
+    .notNull()
+    .default("not_contacted"),
   config: text("config").notNull().default("{}"),
   createdAt: integer("created_at").notNull().default(now),
 });
@@ -755,6 +771,137 @@ export const systemSettings = sqliteTable("system_settings", {
     onDelete: "set null",
   }),
 });
+
+/* -------------------------------------------------------------------------- */
+/*  Owner Command Center — provider CRM                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Business contact details for an activity provider, kept where legitimately
+ * obtained. Business information only — not unrelated personal data.
+ */
+export const providerContacts = sqliteTable(
+  "provider_contacts",
+  {
+    id: text("id").primaryKey(),
+    providerId: text("provider_id")
+      .notNull()
+      .references(() => providers.id, { onDelete: "cascade" }),
+    businessName: text("business_name"),
+    email: text("email"),
+    phone: text("phone"),
+    website: text("website"),
+    contactPage: text("contact_page"),
+    address: text("address"),
+    contactPerson: text("contact_person"),
+    role: text("role"),
+    preferredMethod: text("preferred_method"), // "email" | "phone" | "form" | ...
+    notes: text("notes").notNull().default(""),
+    nextFollowUpAt: integer("next_follow_up_at"),
+    createdAt: integer("created_at").notNull().default(now),
+    updatedAt: integer("updated_at").notNull().default(now),
+  },
+  (t) => ({
+    providerIdx: index("provider_contacts_provider_idx").on(t.providerId),
+  }),
+);
+
+/** A logged interaction with a provider — never auto-fabricated. */
+export const providerCommunications = sqliteTable(
+  "provider_communications",
+  {
+    id: text("id").primaryKey(),
+    providerId: text("provider_id")
+      .notNull()
+      .references(() => providers.id, { onDelete: "cascade" }),
+    contactId: text("contact_id").references(() => providerContacts.id, {
+      onDelete: "set null",
+    }),
+    kind: text("kind", {
+      enum: ["email", "call", "meeting", "note", "other"],
+    })
+      .notNull()
+      .default("note"),
+    occurredAt: integer("occurred_at").notNull().default(now),
+    subject: text("subject").notNull().default(""),
+    status: text("status").notNull().default(""), // free text: "sent", "replied", …
+    notes: text("notes").notNull().default(""),
+    createdBy: text("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: integer("created_at").notNull().default(now),
+  },
+  (t) => ({
+    providerIdx: index("provider_comms_provider_idx").on(t.providerId),
+  }),
+);
+
+/* -------------------------------------------------------------------------- */
+/*  Owner Command Center — encrypted credential vault                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Project-related secrets the owner has legitimate reason to keep (provider
+ * portal logins, dev-service keys, test accounts). The secret is stored
+ * AES-256-GCM encrypted with the server-side ENCRYPTION_KEY — the ciphertext
+ * lives here, the key never does. Only `reveal` (with a fresh password
+ * re-auth) ever decrypts, and every touch is logged.
+ */
+export const credentials = sqliteTable(
+  "credentials",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    provider: text("provider"),
+    category: text("category", {
+      enum: [
+        "activity_provider",
+        "development",
+        "services",
+        "test_account",
+        "other",
+      ],
+    })
+      .notNull()
+      .default("other"),
+    username: text("username"),
+    email: text("email"),
+    url: text("url"),
+    notes: text("notes").notNull().default(""),
+    secretEnc: text("secret_enc").notNull(), // base64(iv||ciphertext||tag)
+    tags: text("tags").notNull().default("[]"), // JSON array
+    ownerId: text("owner_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: integer("created_at").notNull().default(now),
+    updatedAt: integer("updated_at").notNull().default(now),
+    lastAccessedAt: integer("last_accessed_at"),
+  },
+  (t) => ({
+    categoryIdx: index("credentials_category_idx").on(t.category),
+  }),
+);
+
+/** Every create / view / update / delete / export of a credential. Never the
+ *  secret value itself. */
+export const credentialAccessLog = sqliteTable(
+  "credential_access_log",
+  {
+    id: text("id").primaryKey(),
+    credentialId: text("credential_id").notNull(),
+    actorId: text("actor_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    action: text("action", {
+      enum: ["viewed", "created", "updated", "deleted", "exported"],
+    }).notNull(),
+    createdAt: integer("created_at").notNull().default(now),
+  },
+  (t) => ({
+    credIdx: index("credential_access_log_cred_idx").on(t.credentialId),
+    createdIdx: index("credential_access_log_created_idx").on(t.createdAt),
+  }),
+);
 
 /* -------------------------------------------------------------------------- */
 /*  Inferred types                                                           */

@@ -15,6 +15,13 @@
       "when": 1788871199007,
       "tag": "0001_tan_bromley",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788892767418,
+      "tag": "0002_square_gateway",
+      "breakpoints": true
     }
   ]
 }

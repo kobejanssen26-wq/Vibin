@@ -11,6 +11,7 @@ import {
   Td,
   Th,
   Tr,
+  fmtDay,
   fmtNum,
 } from "../ui";
 
@@ -19,9 +20,24 @@ interface Row {
   name: string;
   kind: string;
   enabled: boolean;
+  crmStatus: string;
   activityCount: number;
   verifiedCount: number;
+  contactCount: number;
+  lastContactAt: number | null;
 }
+
+export const CRM_TONE: Record<string, string> = {
+  not_contacted: "slate",
+  contacted: "blue",
+  interested: "blue",
+  partner: "green",
+  not_interested: "red",
+  follow_up: "amber",
+  needs_review: "amber",
+  outdated: "amber",
+  inactive: "slate",
+};
 
 export function Providers() {
   const { data, loading, error, reload } = useResource<{ rows: Row[] }>(
@@ -40,8 +56,9 @@ export function Providers() {
             <thead>
               <tr>
                 <Th>Provider</Th>
-                <Th>Kind</Th>
-                <Th>Enabled</Th>
+                <Th>CRM status</Th>
+                <Th>Contacts</Th>
+                <Th>Last contact</Th>
                 <Th>Activities</Th>
                 <Th>Verified</Th>
               </tr>
@@ -57,14 +74,17 @@ export function Providers() {
                       {p.name}
                     </Link>
                     <div className="font-mono text-[11px] text-slate-400">
-                      {p.id}
+                      {p.kind} · {p.id}
                     </div>
                   </Td>
-                  <Td>{p.kind}</Td>
                   <Td>
-                    <Badge tone={(p.enabled ? "green" : "slate") as never}>
-                      {p.enabled ? "enabled" : "disabled"}
+                    <Badge tone={(CRM_TONE[p.crmStatus] ?? "slate") as never}>
+                      {p.crmStatus.replace(/_/g, " ")}
                     </Badge>
+                  </Td>
+                  <Td>{fmtNum(p.contactCount)}</Td>
+                  <Td className="text-xs text-slate-500">
+                    {p.lastContactAt ? fmtDay(p.lastContactAt) : "—"}
                   </Td>
                   <Td>{fmtNum(p.activityCount)}</Td>
                   <Td>

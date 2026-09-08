@@ -22,6 +22,7 @@ import reportRoutes from "./routes/reports";
 import eventRoutes from "./routes/events";
 import adminRoutes from "./routes/admin";
 import adminCcRoutes from "./routes/admin-cc";
+import adminVaultRoutes from "./routes/admin-vault";
 import mediaRoutes from "./routes/media";
 
 type Ctx = { Bindings: Env; Variables: Vars };
@@ -134,8 +135,9 @@ api.route("/admin/auth", adminAuth);
 
 const commandCenter = new Hono<Ctx>();
 commandCenter.use("*", withAdminSession, requireOwner());
-commandCenter.route("/", adminCcRoutes); // dashboards, analytics, browsers
+commandCenter.route("/", adminCcRoutes); // dashboards, analytics, browsers, CRM
 commandCenter.route("/", adminRoutes); // catalogue + moderation actions
+commandCenter.route("/vault", adminVaultRoutes); // encrypted credential vault
 api.route("/admin/cc", commandCenter);
 
 // Everything below requires a normal user session.
