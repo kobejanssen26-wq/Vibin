@@ -25,6 +25,7 @@ import {
 import { badRequest, unauthorized } from "../lib/errors";
 import { rateLimit, clientIp } from "../lib/ratelimit";
 import { newId } from "../lib/id";
+import { track } from "../lib/analytics";
 import { loadMe } from "../lib/me";
 import {
   resetEmailBody,
@@ -115,6 +116,7 @@ app.post("/signup", async (c) => {
   });
 
   await startSession(c, userId);
+  track(c, "user_registered", { userId, dedupeKey: `user_registered:${userId}` });
   return c.json({ user: await loadMe(db, userId) }, 201);
 });
 
@@ -185,6 +187,10 @@ app.post("/verify-email", async (c) => {
     db.update(users).set({ emailVerifiedAt: now }).where(eq(users.id, tok.userId)),
     db.update(emailTokens).set({ usedAt: now }).where(eq(emailTokens.id, tok.id)),
   ]);
+  track(c, "email_verified", {
+    userId: tok.userId,
+    dedupeKey: `email_verified:${tok.userId}`,
+  });
   return c.json({ ok: true });
 });
 

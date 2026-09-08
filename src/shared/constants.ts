@@ -80,6 +80,13 @@ export const SESSION_COOKIE = "vibin_session";
 export const CSRF_COOKIE = "vibin_csrf";
 export const CSRF_HEADER = "x-vibin-csrf";
 
+/* Owner Command Center — a separate, shorter-lived privileged session. */
+export const ADMIN_SESSION_COOKIE = "vibin_admin";
+export const ADMIN_CSRF_COOKIE = "vibin_admin_csrf";
+export const ADMIN_CSRF_HEADER = "x-vibin-admin-csrf";
+export const ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 12; // 12 hours
+export const ADMIN_MFA_GRACE_SECONDS = 60 * 10; // re-auth window for reveal actions
+
 export const LIMITS = {
   groupName: { min: 2, max: 60 },
   displayName: { min: 2, max: 40 },

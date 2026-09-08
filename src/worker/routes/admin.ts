@@ -241,7 +241,7 @@ app.patch("/reports/:id", async (c) => {
     .update(reports)
     .set({
       status: body.status,
-      resolverId: c.get("userId"),
+      resolverId: c.get("adminUserId"),
       resolvedAt:
         body.status === "resolved" || body.status === "dismissed"
           ? Math.floor(Date.now() / 1000)

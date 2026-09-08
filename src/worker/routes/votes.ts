@@ -14,6 +14,7 @@ import {
 import { parseBody } from "../lib/validate";
 import { badRequest, conflict } from "../lib/errors";
 import { newId } from "../lib/id";
+import { track } from "../lib/analytics";
 import { requireActiveMember, requireGroupMember, activeMemberIds } from "../lib/access";
 import { activityVoteProgress } from "../engine/match";
 import { haversineKm } from "../engine/deck";
@@ -190,6 +191,22 @@ app.post("/:id/swipe", async (c) => {
       ],
       set: { value: body.value, updatedAt: now },
     });
+
+  track(
+    c,
+    body.value === "nope"
+      ? "activity_passed"
+      : body.value === "superlike"
+        ? "activity_superliked"
+        : "activity_liked",
+    {
+      userId: uid(c),
+      groupId,
+      activityId: body.activityId,
+      // one swipe event per (group, activity, member); re-votes don't double-count
+      dedupeKey: `swipe:${groupId}:${body.activityId}:${uid(c)}`,
+    },
+  );
 
   let newMatch = null;
   if (!already && body.value !== "nope") {

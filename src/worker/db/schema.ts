@@ -35,7 +35,12 @@ export const users = sqliteTable(
     emailNormalized: text("email_normalized").notNull(),
     passwordHash: text("password_hash").notNull(),
     emailVerifiedAt: integer("email_verified_at"),
-    role: text("role", { enum: ["user", "admin"] })
+    /**
+     * user  -> normal VIBIN member
+     * admin -> catalogue / moderation access (legacy)
+     * owner -> full Owner Command Center; the only role that can enter /admin
+     */
+    role: text("role", { enum: ["user", "admin", "owner"] })
       .notNull()
       .default("user"),
     status: text("status", { enum: ["active", "suspended", "deleted"] })
@@ -593,6 +598,165 @@ export const reports = sqliteTable(
 );
 
 /* -------------------------------------------------------------------------- */
+/*  Owner Command Center — admin identity, sessions, MFA, recovery            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * DB-backed sessions for the Owner Command Center. Separate from the normal
+ * app session (which lives in KV): holding a `vibin_session` cookie never
+ * grants admin access — you must additionally hold a live `vibin_admin`
+ * session whose owner still has role='owner'. Only the SHA-256 hash of the
+ * session id is stored; the raw id lives only in the HttpOnly cookie.
+ */
+export const adminSessions = sqliteTable(
+  "admin_sessions",
+  {
+    id: text("id").primaryKey(), // sha256(rawSessionId)
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    mfaVerifiedAt: integer("mfa_verified_at"), // null until the MFA step passes
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    createdAt: integer("created_at").notNull().default(now),
+    lastSeenAt: integer("last_seen_at").notNull().default(now),
+    expiresAt: integer("expires_at").notNull(),
+    revokedAt: integer("revoked_at"),
+  },
+  (t) => ({
+    userIdx: index("admin_sessions_user_idx").on(t.userId),
+    expiresIdx: index("admin_sessions_expires_idx").on(t.expiresAt),
+  }),
+);
+
+/**
+ * TOTP (RFC 6238) enrolment for an owner. The base32 secret is stored
+ * AES-256-GCM encrypted with the server-side ENCRYPTION_KEY — never plaintext,
+ * never sent to the frontend after enrolment.
+ */
+export const adminTotp = sqliteTable("admin_totp", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  secretEnc: text("secret_enc").notNull(), // base64(iv||ciphertext||tag)
+  confirmedAt: integer("confirmed_at"), // null until the first code is verified
+  createdAt: integer("created_at").notNull().default(now),
+});
+
+export const adminRecoveryCodes = sqliteTable(
+  "admin_recovery_codes",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    codeHash: text("code_hash").notNull(), // sha256(code) — code shown once
+    usedAt: integer("used_at"),
+    createdAt: integer("created_at").notNull().default(now),
+  },
+  (t) => ({
+    userIdx: index("admin_recovery_codes_user_idx").on(t.userId),
+    hashIdx: index("admin_recovery_codes_hash_idx").on(t.codeHash),
+  }),
+);
+
+/* -------------------------------------------------------------------------- */
+/*  Owner Command Center — audit, analytics, config                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Append-only audit trail for every privileged action. Rows are kept even when
+ * the target object is deleted. `meta` is small JSON and MUST NEVER contain a
+ * secret value — record "credential X viewed", never the credential.
+ */
+export const auditLog = sqliteTable(
+  "audit_log",
+  {
+    id: text("id").primaryKey(),
+    actorType: text("actor_type", { enum: ["owner", "admin", "system"] })
+      .notNull()
+      .default("owner"),
+    actorId: text("actor_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    action: text("action").notNull(), // e.g. "admin.login", "credential.viewed"
+    targetType: text("target_type"),
+    targetId: text("target_id"),
+    meta: text("meta").notNull().default("{}"),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    createdAt: integer("created_at").notNull().default(now),
+  },
+  (t) => ({
+    createdIdx: index("audit_log_created_idx").on(t.createdAt),
+    actorIdx: index("audit_log_actor_idx").on(t.actorId),
+    actionIdx: index("audit_log_action_idx").on(t.action),
+  }),
+);
+
+/**
+ * Structured product analytics. One row per meaningful event. Foreign keys are
+ * ON DELETE SET NULL so historical funnels survive user/activity deletion.
+ * `dedupeKey` (when set) is unique — makes retried/reloaded client events
+ * idempotent.
+ */
+export const analyticsEvents = sqliteTable(
+  "analytics_events",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    groupId: text("group_id").references(() => groups.id, {
+      onDelete: "set null",
+    }),
+    activityId: text("activity_id").references(() => activities.id, {
+      onDelete: "set null",
+    }),
+    props: text("props").notNull().default("{}"), // small JSON
+    dedupeKey: text("dedupe_key"),
+    createdAt: integer("created_at").notNull().default(now),
+  },
+  (t) => ({
+    nameCreatedIdx: index("analytics_events_name_created_idx").on(
+      t.name,
+      t.createdAt,
+    ),
+    activityNameIdx: index("analytics_events_activity_name_idx").on(
+      t.activityId,
+      t.name,
+    ),
+    groupIdx: index("analytics_events_group_idx").on(t.groupId),
+    userIdx: index("analytics_events_user_idx").on(t.userId),
+    createdIdx: index("analytics_events_created_idx").on(t.createdAt),
+    dedupeUnq: uniqueIndex("analytics_events_dedupe_unq").on(t.dedupeKey),
+  }),
+);
+
+/** Server-evaluated feature flags. Never used for authorization. */
+export const featureFlags = sqliteTable("feature_flags", {
+  key: text("key").primaryKey(),
+  enabled: integer("enabled").notNull().default(0),
+  description: text("description").notNull().default(""),
+  updatedAt: integer("updated_at").notNull().default(now),
+  updatedBy: text("updated_by").references(() => users.id, {
+    onDelete: "set null",
+  }),
+});
+
+/**
+ * Single-row key/value store for owner-controlled runtime config:
+ * `owner_setup_completed_at`, `maintenance_mode`, `maintenance_message`, …
+ */
+export const systemSettings = sqliteTable("system_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull().default(""),
+  updatedAt: integer("updated_at").notNull().default(now),
+  updatedBy: text("updated_by").references(() => users.id, {
+    onDelete: "set null",
+  }),
+});
+
+/* -------------------------------------------------------------------------- */
 /*  Inferred types                                                           */
 /* -------------------------------------------------------------------------- */
 
@@ -613,3 +777,10 @@ export type Message = typeof messages.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type Report = typeof reports.$inferSelect;
 export type Provider = typeof providers.$inferSelect;
+export type AdminSession = typeof adminSessions.$inferSelect;
+export type AdminTotp = typeof adminTotp.$inferSelect;
+export type AdminRecoveryCode = typeof adminRecoveryCodes.$inferSelect;
+export type AuditLogRow = typeof auditLog.$inferSelect;
+export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
+export type FeatureFlag = typeof featureFlags.$inferSelect;
+export type SystemSetting = typeof systemSettings.$inferSelect;

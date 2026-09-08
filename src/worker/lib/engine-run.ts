@@ -31,6 +31,7 @@ import {
 import { generateDateOptions, resolveKnownStart } from "./dates";
 import { newId } from "./id";
 import { notifyGroup, systemMessage } from "./notify";
+import { trackNow } from "./analytics";
 import { matchDTO } from "./match-view";
 import type { MatchDTO } from "@shared/types";
 
@@ -98,6 +99,13 @@ export async function runActivityMatch(
     where: eq(groupSettings.groupId, groupId),
   });
 
+  await trackNow(env, "activity_matched", {
+    groupId,
+    activityId,
+    userId: actingUserId,
+    dedupeKey: `activity_matched:${match.id}`,
+  });
+
   await systemMessage(
     db,
     groupId,
@@ -132,6 +140,13 @@ export async function runActivityMatch(
         .set({ status: "planned", updatedAt: now })
         .where(eq(groups.id, groupId)),
     ]);
+    await trackNow(env, "plan_created", {
+      groupId,
+      activityId,
+      userId: actingUserId,
+      props: { path: "known_date" },
+      dedupeKey: `plan_created:${match.id}`,
+    });
     await systemMessage(
       db,
       groupId,
@@ -164,6 +179,12 @@ export async function runActivityMatch(
         })),
       ),
     ]);
+    await trackNow(env, "date_match_started", {
+      groupId,
+      activityId,
+      userId: actingUserId,
+      dedupeKey: `date_match_started:${match.id}`,
+    });
     await systemMessage(
       db,
       groupId,
@@ -238,6 +259,20 @@ export async function runDateMatch(
     .onConflictDoNothing()
     .returning();
   if (planRow.length === 0) return { completed: false }; // another request won
+
+  await trackNow(env, "date_matched", {
+    groupId: match.groupId,
+    activityId: match.activityId,
+    userId: actingUserId,
+    dedupeKey: `date_matched:${matchId}`,
+  });
+  await trackNow(env, "plan_created", {
+    groupId: match.groupId,
+    activityId: match.activityId,
+    userId: actingUserId,
+    props: { path: "date_match" },
+    dedupeKey: `plan_created:${matchId}`,
+  });
 
   await db.batch([
     db

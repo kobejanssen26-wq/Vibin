@@ -7,6 +7,7 @@ import { badRequest, notFound } from "../lib/errors";
 import { newId } from "../lib/id";
 import { buildGroupDTO } from "../lib/group-view";
 import { systemMessage, notifyGroup } from "../lib/notify";
+import { track } from "../lib/analytics";
 import { LIMITS } from "@shared/constants";
 
 type Ctx = { Bindings: Env; Variables: Vars };
@@ -132,6 +133,13 @@ app.post("/:code/join", async (c) => {
   await notifyGroup(db, group.id, userId, {
     kind: "member_joined",
     title: `${profile?.displayName ?? "Someone"} joined ${group.name}`,
+  });
+
+  track(c, "group_joined", {
+    userId,
+    groupId: group.id,
+    props: { rejoin: !!existing },
+    dedupeKey: `group_joined:${group.id}:${userId}`,
   });
 
   return c.json({

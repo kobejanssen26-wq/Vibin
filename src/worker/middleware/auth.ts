@@ -5,7 +5,6 @@ import {
   SESSION_COOKIE,
 } from "@shared/constants";
 import type { Env, Vars } from "../env";
-import { createDb } from "../db/client";
 import { forbidden, unauthorized } from "../lib/errors";
 import { getSession } from "../lib/session";
 
@@ -40,19 +39,8 @@ export const requireAuth: MiddlewareHandler<Ctx> = async (c, next) => {
   await next();
 };
 
-/** Gate: 403 unless the authenticated user has the admin role. */
-export function requireAdmin(): MiddlewareHandler<Ctx> {
-  return async (c, next) => {
-    const userId = c.get("userId");
-    if (!userId) throw unauthorized();
-    const db = createDb(c.env);
-    const user = await db.query.users.findFirst({
-      where: (u, { eq }) => eq(u.id, userId),
-      columns: { role: true, status: true },
-    });
-    if (user?.role !== "admin" || user.status !== "active") {
-      throw forbidden("Admin access required.");
-    }
-    await next();
-  };
-}
+/*
+ * Owner Command Center authorization moved to middleware/admin.ts
+ * (`requireOwner`) — it uses a separate MFA-verified admin session, not the
+ * normal app session, so holding `vibin_session` never grants admin access.
+ */

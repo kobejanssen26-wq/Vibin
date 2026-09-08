@@ -33,8 +33,9 @@ link where one exists.
 12. [GitHub & CI](#github--ci)
 13. [Testing](#testing)
 14. [Design system](#design-system)
-15. [Security & GDPR](#security--gdpr)
-16. [Known limitations & next steps](#known-limitations--next-steps)
+15. [Owner Command Center](#owner-command-center-admin)
+16. [Security & GDPR](#security--gdpr)
+17. [Known limitations & next steps](#known-limitations--next-steps)
 
 ## What VIBIN is
 
@@ -147,12 +148,15 @@ and deploy values go in env files — see [`.env.example`](.env.example):
 | `APP_URL`              | `.dev.vars` / `wrangler.jsonc` | Canonical origin for invite links, emails, `.ics`. |
 | `AUTH_SECRET`          | `.dev.vars` / `wrangler secret` | Reserved for signed tokens (not yet used). Set a strong random in prod. |
 | `EMAIL_API_KEY` / `EMAIL_FROM` | secret / var            | Transactional email. Blank → links logged to console. |
+| `ENCRYPTION_KEY`       | `.dev.vars` / `wrangler secret` | **Owner Command Center.** AES-256-GCM key (base64 of 32 bytes) for the credential vault + TOTP secrets. Required before owner setup. Never commit. |
+| `OWNER_RECOVERY_SECRET`| `.dev.vars` / `wrangler secret` | **Owner Command Center.** Break-glass recovery string. Presenting it triggers a one-shot owner password-reset email + MFA clear. Leave blank to disable recovery. |
 | `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` | GitHub secrets | CI deploy. |
 
-Generate `AUTH_SECRET`:
+Generate secrets:
 
 ```bash
-node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"   # AUTH_SECRET / OWNER_RECOVERY_SECRET
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"       # ENCRYPTION_KEY
 ```
 
 ## Cloudflare resources
@@ -280,6 +284,59 @@ VIBIN tokens live in `tailwind.config.ts` (mirrored as CSS variables in
 Type: **Plus Jakarta Sans**. Animations respect `prefers-reduced-motion`
 (non-essential motion is stripped via `src/client/index.css` and per-component
 guards).
+
+## Owner Command Center (`/admin`)
+
+A private operational backend for the VIBIN owner. It is **not** a normal app
+feature and is not linked from anywhere in the product.
+
+**Access is never URL-based.** Even with the route, you cannot get in without a
+live, MFA-verified *admin session* whose account has `role = 'owner'`. That is
+re-checked server-side on every `/api/admin/cc/*` request. A normal
+`vibin_session` grants nothing here — the admin session is a separate,
+DB-backed, 12-hour, `vibin_admin` cookie.
+
+### First-time setup
+
+1. Set `ENCRYPTION_KEY` (required) and optionally `OWNER_RECOVERY_SECRET` as
+   secrets — see [Environment variables](#environment-variables).
+2. Open `/admin`. While no owner exists it shows **Set up owner**.
+3. Enter the owner email + password → scan the TOTP QR in an authenticator app
+   (Google Authenticator, 1Password, Authy…) → enter the 6-digit code.
+4. **Save the 10 recovery codes shown once.** Setup then locks itself; the
+   setup screen never returns.
+
+### Signing in
+
+`email + password` → `TOTP code` (or a one-time recovery code). Sessions are
+listed under **Security**; *Revoke all* logs out every other device.
+
+### If you lose the authenticator
+
+- Use a **recovery code** at the code prompt (single-use; regenerate from
+  **Security** — old codes then stop working).
+- If you also lose the codes: `POST /api/admin/auth/recover` with
+  `OWNER_RECOVERY_SECRET` + the owner email. It is rate-limited (3/hour),
+  audited, grants **no session**, and simply emails a password-reset link and
+  clears MFA so you can re-enrol. There is **no master password and no
+  backdoor** — if `OWNER_RECOVERY_SECRET` is unset, this path is disabled.
+
+### Credential vault
+
+Provider/portal/test credentials are stored in a dedicated table, each value
+**AES-256-GCM encrypted** with `ENCRYPTION_KEY` (which lives only in deployment
+secrets — never in the DB, the frontend, logs or analytics). Values are masked
+in the UI and require a password re-entry to reveal. Every view/create/update/
+delete is written to the **audit log** — the action only, never the secret.
+
+### Data model added for the Command Center
+
+`admin_sessions`, `admin_totp`, `admin_recovery_codes`, `audit_log`,
+`analytics_events`, `feature_flags`, `system_settings` (migration
+`0001_*.sql`), plus `role='owner'` on `users`. Analytics events are emitted
+from the existing swipe/match/date/plan routes and a rate-limited
+`/api/events` endpoint for client-only signals (impressions, booking clicks,
+front-end errors).
 
 ## Security & GDPR
 

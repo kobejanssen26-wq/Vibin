@@ -3,9 +3,11 @@ import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import type { Env, Vars } from "./env";
 import { toResponse } from "./lib/errors";
-import { withSession, requireAuth, requireAdmin } from "./middleware/auth";
+import { withSession, requireAuth } from "./middleware/auth";
+import { withAdminSession, requireOwner } from "./middleware/admin";
 
 import authRoutes from "./routes/auth";
+import adminAuthRoutes from "./routes/admin-auth";
 import meRoutes from "./routes/me";
 import groupRoutes from "./routes/groups";
 import inviteRoutes from "./routes/invites";
@@ -15,6 +17,7 @@ import dateRoutes from "./routes/dates";
 import planRoutes from "./routes/plans";
 import messageRoutes from "./routes/messages";
 import reportRoutes from "./routes/reports";
+import eventRoutes from "./routes/events";
 import adminRoutes from "./routes/admin";
 import mediaRoutes from "./routes/media";
 
@@ -33,7 +36,7 @@ api.use("*", async (c, next) => {
   return cors({
     origin: allowed,
     credentials: true,
-    allowHeaders: ["content-type", "x-vibin-csrf"],
+    allowHeaders: ["content-type", "x-vibin-csrf", "x-vibin-admin-csrf"],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     maxAge: 600,
   })(c, next);
@@ -66,7 +69,29 @@ api.get("/health", (c) => c.json({ ok: true }));
 api.route("/auth", authRoutes);
 api.route("/media", mediaRoutes);
 
-// Everything below requires a session.
+/* -------------------------- Owner Command Center ------------------------- *
+ * Registered BEFORE the app's `requireAuth` catch-all so `/api/admin/auth/*`
+ * can be reached without a normal `vibin_session`.
+ *
+ * `/api/admin/auth/*`  — pre-authorization: first-run setup, password step,
+ *                        MFA step, deployment recovery, session management.
+ * `/api/admin/cc/*`     — the command center data API. Requires a live,
+ *                        MFA-verified admin session whose account still has
+ *                        role='owner', re-checked independently on every
+ *                        request. A normal `vibin_session` grants nothing here.
+ * The two prefixes never overlap, so the owner gate can't leak onto the
+ * pre-auth routes.                                                           */
+const adminAuth = new Hono<Ctx>();
+adminAuth.use("*", withAdminSession);
+adminAuth.route("/", adminAuthRoutes);
+api.route("/admin/auth", adminAuth);
+
+const commandCenter = new Hono<Ctx>();
+commandCenter.use("*", withAdminSession, requireOwner());
+commandCenter.route("/", adminRoutes);
+api.route("/admin/cc", commandCenter);
+
+// Everything below requires a normal user session.
 const authed = new Hono<Ctx>();
 authed.use("*", requireAuth);
 authed.route("/invites", inviteRoutes);
@@ -78,12 +103,8 @@ authed.route("/groups", messageRoutes);
 authed.route("/", planRoutes); // /groups/:id/matches, /groups/:id/plans, /plans/:id
 authed.route("/activities", activityRoutes);
 authed.route("/reports", reportRoutes);
+authed.route("/events", eventRoutes);
 api.route("/", authed);
-
-const admin = new Hono<Ctx>();
-admin.use("*", requireAuth, requireAdmin());
-admin.route("/", adminRoutes);
-api.route("/admin", admin);
 
 api.onError((err, c) => toResponse(err, c));
 api.notFound((c) => c.json({ error: "not_found", message: "Unknown endpoint." }, 404));

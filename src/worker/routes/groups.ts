@@ -21,6 +21,7 @@ import {
 import { buildGroupDTO, matchCountFor, settingsToDTO } from "../lib/group-view";
 import { chunk, rowsPerInsert } from "../lib/chunk";
 import { rateLimit } from "../lib/ratelimit";
+import { track } from "../lib/analytics";
 import { systemMessage, notifyGroup } from "../lib/notify";
 import { buildDeck } from "../engine/deck";
 import { activityVoteProgress } from "../engine/match";
@@ -79,6 +80,13 @@ app.post("/", async (c) => {
     }),
   ]);
   await systemMessage(db, groupId, `Group "${name}" created. Invite your crew!`);
+  track(c, "group_created", { userId, groupId, dedupeKey: `group_created:${groupId}` });
+  track(c, "group_invite_sent", {
+    userId,
+    groupId,
+    props: { source: "auto" },
+    dedupeKey: `group_invite_sent:${groupId}:initial`,
+  });
 
   const group = await db.query.groups.findFirst({ where: eq(groups.id, groupId) });
   return c.json(
@@ -223,6 +231,7 @@ app.put("/:id/settings", async (c) => {
     })
     .where(eq(groupSettings.groupId, groupId));
   await db.update(groups).set({ updatedAt: now }).where(eq(groups.id, groupId));
+  track(c, "group_config_saved", { userId: uid(c), groupId });
 
   return c.json({ group: await buildGroupDTO(db, group, uid(c), c.env.APP_URL) });
 });
@@ -272,6 +281,12 @@ app.post("/:id/start", async (c) => {
     kind: "swiping_started",
     title: `Swiping started in ${group.name}`,
     body: "Open VIBIN and start swiping.",
+  });
+  track(c, "swiping_started", {
+    userId: uid(c),
+    groupId,
+    props: { deckSize: deck.length },
+    dedupeKey: `swiping_started:${groupId}`,
   });
 
   const fresh = await db.query.groups.findFirst({ where: eq(groups.id, groupId) });

@@ -5,3 +5,8 @@ APP_URL=http://localhost:5173
 AUTH_SECRET=dev-only-insecure-secret-change-me-0123456789abcdef
 EMAIL_API_KEY=
 EMAIL_FROM=hello@vibin.local
+
+# Owner Command Center — dev-only values. Generate your own for anything real:
+#   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+ENCRYPTION_KEY=ZGV2LW9ubHktMzItYnl0ZS1rZXktZG8tbm90LXNoaXA=
+OWNER_RECOVERY_SECRET=dev-only-owner-recovery-secret-change-me

@@ -25,9 +25,15 @@ jobs:
       - run: npm test
       - run: npm run build
 
-      # Boot the built Worker and run the black-box integration suite.
+      # Boot the built Worker and run the black-box suites against a fresh DB.
       - name: Integration tests
         run: |
+          cat > .dev.vars <<'EOF'
+          APP_ENV=development
+          APP_URL=http://localhost:8787
+          ENCRYPTION_KEY=dGVzdC1jaS0zMi1ieXRlLWtleS1kby1ub3Qtc2hpcCE=
+          OWNER_RECOVERY_SECRET=ci-only-owner-recovery-secret
+          EOF
           npx wrangler d1 migrations apply vibin-db --local
           npm run db:seed:build
           npx wrangler d1 execute vibin-db --local --file=./seed/seed.sql
@@ -36,6 +42,7 @@ jobs:
             curl -sf http://127.0.0.1:8787/api/health && break
             sleep 2
           done
+          BASE=http://127.0.0.1:8787 node tests/admin-auth.mjs
           BASE=http://127.0.0.1:8787 node tests/integration.mjs
 
   deploy:

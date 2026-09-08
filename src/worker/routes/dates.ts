@@ -9,6 +9,7 @@ import { badRequest, conflict, notFound } from "../lib/errors";
 import { newId } from "../lib/id";
 import { requireActiveMember, requireGroupMember } from "../lib/access";
 import { runDateMatch } from "../lib/engine-run";
+import { track } from "../lib/analytics";
 import { dateMatchStateDTO } from "../lib/match-view";
 import { formatWhen } from "../lib/dates";
 import { systemMessage } from "../lib/notify";
@@ -84,6 +85,13 @@ app.post("/:id/date-match/vote", async (c) => {
       target: [dateVotes.dateOptionId, dateVotes.userId],
       set: { value: body.value, updatedAt: now },
     });
+
+  track(c, "date_vote_cast", {
+    userId: uid(c),
+    groupId: c.req.param("id"),
+    props: { value: body.value },
+    dedupeKey: `date_vote:${body.optionId}:${uid(c)}`,
+  });
 
   const { completed } = await runDateMatch(db, c.env, option.matchId, uid(c));
   const state = await dateMatchStateDTO(db, option.matchId, uid(c));
