@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { Wordmark } from "./Logo";
+import { RouteFade } from "./RouteFade";
 import { Avatar } from "./ui";
 import { IconBell, IconLogout } from "./icons";
 import { useAuth } from "../lib/auth";
@@ -73,7 +74,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <IconBell />
               {!!data?.unread && (
-                <span className="absolute right-1.5 top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand-500 px-1 text-[10px] font-bold text-white ring-2 ring-paper">
+                <span
+                  key={data.unread}
+                  className="absolute right-1.5 top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand-500 px-1 text-[10px] font-bold text-white ring-2 ring-paper motion-safe:animate-check-pop"
+                >
                   {data.unread > 9 ? "9+" : data.unread}
                 </span>
               )}
@@ -142,7 +146,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
       </header>
 
-      <main className="flex-1 px-4 pb-24 pt-4">{children}</main>
+      <main className="flex-1 px-4 pb-24 pt-4">
+        <RouteFade>{children}</RouteFade>
+      </main>
     </div>
   );
 }

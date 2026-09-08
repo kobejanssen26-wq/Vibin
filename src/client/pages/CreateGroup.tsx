@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Field } from "../components/ui";
+import { PageHeader } from "../components/PageHeader";
 import { api, ApiRequestError } from "../lib/api";
 import type { GroupDTO } from "@shared/types";
 
@@ -37,12 +38,13 @@ export function CreateGroup() {
 
   return (
     <div>
-      <h1 className="text-2xl font-extrabold">Name your group</h1>
-      <p className="mt-1 text-sm text-navy-400">
-        You can change this later. Next you’ll set what, where and when.
-      </p>
+      <PageHeader
+        back={{ to: "/app", label: "Groups" }}
+        title="Name your group"
+        subtitle="You can change this later. Next you’ll set what, where and when."
+      />
 
-      <form onSubmit={submit} className="mt-6 space-y-4">
+      <form onSubmit={submit} className="space-y-4">
         <Field
           label="Group name"
           placeholder="Weekend with the boys"
@@ -51,19 +53,19 @@ export function CreateGroup() {
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-        <div className="flex flex-wrap gap-2">
+        <div className="stagger flex flex-wrap gap-2">
           {IDEAS.map((i) => (
             <button
               key={i}
               type="button"
-              className="chip"
+              className={name === i ? "chip-on" : "chip"}
               onClick={() => setName(i)}
             >
               {i}
             </button>
           ))}
         </div>
-        {err && <p className="text-sm font-medium text-danger-600">{err}</p>}
+        {err && <p className="text-sm font-medium text-danger-600 motion-safe:animate-shake">{err}</p>}
         <Button type="submit" loading={busy} className="w-full">
           Create group
         </Button>

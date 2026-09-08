@@ -38,7 +38,7 @@ export function GroupHome() {
   const cta = primaryCta(group);
 
   return (
-    <div className="space-y-5">
+    <div className="stagger space-y-5">
       <PageHeader
         back={{ to: "/app", label: "Groups" }}
         title={group.name}
@@ -76,6 +76,7 @@ export function GroupHome() {
           {cta && (
             <div className="relative overflow-hidden rounded-3xl bg-vibin-match p-5 text-white">
               <div className="dot-grid pointer-events-none absolute inset-0 text-white/60 opacity-[0.06]" />
+              <div className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-white/10 blur-md motion-safe:animate-[sheen_1.4s_ease-out_0.35s_both] motion-reduce:hidden" />
               <p className="relative eyebrow text-lime-400">Next step</p>
               <p className="relative mt-1 text-lg font-extrabold">{cta.title}</p>
               <p className="relative mt-0.5 text-sm text-white/80">{cta.sub}</p>

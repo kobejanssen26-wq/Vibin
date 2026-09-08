@@ -97,7 +97,7 @@ export function Admin() {
       </div>
 
       {tab === "overview" && stats && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="stagger grid grid-cols-2 gap-3">
           {(
             [
               ["Users", stats.users, "bg-brand-500"],
@@ -111,7 +111,12 @@ export function Admin() {
                 className={`absolute inset-y-0 left-0 w-1 ${edge}`}
                 aria-hidden="true"
               />
-              <p className="text-3xl font-extrabold tracking-[-0.03em]">{n}</p>
+              <p
+                key={n}
+                className="text-3xl font-extrabold tracking-[-0.03em] motion-safe:animate-count-pop"
+              >
+                {n}
+              </p>
               <p className="eyebrow mt-1">{label}</p>
             </div>
           ))}

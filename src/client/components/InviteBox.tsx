@@ -50,7 +50,7 @@ export function InviteBox({
           </span>
           <span className="text-xs font-bold text-navy-400 group-hover:text-brand-600">
             {copied === "code" ? (
-              <span className="inline-flex items-center gap-1 text-lime-600">
+              <span className="inline-flex items-center gap-1 text-lime-600 motion-safe:animate-check-pop">
                 <IconCheck size={14} /> Copied
               </span>
             ) : (

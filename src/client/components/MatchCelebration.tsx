@@ -77,7 +77,12 @@ export function MatchCelebration({
         </p>
 
         <div
-          className={`mx-auto my-6 overflow-hidden rounded-3xl ring-1 ring-white/15 ${stage >= 2 ? "animate-pop-in" : "opacity-0 scale-90"}`}
+          className="mx-auto my-6"
+          style={{ perspective: "1000px" }}
+        >
+        <div
+          className={`overflow-hidden rounded-3xl shadow-[0_40px_80px_-30px_rgba(0,0,0,0.6)] ring-1 ring-white/15 transition-transform duration-700 ${stage >= 2 ? "animate-pop-in" : "opacity-0 scale-90"}`}
+          style={{ transform: stage >= 3 ? "rotateX(0deg)" : "rotateX(8deg)" }}
         >
           {match.activity.imageUrl ? (
             <img
@@ -96,6 +101,7 @@ export function MatchCelebration({
               📍 {match.activity.locationLabel}
             </p>
           </div>
+        </div>
         </div>
 
         <div

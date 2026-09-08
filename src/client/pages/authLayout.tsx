@@ -26,7 +26,7 @@ export function AuthLayout({
         >
           <Wordmark />
         </Link>
-        <div className="card-raised p-6">
+        <div className="route-fade card-raised p-6">
           <h1 className="text-xl font-extrabold tracking-[-0.02em]">{title}</h1>
           {subtitle && (
             <p className="mt-1 text-sm text-navy-400">{subtitle}</p>
