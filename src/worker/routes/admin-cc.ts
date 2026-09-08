@@ -26,6 +26,7 @@ import {
 } from "../db/schema";
 import { parseRange, pctDelta } from "../lib/range";
 import { hasEncryptionKey } from "../lib/crypto-box";
+import { notFound } from "../lib/errors";
 
 type Ctx = { Bindings: Env; Variables: Vars };
 const app = new Hono<Ctx>();
@@ -36,6 +37,27 @@ async function scalar(q: Promise<{ n: number }[]>): Promise<number> {
   return (await q).at(0)?.n ?? 0;
 }
 const COUNT = { n: sql<number>`count(*)` };
+
+/** Shared list-query params: ?q=&page=&pageSize=&sort=&order= */
+function listParams(url: URL, sortable: string[], defSort: string) {
+  const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
+  const pageSize = Math.min(
+    100,
+    Math.max(5, Number(url.searchParams.get("pageSize")) || 25),
+  );
+  const q = (url.searchParams.get("q") || "").trim().slice(0, 120);
+  const sortReq = url.searchParams.get("sort") || defSort;
+  const sort = sortable.includes(sortReq) ? sortReq : defSort;
+  const order =
+    (url.searchParams.get("order") || "desc").toLowerCase() === "asc"
+      ? "asc"
+      : "desc";
+  return { page, pageSize, q, sort, order, offset: (page - 1) * pageSize };
+}
+
+function pageMeta(total: number, page: number, pageSize: number) {
+  return { total, page, pageSize, pageCount: Math.ceil(total / pageSize) || 1 };
+}
 
 /* -------------------------------- overview -------------------------------- */
 
@@ -250,6 +272,326 @@ app.get("/overview", async (c) => {
     },
     system,
     attention,
+  });
+});
+
+/* --------------------------------- users --------------------------------- */
+
+const USER_SORT: Record<string, string> = {
+  created: "u.created_at",
+  email: "u.email_normalized",
+  active: "last_active_at",
+  groups: "group_count",
+};
+
+app.get("/users", async (c) => {
+  const url = new URL(c.req.url);
+  const { page, pageSize, q, sort, order, offset } = listParams(
+    url,
+    Object.keys(USER_SORT),
+    "created",
+  );
+  const status = url.searchParams.get("status");
+  const validStatus =
+    status && ["active", "suspended", "deleted"].includes(status) ? status : null;
+
+  const where: string[] = [];
+  const args: unknown[] = [];
+  if (q) {
+    where.push("(u.email_normalized LIKE ?1 OR u.id = ?2 OR p.display_name LIKE ?1)");
+    args.push(`%${q.toLowerCase()}%`, q);
+  }
+  if (validStatus) {
+    where.push(`u.status = ?${args.length + 1}`);
+    args.push(validStatus);
+  }
+  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  const orderSql = `${USER_SORT[sort]} ${order.toUpperCase()}`;
+
+  const rows = await c.env.DB.prepare(
+    `SELECT u.id, u.email, u.role, u.status, u.created_at AS createdAt,
+            p.display_name AS displayName,
+            (SELECT COUNT(*) FROM group_members gm WHERE gm.user_id = u.id AND gm.status IN ('active','inactive')) AS group_count,
+            (SELECT COUNT(*) FROM activity_votes av WHERE av.user_id = u.id) AS vote_count,
+            (SELECT MAX(ce) FROM (
+               SELECT MAX(created_at) AS ce FROM analytics_events WHERE user_id = u.id
+               UNION ALL SELECT MAX(created_at) FROM activity_votes WHERE user_id = u.id
+               UNION ALL SELECT MAX(created_at) FROM messages WHERE user_id = u.id
+            )) AS last_active_at
+     FROM users u LEFT JOIN profiles p ON p.user_id = u.id
+     ${whereSql}
+     ORDER BY ${orderSql}
+     LIMIT ${pageSize} OFFSET ${offset}`,
+  )
+    .bind(...(args as never[]))
+    .all<{
+      id: string;
+      email: string;
+      role: string;
+      status: string;
+      createdAt: number;
+      displayName: string | null;
+      group_count: number;
+      vote_count: number;
+      last_active_at: number | null;
+    }>();
+  const totalCount = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM users u LEFT JOIN profiles p ON p.user_id = u.id ${whereSql}`,
+  )
+    .bind(...(args as never[]))
+    .first<{ n: number }>();
+
+  return c.json({
+    rows: rows.results.map((r) => ({
+      id: r.id,
+      email: r.email,
+      displayName: r.displayName,
+      role: r.role,
+      status: r.status,
+      createdAt: r.createdAt,
+      groupCount: r.group_count,
+      voteCount: r.vote_count,
+      lastActiveAt: r.last_active_at,
+    })),
+    ...pageMeta(totalCount?.n ?? 0, page, pageSize),
+  });
+});
+
+app.get("/users/:id", async (c) => {
+  const db = createDb(c.env);
+  const id = c.req.param("id");
+  const u = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      role: users.role,
+      status: users.status,
+      emailVerifiedAt: users.emailVerifiedAt,
+      createdAt: users.createdAt,
+      updatedAt: users.updatedAt,
+    })
+    .from(users)
+    .where(eq(users.id, id))
+    .get();
+  if (!u) throw notFound("User not found.");
+
+  const profile = await c.env.DB.prepare(
+    `SELECT display_name AS displayName, age, location_label AS locationLabel, bio FROM profiles WHERE user_id = ?1`,
+  )
+    .bind(id)
+    .first<{
+      displayName: string | null;
+      age: number | null;
+      locationLabel: string | null;
+      bio: string | null;
+    }>();
+
+  const groupRows = await c.env.DB.prepare(
+    `SELECT g.id, g.name, g.status, gm.role AS memberRole, gm.status AS memberStatus, gm.joined_at AS joinedAt
+     FROM group_members gm JOIN groups g ON g.id = gm.group_id
+     WHERE gm.user_id = ?1 ORDER BY gm.joined_at DESC`,
+  )
+    .bind(id)
+    .all();
+
+  const votes = await c.env.DB.prepare(
+    `SELECT value, COUNT(*) AS n FROM activity_votes WHERE user_id = ?1 GROUP BY value`,
+  )
+    .bind(id)
+    .all<{ value: string; n: number }>();
+  const vc = Object.fromEntries(votes.results.map((v) => [v.value, v.n]));
+
+  const planCount = await c.env.DB.prepare(
+    `SELECT COUNT(DISTINCT p.id) AS n FROM plans p
+     JOIN group_members gm ON gm.group_id = p.group_id
+     WHERE gm.user_id = ?1 AND gm.status IN ('active','inactive')`,
+  )
+    .bind(id)
+    .first<{ n: number }>();
+
+  const timeline = await c.env.DB.prepare(
+    `SELECT name, activity_id AS activityId, group_id AS groupId, created_at AS createdAt
+     FROM analytics_events WHERE user_id = ?1 ORDER BY created_at DESC LIMIT 40`,
+  )
+    .bind(id)
+    .all();
+
+  const recentSwipes = await c.env.DB.prepare(
+    `SELECT av.value, av.created_at AS createdAt, a.title, a.category_id AS category
+     FROM activity_votes av JOIN activities a ON a.id = av.activity_id
+     WHERE av.user_id = ?1 ORDER BY av.created_at DESC LIMIT 20`,
+  )
+    .bind(id)
+    .all();
+
+  return c.json({
+    user: { ...u, ...(profile ?? {}) },
+    groups: groupRows.results,
+    activity: {
+      likes: vc.like ?? 0,
+      passes: vc.nope ?? 0,
+      superlikes: vc.superlike ?? 0,
+      total: (vc.like ?? 0) + (vc.nope ?? 0) + (vc.superlike ?? 0),
+    },
+    plans: planCount?.n ?? 0,
+    recentSwipes: recentSwipes.results,
+    timeline: timeline.results,
+  });
+});
+
+/* -------------------------------- groups -------------------------------- */
+
+const GROUP_SORT: Record<string, string> = {
+  created: "g.created_at",
+  name: "g.name",
+  members: "member_count",
+};
+
+app.get("/groups", async (c) => {
+  const url = new URL(c.req.url);
+  const { page, pageSize, q, sort, order, offset } = listParams(
+    url,
+    Object.keys(GROUP_SORT),
+    "created",
+  );
+  const status = url.searchParams.get("status");
+  const validStatus =
+    status &&
+    ["configuring", "swiping", "date_matching", "planned", "archived"].includes(
+      status,
+    )
+      ? status
+      : null;
+
+  const where: string[] = [];
+  const args: unknown[] = [];
+  if (q) {
+    where.push("(g.name LIKE ?1 OR g.id = ?2)");
+    args.push(`%${q}%`, q);
+  }
+  if (validStatus) {
+    where.push(`g.status = ?${args.length + 1}`);
+    args.push(validStatus);
+  }
+  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+  const rows = await c.env.DB.prepare(
+    `SELECT g.id, g.name, g.status, g.created_at AS createdAt,
+            g.creator_id AS creatorId, cp.display_name AS creatorName,
+            (SELECT COUNT(*) FROM group_members gm WHERE gm.group_id = g.id AND gm.status IN ('active','inactive')) AS member_count,
+            (SELECT COUNT(*) FROM matches m WHERE m.group_id = g.id) AS match_count,
+            (SELECT COUNT(*) FROM plans p WHERE p.group_id = g.id) AS plan_count
+     FROM groups g LEFT JOIN profiles cp ON cp.user_id = g.creator_id
+     ${whereSql}
+     ORDER BY ${GROUP_SORT[sort]} ${order.toUpperCase()}
+     LIMIT ${pageSize} OFFSET ${offset}`,
+  )
+    .bind(...(args as never[]))
+    .all<{
+      id: string;
+      name: string;
+      status: string;
+      createdAt: number;
+      creatorId: string;
+      creatorName: string | null;
+      member_count: number;
+      match_count: number;
+      plan_count: number;
+    }>();
+  const total = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM groups g ${whereSql}`,
+  )
+    .bind(...(args as never[]))
+    .first<{ n: number }>();
+
+  return c.json({
+    rows: rows.results.map((r) => ({
+      id: r.id,
+      name: r.name,
+      status: r.status,
+      createdAt: r.createdAt,
+      creatorId: r.creatorId,
+      creatorName: r.creatorName,
+      memberCount: r.member_count,
+      matchCount: r.match_count,
+      planCount: r.plan_count,
+    })),
+    ...pageMeta(total?.n ?? 0, page, pageSize),
+  });
+});
+
+app.get("/groups/:id", async (c) => {
+  const db = createDb(c.env);
+  const id = c.req.param("id");
+  const g = await db.select().from(groups).where(eq(groups.id, id)).get();
+  if (!g) throw notFound("Group not found.");
+
+  const settings = await c.env.DB.prepare(
+    `SELECT * FROM group_settings WHERE group_id = ?1`,
+  )
+    .bind(id)
+    .first();
+
+  const members = await c.env.DB.prepare(
+    `SELECT gm.user_id AS userId, gm.role, gm.status, gm.joined_at AS joinedAt,
+            u.email, p.display_name AS displayName
+     FROM group_members gm JOIN users u ON u.id = gm.user_id
+     LEFT JOIN profiles p ON p.user_id = gm.user_id
+     WHERE gm.group_id = ?1 ORDER BY gm.joined_at ASC`,
+  )
+    .bind(id)
+    .all();
+
+  const votes = await c.env.DB.prepare(
+    `SELECT value, COUNT(*) AS n FROM activity_votes WHERE group_id = ?1 GROUP BY value`,
+  )
+    .bind(id)
+    .all<{ value: string; n: number }>();
+  const vc = Object.fromEntries(votes.results.map((v) => [v.value, v.n]));
+
+  const matchRows = await c.env.DB.prepare(
+    `SELECT m.id, m.status, m.starts_at AS startsAt, m.matched_at AS matchedAt,
+            m.completed_at AS completedAt, a.title, a.category_id AS category
+     FROM matches m JOIN activities a ON a.id = m.activity_id
+     WHERE m.group_id = ?1 ORDER BY m.matched_at DESC`,
+  )
+    .bind(id)
+    .all();
+
+  const planRows = await c.env.DB.prepare(
+    `SELECT p.id, p.starts_at AS startsAt, p.location_label AS locationLabel,
+            p.created_at AS createdAt, a.title
+     FROM plans p JOIN activities a ON a.id = p.activity_id
+     WHERE p.group_id = ?1 ORDER BY p.created_at DESC`,
+  )
+    .bind(id)
+    .all();
+
+  const msgCount = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM messages WHERE group_id = ?1 AND kind = 'text'`,
+  )
+    .bind(id)
+    .first<{ n: number }>();
+
+  const deckSize = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM group_activity_pool WHERE group_id = ?1`,
+  )
+    .bind(id)
+    .first<{ n: number }>();
+
+  return c.json({
+    group: g,
+    settings,
+    members: members.results,
+    votes: {
+      likes: vc.like ?? 0,
+      passes: vc.nope ?? 0,
+      superlikes: vc.superlike ?? 0,
+    },
+    matches: matchRows.results,
+    plans: planRows.results,
+    messageCount: msgCount?.n ?? 0,
+    deckSize: deckSize?.n ?? 0,
   });
 });
 

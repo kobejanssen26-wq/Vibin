@@ -4,6 +4,10 @@ import { AuthScreens } from "./AuthScreens";
 import { Shell } from "./Shell";
 import { Loading } from "./ui";
 import { Dashboard } from "./pages/Dashboard";
+import { Users } from "./pages/Users";
+import { UserDetail } from "./pages/UserDetail";
+import { Groups } from "./pages/Groups";
+import { GroupDetail } from "./pages/GroupDetail";
 
 /** Placeholder for sections that land in a later phase. Keeps the nav honest. */
 function Soon({ title }: { title: string }) {
@@ -34,10 +38,10 @@ function AdminRoutes() {
     <Shell>
       <Routes>
         <Route path="/" element={<Dashboard />} />
-        <Route path="/users" element={<Soon title="Users" />} />
-        <Route path="/users/:id" element={<Soon title="User detail" />} />
-        <Route path="/groups" element={<Soon title="Groups" />} />
-        <Route path="/groups/:id" element={<Soon title="Group detail" />} />
+        <Route path="/users" element={<Users />} />
+        <Route path="/users/:id" element={<UserDetail />} />
+        <Route path="/groups" element={<Groups />} />
+        <Route path="/groups/:id" element={<GroupDetail />} />
         <Route path="/activities" element={<Soon title="Activities" />} />
         <Route path="/activities/:id" element={<Soon title="Activity detail" />} />
         <Route path="/providers" element={<Soon title="Providers" />} />
