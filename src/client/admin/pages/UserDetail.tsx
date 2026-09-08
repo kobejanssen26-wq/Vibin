@@ -1,9 +1,13 @@
-import { Link, useParams } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { cc } from "../api";
 import { useResource } from "../lib";
 import {
   Badge,
+  Btn,
   ErrorNote,
+  Field,
+  Input,
   Loading,
   Panel,
   PageTitle,
@@ -41,6 +45,7 @@ interface Detail {
   }[];
   activity: { likes: number; passes: number; superlikes: number; total: number };
   plans: number;
+  createdGroups: number;
   recentSwipes: {
     value: string;
     createdAt: number;
@@ -60,6 +65,7 @@ const voteTone = (v: string) =>
 
 export function UserDetail() {
   const { id = "" } = useParams();
+  const nav = useNavigate();
   const { data, loading, error, reload } = useResource<Detail>(
     () => cc<Detail>(`/users/${id}`),
     id,
@@ -121,6 +127,17 @@ export function UserDetail() {
             />
             <StatTile label="Plans" value={fmtNum(data.plans)} />
           </div>
+
+          {data.user.role !== "owner" && (
+            <UserActions
+              id={data.user.id}
+              email={data.user.email}
+              status={data.user.status}
+              createdGroups={data.createdGroups}
+              onChanged={reload}
+              onDeleted={() => nav("/admin/users")}
+            />
+          )}
 
           <Panel title={`Groups · ${data.groups.length}`} bodyClassName="">
             <Table>
@@ -238,5 +255,131 @@ function Row({ k, children }: { k: string; children: React.ReactNode }) {
       <dt className="w-32 shrink-0 text-slate-500">{k}</dt>
       <dd className="text-slate-800">{children}</dd>
     </div>
+  );
+}
+
+function UserActions({
+  id,
+  email,
+  status,
+  createdGroups,
+  onChanged,
+  onDeleted,
+}: {
+  id: string;
+  email: string;
+  status: string;
+  createdGroups: number;
+  onChanged: () => void;
+  onDeleted: () => void;
+}) {
+  const [busy, setBusy] = useState<"status" | "delete" | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [pw, setPw] = useState("");
+
+  const setStatus = async (next: "active" | "suspended") => {
+    setBusy("status");
+    setErr(null);
+    try {
+      await cc(`/users/${id}/status`, { method: "POST", body: { status: next } });
+      onChanged();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const doDelete = async () => {
+    setBusy("delete");
+    setErr(null);
+    try {
+      await cc(`/users/${id}`, { method: "DELETE", body: { password: pw } });
+      onDeleted();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed");
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Panel title="Actions" subtitle="Destructive — confirmation required">
+      <div className="flex flex-wrap items-center gap-2">
+        {status === "suspended" ? (
+          <Btn
+            variant="neutral"
+            loading={busy === "status"}
+            onClick={() => setStatus("active")}
+          >
+            Reactivate account
+          </Btn>
+        ) : (
+          <Btn
+            variant="neutral"
+            loading={busy === "status"}
+            onClick={() => {
+              if (confirm(`Suspend ${email}? They will be unable to sign in.`))
+                void setStatus("suspended");
+            }}
+          >
+            Suspend account
+          </Btn>
+        )}
+        <Btn variant="danger" onClick={() => setConfirming((v) => !v)}>
+          Delete account…
+        </Btn>
+      </div>
+
+      {confirming && (
+        <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-3">
+          <p className="text-[13px] text-rose-800">
+            Permanently delete <strong>{email}</strong>. This also removes their
+            memberships, votes, notifications
+            {createdGroups > 0 && (
+              <>
+                {" "}
+                and <strong>{createdGroups}</strong> group
+                {createdGroups === 1 ? "" : "s"} they created (with those groups'
+                matches, plans and messages)
+              </>
+            )}
+            . Analytics and audit history are kept (anonymised). This cannot be
+            undone.
+          </p>
+          <div className="mt-2 max-w-xs">
+            <Field label="Confirm with your password">
+              <Input
+                type="password"
+                value={pw}
+                onChange={(e) => setPw(e.target.value)}
+                className="w-full"
+              />
+            </Field>
+          </div>
+          <div className="mt-2 flex gap-2">
+            <Btn
+              variant="ghost"
+              onClick={() => {
+                setConfirming(false);
+                setPw("");
+                setErr(null);
+              }}
+            >
+              Cancel
+            </Btn>
+            <Btn
+              variant="danger"
+              loading={busy === "delete"}
+              disabled={!pw}
+              onClick={doDelete}
+            >
+              Delete permanently
+            </Btn>
+          </div>
+        </div>
+      )}
+      {err && <p className="mt-2 text-xs text-rose-600">{err}</p>}
+    </Panel>
   );
 }

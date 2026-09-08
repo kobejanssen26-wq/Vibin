@@ -243,6 +243,50 @@ const run = async () => {
       !JSON.stringify(r.data).includes("TOP-SECRET-VALUE-42"),
   );
 
+  // 6b. user moderation: password-gated delete, owner protected
+  const victim = jar();
+  const vEmail = `victim${Date.now()}@x.com`;
+  await call(victim, "POST", "/api/auth/signup", {
+    displayName: "Victim",
+    email: vEmail,
+    password: "victim-pw-123456",
+  });
+  const vId = (await call(victim, "GET", "/api/auth/session")).data?.user?.id;
+  r = await call(
+    admin,
+    "POST",
+    `/api/admin/cc/users/${vId}/status`,
+    { status: "suspended" },
+    csrf(),
+  );
+  ok("owner can suspend a normal user", r.status === 200);
+  r = await call(
+    admin,
+    "DELETE",
+    `/api/admin/cc/users/${vId}`,
+    { password: "wrong" },
+    csrf(),
+  );
+  ok("delete user with wrong password -> 403", r.status === 403);
+  r = await call(
+    admin,
+    "DELETE",
+    `/api/admin/cc/users/${vId}`,
+    { password: PW },
+    csrf(),
+  );
+  ok("delete user with correct password -> 200", r.status === 200);
+  const ownerId = (await call(admin, "GET", "/api/admin/auth/session")).data
+    ?.user?.id;
+  r = await call(
+    admin,
+    "DELETE",
+    `/api/admin/cc/users/${ownerId}`,
+    { password: PW },
+    csrf(),
+  );
+  ok("owner account cannot be deleted -> 400", r.status === 400);
+
   // 7. maintenance mode: normal API 503, command center still 200
   await call(
     admin,

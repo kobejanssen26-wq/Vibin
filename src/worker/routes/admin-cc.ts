@@ -27,8 +27,9 @@ import {
 import { z } from "zod";
 import { parseRange, pctDelta } from "../lib/range";
 import { hasEncryptionKey } from "../lib/crypto-box";
-import { badRequest, notFound } from "../lib/errors";
+import { badRequest, forbidden, notFound } from "../lib/errors";
 import { newId } from "../lib/id";
+import { verifyPassword } from "../lib/password";
 import { parseBody } from "../lib/validate";
 import { audit } from "../lib/audit";
 import { SETTINGS, getSetting, setSetting } from "../lib/system-settings";
@@ -429,6 +430,12 @@ app.get("/users/:id", async (c) => {
     .bind(id)
     .all();
 
+  const createdGroups = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM groups WHERE creator_id = ?1`,
+  )
+    .bind(id)
+    .first<{ n: number }>();
+
   return c.json({
     user: { ...u, ...(profile ?? {}) },
     groups: groupRows.results,
@@ -439,9 +446,79 @@ app.get("/users/:id", async (c) => {
       total: (vc.like ?? 0) + (vc.nope ?? 0) + (vc.superlike ?? 0),
     },
     plans: planCount?.n ?? 0,
+    createdGroups: createdGroups?.n ?? 0,
     recentSwipes: recentSwipes.results,
     timeline: timeline.results,
   });
+});
+
+/* --------------------------- user moderation --------------------------- */
+
+app.post("/users/:id/status", async (c) => {
+  const id = c.req.param("id");
+  const { status } = await parseBody(
+    c,
+    z.object({ status: z.enum(["active", "suspended"]) }),
+  );
+  const db = createDb(c.env);
+  const target = await db.query.users.findFirst({
+    where: eq(users.id, id),
+    columns: { id: true, role: true },
+  });
+  if (!target) throw notFound("User not found.");
+  if (target.role === "owner") throw badRequest("The owner account cannot be suspended.");
+
+  await db
+    .update(users)
+    .set({ status, updatedAt: Math.floor(Date.now() / 1000) })
+    .where(eq(users.id, id));
+  await audit(c, {
+    action: status === "suspended" ? "user.suspended" : "user.reactivated",
+    targetType: "user",
+    targetId: id,
+  });
+  return c.json({ ok: true });
+});
+
+app.delete("/users/:id", async (c) => {
+  const id = c.req.param("id");
+  const { password } = await parseBody(
+    c,
+    z.object({ password: z.string().min(1).max(200) }),
+  );
+  const db = createDb(c.env);
+
+  // sensitive action -> fresh password re-entry
+  const me = await db.query.users.findFirst({
+    where: eq(users.id, c.get("adminUserId")!),
+    columns: { passwordHash: true },
+  });
+  const { ok } = await verifyPassword(password, me?.passwordHash ?? "");
+  if (!ok) throw forbidden("Password re-entry failed.");
+
+  const target = await db.query.users.findFirst({
+    where: eq(users.id, id),
+    columns: { id: true, role: true, email: true },
+  });
+  if (!target) throw notFound("User not found.");
+  if (target.role === "owner")
+    throw badRequest("The owner account cannot be deleted here.");
+  if (id === c.get("adminUserId"))
+    throw badRequest("You cannot delete your own account.");
+
+  // Hard delete. FKs cascade: group_members, activity_votes, date_votes,
+  // notifications, email_tokens, group_invites, reports(reporter). Groups this
+  // user created cascade too (and their matches / plans / pool / messages).
+  // analytics_events.user_id and audit_log.actor_id are ON DELETE SET NULL, so
+  // history stays intact (§93, §95).
+  await db.delete(users).where(eq(users.id, id));
+  await audit(c, {
+    action: "user.deleted",
+    targetType: "user",
+    targetId: id,
+    meta: { email: target.email },
+  });
+  return c.json({ ok: true });
 });
 
 /* -------------------------------- groups -------------------------------- */
