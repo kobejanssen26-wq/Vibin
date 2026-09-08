@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { IconCheck, IconShare } from "./icons";
 
 export function InviteBox({
   code,
@@ -14,7 +15,7 @@ export function InviteBox({
     try {
       await navigator.clipboard.writeText(value);
       setCopied(what);
-      setTimeout(() => setCopied(null), 1500);
+      setTimeout(() => setCopied(null), 1600);
     } catch {
       /* clipboard blocked — the value is visible to copy manually */
     }
@@ -33,31 +34,52 @@ export function InviteBox({
   };
 
   return (
-    <div className="card p-4">
-      <p className="text-sm font-bold">Invite your crew</p>
-      <div className="mt-2 flex items-center gap-2">
-        <code className="flex-1 rounded-xl bg-paper-soft px-3 py-2 text-center text-lg font-extrabold tracking-widest">
-          {code}
-        </code>
+    <div className="card overflow-hidden">
+      <div className="flex items-center justify-between px-4 pt-3.5">
+        <p className="eyebrow">Invite your crew</p>
+      </div>
+
+      <div className="px-4 py-3">
         <button
-          className="btn-ghost px-3 py-2 text-sm"
+          type="button"
           onClick={() => copy("code", code)}
+          className="group flex w-full items-center gap-3 rounded-2xl border border-dashed border-paper-line bg-paper-soft/60 px-4 py-3 transition-colors hover:border-brand-300"
         >
-          {copied === "code" ? "Copied" : "Copy"}
+          <span className="flex-1 text-left font-mono text-2xl font-extrabold tracking-[0.35em] text-navy">
+            {code}
+          </span>
+          <span className="text-xs font-bold text-navy-400 group-hover:text-brand-600">
+            {copied === "code" ? (
+              <span className="inline-flex items-center gap-1 text-lime-600">
+                <IconCheck size={14} /> Copied
+              </span>
+            ) : (
+              "Tap to copy"
+            )}
+          </span>
         </button>
       </div>
-      <div className="mt-2 flex items-center gap-2">
-        <input readOnly value={url} className="field flex-1 text-xs" />
+
+      <div className="flex items-center gap-2 border-t border-paper-line px-4 py-3">
+        <input
+          readOnly
+          value={url}
+          onFocus={(e) => e.currentTarget.select()}
+          className="field flex-1 truncate bg-paper-soft/60 text-xs"
+        />
         <button
-          className="btn-ghost px-3 py-2 text-sm"
+          className="btn-outline shrink-0 px-3 py-2.5 text-sm"
           onClick={() => copy("link", url)}
         >
           {copied === "link" ? "Copied" : "Copy"}
         </button>
       </div>
-      <button className="btn-primary mt-3 w-full py-2 text-sm" onClick={share}>
-        Share invite link
-      </button>
+
+      <div className="border-t border-paper-line p-3">
+        <button className="btn-primary w-full" onClick={share}>
+          <IconShare size={16} /> Share invite link
+        </button>
+      </div>
     </div>
   );
 }

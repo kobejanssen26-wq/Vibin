@@ -39,9 +39,12 @@ export function demoActivity(): ActivityDTO {
     websiteUrl: "https://theparkplayground.com",
     bookingUrl: "https://theparkplayground.com/en-be/our-locations/antwerp",
     ticketUrl: null,
-    imageUrl: null,
-    images: [],
-    imageAttribution: null,
+    imageUrl:
+      "https://images.unsplash.com/photo-1758273239313-6c703d089dd4?w=1200&q=75&auto=format&fit=crop",
+    images: [
+      "https://images.unsplash.com/photo-1758273239313-6c703d089dd4?w=1200&q=75&auto=format&fit=crop",
+    ],
+    imageAttribution: "Photo via Unsplash",
     tags: ["indoor", "tech", "teamwork"],
     source: "web",
     sourceUrl: "https://theparkplayground.com/en-be/our-locations/antwerp",

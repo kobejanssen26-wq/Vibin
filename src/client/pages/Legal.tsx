@@ -1,28 +1,45 @@
 import { Link } from "react-router-dom";
-import { Wordmark } from "../components/Logo";
+import { IconArrowLeft } from "../components/icons";
 
 export function Legal({ tab }: { tab: "privacy" | "terms" }) {
   return (
     <div className="mx-auto max-w-2xl px-5 py-10">
-      <Link to="/" className="mb-6 inline-block">
-        <Wordmark />
+      <Link
+        to="/"
+        className="mb-8 inline-flex items-center gap-1 text-sm font-semibold text-navy-500 hover:text-navy"
+      >
+        <IconArrowLeft size={16} /> Back to VIBIN
       </Link>
-      <div className="mb-6 flex gap-2 text-sm font-semibold">
+
+      <div className="mb-8 inline-flex gap-1 rounded-2xl border border-paper-line bg-paper-soft p-1 text-sm font-semibold">
         <Link
           to="/privacy"
-          className={tab === "privacy" ? "chip-on" : "chip"}
+          className={`rounded-xl px-4 py-2 transition-colors ${
+            tab === "privacy"
+              ? "bg-paper-card text-navy shadow-sm"
+              : "text-navy-400 hover:text-navy"
+          }`}
         >
-          Privacy Policy
+          Privacy
         </Link>
-        <Link to="/terms" className={tab === "terms" ? "chip-on" : "chip"}>
-          Terms of Service
+        <Link
+          to="/terms"
+          className={`rounded-xl px-4 py-2 transition-colors ${
+            tab === "terms"
+              ? "bg-paper-card text-navy shadow-sm"
+              : "text-navy-400 hover:text-navy"
+          }`}
+        >
+          Terms
         </Link>
       </div>
 
-      {tab === "privacy" ? <Privacy /> : <Terms />}
+      <article className="card p-6 sm:p-8">
+        {tab === "privacy" ? <Privacy /> : <Terms />}
+      </article>
 
-      <p className="mt-10 text-xs text-navy-400">
-        This is a template covering VIBIN’s actual data practices for the MVP.
+      <p className="mt-6 px-1 text-xs text-navy-400">
+        This is a template covering VIBIN's actual data practices for the MVP.
         Have a lawyer review it before a public launch.
       </p>
     </div>
@@ -30,10 +47,10 @@ export function Legal({ tab }: { tab: "privacy" | "terms" }) {
 }
 
 const P = ({ children }: { children: React.ReactNode }) => (
-  <p className="mt-3 text-sm leading-relaxed text-navy-700">{children}</p>
+  <p className="mt-3 text-sm leading-relaxed text-navy-500">{children}</p>
 );
 const H = ({ children }: { children: React.ReactNode }) => (
-  <h2 className="mt-7 text-lg font-bold">{children}</h2>
+  <h2 className="mt-7 text-base font-bold first:mt-0">{children}</h2>
 );
 
 function Privacy() {

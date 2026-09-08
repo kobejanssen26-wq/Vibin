@@ -4,15 +4,16 @@ import { usePoll } from "../lib/usePoll";
 import { api, ApiRequestError } from "../lib/api";
 import {
   Avatar,
-  EmptyState,
   ErrorState,
   LinkButton,
   LoadingScreen,
+  SectionHead,
 } from "../components/ui";
 import { InviteBox } from "../components/InviteBox";
 import { GroupChat } from "../components/GroupChat";
 import { PageHeader } from "../components/PageHeader";
 import { useConfirm } from "../components/Confirm";
+import { IconChevronRight } from "../components/icons";
 import { formatWhen } from "../lib/format";
 import type { GroupDTO, MatchDTO, PlanDTO } from "@shared/types";
 
@@ -52,12 +53,14 @@ export function GroupHome() {
         </p>
       )}
 
-      <div className="flex gap-1 rounded-2xl bg-paper-soft p-1 text-sm font-semibold">
+      <div className="flex gap-1 rounded-2xl border border-paper-line bg-paper-soft p-1 text-sm font-semibold">
         {(["plan", "chat"] as const).map((t) => (
           <button
             key={t}
-            className={`flex-1 rounded-xl py-2 capitalize transition ${
-              tab === t ? "bg-white text-navy shadow-card" : "text-navy-400"
+            className={`flex-1 rounded-xl py-2 capitalize transition-[background-color,color] ${
+              tab === t
+                ? "bg-paper-card text-navy shadow-sm"
+                : "text-navy-400 hover:text-navy"
             }`}
             onClick={() => setTab(t)}
           >
@@ -71,11 +74,13 @@ export function GroupHome() {
       ) : (
         <>
           {cta && (
-            <div className="card bg-vibin-blue p-5 text-white">
-              <p className="font-bold">{cta.title}</p>
-              <p className="mt-0.5 text-sm text-white/90">{cta.sub}</p>
+            <div className="relative overflow-hidden rounded-3xl bg-vibin-match p-5 text-white">
+              <div className="dot-grid pointer-events-none absolute inset-0 text-white/60 opacity-[0.06]" />
+              <p className="relative eyebrow text-lime-400">Next step</p>
+              <p className="relative mt-1 text-lg font-extrabold">{cta.title}</p>
+              <p className="relative mt-0.5 text-sm text-white/80">{cta.sub}</p>
               <button
-                className="btn mt-3 w-full bg-white text-navy"
+                className="btn-lime relative mt-4 w-full"
                 onClick={() => nav(cta.to)}
               >
                 {cta.label}
@@ -84,7 +89,11 @@ export function GroupHome() {
           )}
 
           {group.isCreator && group.status === "configuring" && (
-            <LinkButton to={`/groups/${id}/configure`} variant="ghost" className="w-full">
+            <LinkButton
+              to={`/groups/${id}/configure`}
+              variant="outline"
+              className="w-full"
+            >
               Edit group setup
             </LinkButton>
           )}
@@ -92,14 +101,17 @@ export function GroupHome() {
           <InviteBox code={group.inviteCode} url={group.inviteUrl} />
 
           {/* members */}
-          <section className="card p-4">
-            <h2 className="mb-3 font-bold">Members</h2>
-            <ul className="space-y-2">
+          <section>
+            <SectionHead
+              label="Crew"
+              count={`${group.members.length}`}
+            />
+            <div className="hairline">
               {group.members.map((m) => (
-                <li key={m.id} className="flex items-center gap-3">
+                <div key={m.id} className="flex items-center gap-3 p-3.5">
                   <Avatar name={m.displayName} url={m.avatarUrl} size={36} />
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">
                       {m.displayName}
                       {m.isYou && " (you)"}
                     </p>
@@ -117,79 +129,89 @@ export function GroupHome() {
                       onDone={refetch}
                     />
                   )}
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           </section>
 
           {/* upcoming plans */}
-          <section className="card p-4">
-            <h2 className="mb-3 font-bold">Upcoming plans</h2>
-            {plans.data?.plans.length ? (
-              <ul className="space-y-2">
+          {plans.data && plans.data.plans.length > 0 && (
+            <section>
+              <SectionHead label="Upcoming" count={`${plans.data.plans.length}`} />
+              <div className="hairline">
                 {plans.data.plans.map((p) => (
-                  <li key={p.id}>
-                    <Link
-                      to={`/plans/${p.id}`}
-                      className="block rounded-2xl bg-paper-soft p-3"
-                    >
-                      <p className="font-semibold">{p.activity.title}</p>
-                      <p className="text-sm text-navy-400">
+                  <Link
+                    key={p.id}
+                    to={`/plans/${p.id}`}
+                    className="flex items-center gap-3 p-3.5 transition-colors hover:bg-paper-soft"
+                  >
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-lime-400/20 text-lg">
+                      {p.activity.categoryIcon}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">
+                        {p.activity.title}
+                      </p>
+                      <p className="truncate text-xs text-navy-400">
                         {formatWhen(p.startsAt)} · {p.locationLabel}
                       </p>
-                    </Link>
-                  </li>
+                    </div>
+                    <IconChevronRight size={16} className="shrink-0 text-navy-300" />
+                  </Link>
                 ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-navy-400">No confirmed plans yet.</p>
-            )}
-          </section>
+              </div>
+            </section>
+          )}
 
           {/* matches */}
-          <section className="card p-4">
-            <h2 className="mb-3 font-bold">Matches</h2>
+          <section>
+            <SectionHead
+              label="Matches"
+              count={matches.data ? `${matches.data.matches.length}` : undefined}
+            />
             {matches.data?.matches.length ? (
-              <ul className="space-y-2">
+              <div className="hairline">
                 {matches.data.matches.map((m) => (
-                  <li
-                    key={m.id}
-                    className="flex items-center gap-3 rounded-2xl bg-paper-soft p-3"
-                  >
-                    <span className="text-2xl">{m.activity.categoryIcon}</span>
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold">{m.activity.title}</p>
+                  <div key={m.id} className="flex items-center gap-3 p-3.5">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-500/10 text-lg">
+                      {m.activity.categoryIcon}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">
+                        {m.activity.title}
+                      </p>
                       <p className="text-xs text-navy-400">
                         {m.status === "complete"
                           ? `Planned · ${formatWhen(m.startsAt)}`
                           : m.needsDateMatch
-                            ? "Matched · needs a date"
+                            ? "Needs a date"
                             : "Matched"}
                       </p>
                     </div>
                     {m.needsDateMatch && (
                       <Link
                         to={`/groups/${id}/date`}
-                        className="btn-ghost px-3 py-1.5 text-xs"
+                        className="btn-outline shrink-0 px-3 py-1.5 text-xs"
                       >
                         Vote
                       </Link>
                     )}
-                  </li>
+                  </div>
                 ))}
-              </ul>
+              </div>
             ) : (
-              <EmptyState
-                emoji="🃏"
-                title="No matches yet"
-                message="Keep swiping — a match needs everyone."
-              />
+              <div className="card p-6 text-center">
+                <p className="text-sm font-semibold text-navy">No matches yet</p>
+                <p className="mt-1 text-xs text-navy-400">
+                  Keep swiping. It only counts when everyone likes the same thing.
+                </p>
+              </div>
             )}
           </section>
 
           {group.isCreator && group.status !== "archived" && (
             <button
-              className="w-full rounded-xl py-3 text-center text-sm font-medium text-danger-600 hover:bg-danger-50"
+              className="w-full rounded-xl py-3 text-center text-sm font-semibold text-danger-600 transition-colors hover:bg-danger-50"
               onClick={async () => {
                 const ok = await confirm({
                   title: "Archive this group?",

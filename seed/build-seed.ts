@@ -13,7 +13,14 @@
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { ACTIVITIES, CATEGORIES, SEED_VERIFIED_ON } from "./activities";
+import {
+  ACTIVITIES,
+  ACTIVITY_IMAGE_ATTRIBUTION,
+  ACTIVITY_IMAGE_SOURCE,
+  CATEGORIES,
+  SEED_VERIFIED_ON,
+  activityImageUrl,
+} from "./activities";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const q = (s: string | null | undefined) =>
@@ -57,6 +64,7 @@ const COLS = [
 for (const a of ACTIVITIES) {
   const id = `act_${a.slug}`;
   const locationLabel = a.address ? `${a.provider}, ${a.city}` : `${a.provider}, ${a.city}`;
+  const imageUrl = activityImageUrl(a.slug);
   const vals = [
     q(id),
     q(PROVIDER_ID),
@@ -87,9 +95,9 @@ for (const a of ACTIVITIES) {
     q(a.providerWebsite),
     q(a.bookingUrl ?? null),
     q(a.ticketUrl ?? null),
-    "NULL", // image_url — provider-approved photos added later (§18)
-    "NULL", // image_source
-    "NULL", // image_attribution
+    q(imageUrl), // image_url — hand-matched free-licence photo per activity
+    q(imageUrl ? ACTIVITY_IMAGE_SOURCE : null),
+    q(imageUrl ? ACTIVITY_IMAGE_ATTRIBUTION : null),
     q(JSON.stringify(a.tags)),
     q("web"),
     q(a.sourceUrl),

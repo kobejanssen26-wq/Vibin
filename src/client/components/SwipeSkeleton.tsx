@@ -7,7 +7,7 @@ export function SwipeSkeleton() {
         <div className="skeleton h-7 w-24 rounded-full" />
       </div>
       <div className="relative mx-auto aspect-[3/4.1] w-full max-w-sm flex-1">
-        <div className="card absolute inset-0 overflow-hidden">
+        <div className="card-raised absolute inset-0 overflow-hidden">
           <div className="skeleton h-[56%] w-full rounded-none" />
           <div className="space-y-2.5 p-4">
             <div className="flex gap-2">

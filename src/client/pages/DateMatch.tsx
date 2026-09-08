@@ -119,40 +119,55 @@ export function DateMatch() {
         }
       />
 
-      <AvatarStack people={state.members} />
+      <div className="flex items-center gap-3">
+        <AvatarStack people={state.members} />
+        <span className="text-xs font-medium text-navy-400">
+          {state.members.length} deciding
+        </span>
+      </div>
 
       {state.status === "no_consensus" && (
-        <p className="rounded-2xl bg-danger-500/10 px-4 py-3 text-sm font-medium text-danger-700">
-          No slot works for everyone yet. Add another option or change a vote —
-          VIBIN won’t pick a time that excludes someone.
-        </p>
+        <div className="flex gap-3 rounded-2xl border border-amber-400/40 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          <span className="mt-0.5 shrink-0 font-bold">Heads up</span>
+          <p>
+            No slot works for everyone yet. Add another option or change a vote.
+            VIBIN won't pick a time that leaves someone out.
+          </p>
+        </div>
       )}
 
       <ul className="space-y-3">
         {state.options.map((o) => (
-          <li key={o.id} className="card p-4">
-            <div className="flex items-center justify-between">
+          <li
+            key={o.id}
+            className={`card overflow-hidden ${
+              o.unanimous ? "border-lime-400 ring-1 ring-lime-400" : ""
+            }`}
+          >
+            <div className="flex items-center justify-between px-4 pt-3.5">
               <div>
-                <p className="font-bold">{formatDay(o.startsAt)}</p>
+                <p className="font-extrabold tracking-[-0.01em]">
+                  {formatDay(o.startsAt)}
+                </p>
                 <p className="text-sm text-navy-400">{formatTime(o.startsAt)}</p>
               </div>
               {o.unanimous && (
-                <span className="rounded-full bg-lime-400/20 px-2 py-1 text-xs font-bold text-lime-700">
-                  Works for all
+                <span className="chip-lime px-2.5 py-1 text-xs font-bold">
+                  <IconCheck size={13} /> Works for all
                 </span>
               )}
             </div>
 
-            <div className="mt-3 flex gap-2">
+            <div className="mt-3 grid grid-cols-3 gap-1.5 px-4">
               {VOTES.map((btn) => (
                 <button
                   key={btn.v}
                   disabled={busy}
                   onClick={() => castVote(o.id, btn.v)}
-                  className={`flex-1 rounded-xl py-2 text-sm font-bold transition ${
+                  className={`rounded-xl py-2.5 text-sm font-bold transition-[background-color,color] disabled:opacity-60 ${
                     o.yourVote === btn.v
                       ? btn.cls
-                      : "bg-paper-soft text-navy-400"
+                      : "bg-paper-soft text-navy-400 hover:text-navy"
                   }`}
                 >
                   {btn.label}
@@ -160,7 +175,7 @@ export function DateMatch() {
               ))}
             </div>
 
-            <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-navy-400">
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-paper-line px-4 py-2.5 text-xs font-medium text-navy-400">
               <Tally n={o.tally.yes} label="yes" dot="bg-lime-500" />
               <Tally n={o.tally.maybe} label="maybe" dot="bg-amber-400" />
               <Tally n={o.tally.no} label="no" dot="bg-danger-500" />
@@ -185,12 +200,13 @@ export function DateMatch() {
             value={newSlot}
             onChange={(e) => setNewSlot(e.target.value)}
           />
-          <div className="mt-2 flex gap-2">
-            <Button loading={busy} onClick={addOption} className="flex-1 py-2">
+          <div className="mt-2.5 flex gap-2">
+            <Button loading={busy} onClick={addOption} className="flex-1">
               Add option
             </Button>
             <button
-              className="btn-ghost flex-1 py-2"
+              type="button"
+              className="btn-outline flex-1"
               onClick={() => setAdding(false)}
             >
               Cancel
@@ -198,10 +214,7 @@ export function DateMatch() {
           </div>
         </div>
       ) : (
-        <button
-          className="btn-outline w-full"
-          onClick={() => setAdding(true)}
-        >
+        <button className="btn-outline w-full" onClick={() => setAdding(true)}>
           <IconPlus size={16} /> Suggest another time
         </button>
       )}

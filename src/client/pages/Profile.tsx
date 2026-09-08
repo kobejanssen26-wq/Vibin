@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { api, ApiRequestError } from "../lib/api";
-import { Avatar, Button, Field, Modal } from "../components/ui";
+import { Avatar, Button, Field, Modal, SectionHead } from "../components/ui";
 import { PageHeader } from "../components/PageHeader";
 import type { Me } from "@shared/types";
 
@@ -112,9 +112,13 @@ export function Profile() {
         title="Profile & settings"
       />
 
-      <div className="flex items-center gap-4">
-        <Avatar name={user.displayName} url={user.avatarUrl} size={64} />
-        <label className="btn-ghost cursor-pointer text-sm">
+      <div className="card flex items-center gap-4 p-4">
+        <Avatar name={user.displayName} url={user.avatarUrl} size={60} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-bold">{user.displayName}</p>
+          <p className="truncate text-xs text-navy-400">{user.email}</p>
+        </div>
+        <label className="btn-outline shrink-0 cursor-pointer text-sm">
           Change photo
           <input
             type="file"
@@ -127,43 +131,48 @@ export function Profile() {
         </label>
       </div>
 
-      <form onSubmit={save} className="space-y-4">
-        <Field
-          label="Name"
-          value={form.displayName}
-          onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-        />
-        <div className="grid grid-cols-2 gap-3">
+      <section>
+        <SectionHead label="Your profile" />
+        <form onSubmit={save} className="card space-y-4 p-4">
           <Field
-            label="Age (optional)"
-            type="number"
-            min={13}
-            max={120}
-            value={form.age}
-            onChange={(e) => setForm({ ...form, age: e.target.value })}
+            label="Name"
+            value={form.displayName}
+            onChange={(e) => setForm({ ...form, displayName: e.target.value })}
           />
+          <div className="grid grid-cols-2 gap-3">
+            <Field
+              label="Age (optional)"
+              type="number"
+              min={13}
+              max={120}
+              value={form.age}
+              onChange={(e) => setForm({ ...form, age: e.target.value })}
+            />
+            <Field
+              label="Location (optional)"
+              value={form.locationLabel}
+              onChange={(e) =>
+                setForm({ ...form, locationLabel: e.target.value })
+              }
+            />
+          </div>
           <Field
-            label="Location (optional)"
-            value={form.locationLabel}
-            onChange={(e) =>
-              setForm({ ...form, locationLabel: e.target.value })
-            }
+            label="Bio (optional)"
+            value={form.bio}
+            onChange={(e) => setForm({ ...form, bio: e.target.value })}
           />
-        </div>
-        <Field
-          label="Bio (optional)"
-          value={form.bio}
-          onChange={(e) => setForm({ ...form, bio: e.target.value })}
-        />
-        {msg && <p className="text-sm text-navy-400">{msg}</p>}
-        <Button type="submit" loading={busy}>
-          Save changes
-        </Button>
-      </form>
+          {msg && (
+            <p className="text-sm font-medium text-lime-700">{msg}</p>
+          )}
+          <Button type="submit" loading={busy} className="w-full">
+            Save changes
+          </Button>
+        </form>
+      </section>
 
       <section>
-        <h2 className="mb-2 font-bold">Notifications</h2>
-        <div className="card divide-y divide-ink/5">
+        <SectionHead label="Notifications" />
+        <div className="card divide-y divide-paper-line">
           {(
             [
               ["invites", "Group invites"],
@@ -177,7 +186,7 @@ export function Profile() {
           ).map(([key, label]) => (
             <label
               key={key}
-              className="flex items-center justify-between px-4 py-3 text-sm"
+              className="flex cursor-pointer items-center justify-between px-4 py-3 text-sm"
             >
               {label}
               <input
@@ -194,25 +203,40 @@ export function Profile() {
       </section>
 
       <section>
-        <h2 className="mb-2 font-bold">Your data</h2>
-        <p className="mb-3 text-sm text-navy-400">
-          Account: {user.email}
-          {user.emailVerified ? " · verified" : " · not verified"}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <button className="btn-outline" onClick={exportData}>
-            Export my data (JSON)
-          </button>
-          <button
-            className="btn-outline !border-danger-200 text-danger-600 hover:!border-danger-400"
-            onClick={() => {
-              setDelPw("");
-              setDelErr(null);
-              setDelOpen(true);
-            }}
-          >
-            Delete my account
-          </button>
+        <SectionHead label="Your data" />
+        <div className="card divide-y divide-paper-line">
+          <div className="flex items-center justify-between px-4 py-3.5">
+            <div>
+              <p className="text-sm font-semibold">Export</p>
+              <p className="text-xs text-navy-400">
+                Everything we hold on you, as JSON.
+              </p>
+            </div>
+            <button
+              className="btn-outline shrink-0 px-3 py-2 text-sm"
+              onClick={exportData}
+            >
+              Download
+            </button>
+          </div>
+          <div className="flex items-center justify-between px-4 py-3.5">
+            <div>
+              <p className="text-sm font-semibold text-danger-600">
+                Delete account
+              </p>
+              <p className="text-xs text-navy-400">Permanent. Can't be undone.</p>
+            </div>
+            <button
+              className="btn-outline shrink-0 !border-danger-200 px-3 py-2 text-sm text-danger-600 hover:!border-danger-400"
+              onClick={() => {
+                setDelPw("");
+                setDelErr(null);
+                setDelOpen(true);
+              }}
+            >
+              Delete
+            </button>
+          </div>
         </div>
       </section>
 

@@ -80,13 +80,15 @@ export function Admin() {
         subtitle="Catalogue, moderation and stats"
       />
 
-      <div className="flex gap-1 rounded-2xl bg-paper-soft p-1 text-sm font-semibold">
+      <div className="flex gap-1 rounded-2xl border border-paper-line bg-paper-soft p-1 text-sm font-semibold">
         {(["overview", "activities", "reports"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`flex-1 rounded-xl py-2 capitalize ${
-              tab === t ? "bg-white shadow-card" : "text-navy-400"
+            className={`flex-1 rounded-xl py-2 capitalize transition-[background-color,color] ${
+              tab === t
+                ? "bg-paper-card text-navy shadow-sm"
+                : "text-navy-400 hover:text-navy"
             }`}
           >
             {t}
@@ -98,77 +100,91 @@ export function Admin() {
         <div className="grid grid-cols-2 gap-3">
           {(
             [
-              ["Users", stats.users],
-              ["Groups", stats.groups],
-              ["Activities", stats.activities],
-              ["Open reports", stats.openReports],
+              ["Users", stats.users, "bg-brand-500"],
+              ["Groups", stats.groups, "bg-navy-700"],
+              ["Activities", stats.activities, "bg-brand-400"],
+              ["Open reports", stats.openReports, "bg-amber-400"],
             ] as const
-          ).map(([label, n]) => (
-            <div key={label} className="card p-4">
-              <p className="text-3xl font-extrabold">{n}</p>
-              <p className="text-sm text-navy-400">{label}</p>
+          ).map(([label, n, edge]) => (
+            <div key={label} className="card relative overflow-hidden p-4 pl-5">
+              <span
+                className={`absolute inset-y-0 left-0 w-1 ${edge}`}
+                aria-hidden="true"
+              />
+              <p className="text-3xl font-extrabold tracking-[-0.03em]">{n}</p>
+              <p className="eyebrow mt-1">{label}</p>
             </div>
           ))}
         </div>
       )}
 
       {tab === "activities" && (
-        <ul className="space-y-2">
+        <div className="hairline">
           {acts.map((a) => (
-            <li
+            <div
               key={a.id}
-              className="card flex items-center justify-between p-3 text-sm"
+              className="flex items-center justify-between gap-3 p-3.5 text-sm"
             >
-              <div>
-                <p className="font-semibold">{a.title}</p>
-                <p className="text-xs text-navy-400">
+              <div className="min-w-0">
+                <p className="truncate font-semibold">{a.title}</p>
+                <p className="truncate text-xs text-navy-400">
                   {a.categoryId} · {a.locationLabel}
                 </p>
               </div>
               <button
-                className={`rounded-full px-3 py-1 text-xs font-bold ${
+                className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${
                   a.active
-                    ? "bg-lime-400/20 text-lime-700"
+                    ? "bg-lime-400/25 text-lime-700"
                     : "bg-navy/10 text-navy-400"
                 }`}
                 onClick={() => toggleActive(a)}
               >
                 {a.active ? "Active" : "Hidden"}
               </button>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
 
       {tab === "reports" && (
-        <ul className="space-y-2">
-          {reports.length === 0 && (
-            <p className="text-sm text-navy-400">No reports.</p>
-          )}
-          {reports.map((r) => (
-            <li key={r.id} className="card p-3 text-sm">
-              <p className="font-semibold">
-                {r.reason} · {r.targetType}
+        <>
+          {reports.length === 0 ? (
+            <div className="card p-6 text-center">
+              <p className="text-sm font-semibold">Nothing to review</p>
+              <p className="mt-1 text-xs text-navy-400">
+                Reported activities and content will show up here.
               </p>
-              <p className="text-xs text-navy-400">{r.detail || "—"}</p>
-              <div className="mt-2 flex gap-2">
-                {["reviewing", "resolved", "dismissed"].map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setReport(r.id, s)}
-                    className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                      r.status === s
-                        ? "bg-brand-500 text-white"
-                        : "bg-paper-soft text-navy-400"
-                    }`}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </li>
-          ))}
-        </ul>
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {reports.map((r) => (
+                <li key={r.id} className="card p-3.5 text-sm">
+                  <p className="font-semibold capitalize">
+                    {r.reason.replace("_", " ")} · {r.targetType}
+                  </p>
+                  <p className="mt-0.5 text-xs text-navy-400">
+                    {r.detail || "No extra detail"}
+                  </p>
+                  <div className="mt-2.5 flex gap-1.5">
+                    {["reviewing", "resolved", "dismissed"].map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setReport(r.id, s)}
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize transition-colors ${
+                          r.status === s
+                            ? "bg-brand-500 text-white"
+                            : "bg-paper-soft text-navy-400 hover:text-navy"
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </div>
   );

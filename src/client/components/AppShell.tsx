@@ -91,10 +91,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         {panel === "bell" && (
-          <div className="border-t border-paper-line bg-paper-card px-4 py-3">
-            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-navy-400">
-              Notifications
-            </p>
+          <div className="animate-float-up border-t border-paper-line bg-paper-card px-4 py-3">
+            <p className="eyebrow mb-2">Notifications</p>
             {data?.notifications.length ? (
               <ul className="-mx-2 max-h-72 space-y-1 overflow-auto">
                 {data.notifications.slice(0, 15).map((n) => (
@@ -121,7 +119,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
 
         {panel === "menu" && (
-          <div className="border-t border-paper-line bg-paper-card p-2 text-sm">
+          <div className="animate-float-up border-t border-paper-line bg-paper-card p-2 text-sm">
             <MenuLink to="/settings" onClick={() => setPanel("none")}>
               Profile &amp; settings
             </MenuLink>

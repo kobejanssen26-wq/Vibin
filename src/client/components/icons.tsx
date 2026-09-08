@@ -129,6 +129,11 @@ export const IconInfo = (p: P) => (
     <path d="M12 11v5M12 8h.01" />
   </Svg>
 );
+export const IconSend = (p: P) => (
+  <Svg {...p}>
+    <path d="M4 12 20 4l-6 16-2.5-6.5L4 12Z" />
+  </Svg>
+);
 export const IconUsers = (p: P) => (
   <Svg {...p}>
     <circle cx="9" cy="8" r="3.2" />

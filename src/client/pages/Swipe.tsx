@@ -144,32 +144,32 @@ export function Swipe() {
 
       {done ? (
         <EmptyState
-          emoji={state.status === "planned" ? "🎉" : "✅"}
+          emoji={state.status === "planned" ? "🎉" : state.status === "date_matching" ? "📅" : "✓"}
           title={
             state.status === "planned"
-              ? "You’ve got a plan"
+              ? "You've got a plan"
               : state.status === "date_matching"
                 ? "Time to pick a date"
-                : "You’re all caught up"
+                : "All caught up"
           }
           message={
             state.status === "date_matching"
-              ? "Everyone matched an activity. Vote on when to go."
+              ? "Everyone matched an activity. Now vote on when to go."
               : state.status === "planned"
-                ? "Check the plan for all the details."
-                : "You’ve voted on every card. Waiting on the others — or add more with wider filters."
+                ? "The plan has everything: place, time, price and the booking link."
+                : "You've voted on every card. Waiting on the others, or widen the filters for more."
           }
           action={
             state.status === "date_matching" ? (
               <Link to={`/groups/${id}/date`} className="btn-primary">
-                Vote on dates →
+                Vote on dates
               </Link>
             ) : state.status === "planned" ? (
               <Link to={`/groups/${id}/plan`} className="btn-primary">
                 View the plan
               </Link>
             ) : (
-              <Link to={`/groups/${id}`} className="btn-ghost">
+              <Link to={`/groups/${id}`} className="btn-outline">
                 Back to group
               </Link>
             )

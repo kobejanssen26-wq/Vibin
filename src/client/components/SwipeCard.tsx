@@ -118,7 +118,7 @@ export function SwipeCard({
       onPointerUp={onUp}
       onPointerCancel={onUp}
     >
-      <article className="card relative h-full overflow-hidden">
+      <article className="card-raised relative h-full overflow-hidden">
         {/* edge glow feedback */}
         <div
           className="pointer-events-none absolute inset-0 z-10 rounded-3xl ring-4 ring-inset ring-brand-500 transition-opacity"

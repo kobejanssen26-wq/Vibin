@@ -117,8 +117,15 @@ export function Spinner({ className = "h-6 w-6" }: { className?: string }) {
 /* ---------------------------- Page states --------------------------- */
 export function LoadingScreen({ label = "Loading…" }: { label?: string }) {
   return (
-    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-navy-400">
-      <LogoMark className="h-10 w-10 animate-float-up motion-reduce:animate-none" />
+    <div
+      className="flex min-h-[55vh] flex-col items-center justify-center gap-3 text-navy-400"
+      role="status"
+      aria-live="polite"
+    >
+      <span className="relative grid h-12 w-12 place-items-center">
+        <span className="absolute inset-0 animate-ring-pulse rounded-full bg-brand-500/25 motion-reduce:hidden" />
+        <LogoMark className="h-10 w-10" />
+      </span>
       <p className="text-sm">{label}</p>
     </div>
   );
@@ -128,7 +135,7 @@ export function SkeletonCard({ className = "" }: { className?: string }) {
   return (
     <div className={`card overflow-hidden ${className}`}>
       <div className="skeleton h-40 w-full rounded-none" />
-      <div className="space-y-2 p-4">
+      <div className="space-y-2.5 p-4">
         <div className="skeleton h-4 w-2/3" />
         <div className="skeleton h-3 w-1/2" />
         <div className="skeleton h-3 w-full" />
@@ -147,14 +154,22 @@ export function ErrorState({
   onRetry?: () => void;
 }) {
   return (
-    <div className="mx-auto max-w-sm py-16 text-center animate-float-up">
-      <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-danger-100 text-2xl">
-        ⚠️
+    <div className="mx-auto max-w-sm animate-float-up py-16 text-center">
+      <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-danger-50 text-danger-500">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M12 8v5M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"
+            stroke="currentColor"
+            strokeWidth="1.75"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </div>
       <h2 className="text-lg font-bold">{title}</h2>
-      {message && <p className="mt-1 text-sm text-navy-400">{message}</p>}
+      {message && <p className="mt-1.5 text-sm text-navy-400">{message}</p>}
       {onRetry && (
-        <Button variant="outline" className="mt-4" onClick={onRetry}>
+        <Button variant="outline" className="mt-5" onClick={onRetry}>
           Try again
         </Button>
       )}
@@ -174,13 +189,41 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="mx-auto max-w-sm py-14 text-center animate-float-up">
-      <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-3xl bg-paper-soft text-3xl">
-        {emoji}
+    <div className="mx-auto max-w-sm animate-float-up py-14 text-center">
+      <div className="relative mx-auto mb-4 grid h-16 w-16 place-items-center overflow-hidden rounded-3xl bg-brand-500 text-3xl text-white">
+        <span className="dot-grid absolute inset-0 opacity-[0.14]" />
+        <span className="relative">{emoji}</span>
       </div>
       <h2 className="text-lg font-bold">{title}</h2>
-      {message && <p className="mt-1 text-sm text-navy-400">{message}</p>}
-      {action && <div className="mt-5">{action}</div>}
+      {message && (
+        <p className="mx-auto mt-1.5 max-w-xs text-sm text-navy-400">{message}</p>
+      )}
+      {action && <div className="mt-6">{action}</div>}
+    </div>
+  );
+}
+
+/* --------------------------- Section head --------------------------- */
+export function SectionHead({
+  label,
+  count,
+  action,
+}: {
+  label: string;
+  count?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="mb-2.5 flex items-center justify-between px-1">
+      <h2 className="flex items-center gap-2 eyebrow">
+        {label}
+        {count != null && (
+          <span className="rounded-full bg-paper-soft px-1.5 py-0.5 text-[11px] font-bold text-navy-400">
+            {count}
+          </span>
+        )}
+      </h2>
+      {action}
     </div>
   );
 }
@@ -214,7 +257,7 @@ export function Modal({
       aria-label={title}
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="card w-full max-w-sm animate-slide-up p-5">
+      <div className="card-raised w-full max-w-sm animate-slide-up p-5">
         <div className="mb-3 flex items-start justify-between gap-4">
           <h2 className="text-lg font-bold">{title}</h2>
           <button

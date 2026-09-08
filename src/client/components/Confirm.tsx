@@ -68,7 +68,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           aria-labelledby="confirm-title"
           onMouseDown={(e) => e.target === e.currentTarget && close(false)}
         >
-          <div className="card w-full max-w-sm animate-slide-up p-5">
+          <div className="card-raised w-full max-w-sm animate-slide-up p-5">
             <h2 id="confirm-title" className="text-lg font-bold">
               {state.title}
             </h2>

@@ -13,12 +13,57 @@
  * to `verified` in the admin (which stamps `lastVerifiedAt`). VIBIN never
  * presents unverified data as guaranteed-current (§27).
  *
- * Images: seeded activities have no photo yet. The card falls back to a branded
- * category treatment. Provider-approved photos are the launch upgrade path
- * (§18 priority 1) and can be added per-activity in the admin.
+ * Images: each activity carries a hand-picked photo that shows THAT specific
+ * activity (see ACTIVITY_IMAGES below) — free-licence Unsplash photos resolved to
+ * their stable CDN URLs. The SwipeCard/PlanView `<img onError>` still falls back
+ * to the branded category treatment if a URL ever fails. Provider-approved
+ * photos remain the launch upgrade path (§18 priority 1) and can replace these
+ * per-activity in the admin.
  */
 
 export const SEED_VERIFIED_ON = "2026-09-07"; // YYYY-MM-DD
+
+/**
+ * Per-activity photography. Values are Unsplash photo ids (the `photo-<id>`
+ * segment of images.unsplash.com URLs). Every photo was hand-checked to depict
+ * the actual activity — not a loose category match — and confirmed to be on the
+ * free Unsplash licence (not Unsplash+). Shared ids are intentional: the two
+ * Bowling Stones venues, the two The Park VR venues and the two axe-throwing
+ * venues run the identical format, and both brewery visits are lambic/cellar
+ * tours.
+ */
+export const ACTIVITY_IMAGES: Record<string, string> = {
+  "bowling-stones-antwerp": "1545056453-f0359c3df6db",
+  "bowling-stones-brussels": "1545056453-f0359c3df6db",
+  "the-park-vr-antwerp": "1758273239313-6c703d089dd4",
+  "the-park-vr-ghent": "1758273239313-6c703d089dd4",
+  "dijle-floats-kayak-leuven": "1578940695359-2dd6aff3eb84",
+  "halve-maan-brewery-tour-bruges": "1779591211635-5e3daafab2a2",
+  "cantillon-brewery-brussels": "1779591211635-5e3daafab2a2",
+  "train-world-brussels": "1779643796787-aa14cac77030",
+  "mas-museum-antwerp": "1782507421864-25e22178f70e",
+  "gravensteen-castle-ghent": "1668030589283-cc19db6b4f97",
+  "thermae-boetfort-spa": "1757940661240-f2e8d2ff93bf",
+  "boulder-the-island-antwerp": "1696105538782-7815474f28e0",
+  "antwerp-axe-throwing": "1761873763418-2c9596bc8c65",
+  "gent-axe-throwing": "1761873763418-2c9596bc8c65",
+  "jump-xl-brussels": "1751235604534-f07bf076d690",
+  "kings-of-comedy-brussels": "1507676385008-e7fb562d11f8",
+  "60-minutes-escape-brussels": "1761207850889-75d5765d33c0",
+  "outpost-gamecenter-antwerp": "1676651471150-0e3a5f8de05e",
+  "kinepolis-cinema": "1595769816263-9b910be24d5f",
+};
+
+/** Resolve a slug to a sized, CDN-optimised Unsplash URL (or null if unmapped). */
+export function activityImageUrl(slug: string): string | null {
+  const id = ACTIVITY_IMAGES[slug];
+  return id
+    ? `https://images.unsplash.com/photo-${id}?w=1200&q=75&auto=format&fit=crop`
+    : null;
+}
+
+export const ACTIVITY_IMAGE_SOURCE = "Unsplash";
+export const ACTIVITY_IMAGE_ATTRIBUTION = "Photo via Unsplash";
 
 export interface SeedActivity {
   slug: string;
