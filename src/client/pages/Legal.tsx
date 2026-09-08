@@ -34,7 +34,7 @@ export function Legal({ tab }: { tab: "privacy" | "terms" }) {
         </Link>
       </div>
 
-      <article className="card p-6 sm:p-8">
+      <article key={tab} className="route-fade card p-6 sm:p-8">
         {tab === "privacy" ? <Privacy /> : <Terms />}
       </article>
 
