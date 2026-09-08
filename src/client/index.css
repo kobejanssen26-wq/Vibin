@@ -45,22 +45,22 @@
 @layer components {
   /* -------- buttons -------- */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-[15px] font-semibold
-      transition-[background-color,border-color,color,opacity] duration-100 ease-out
-      active:opacity-90 disabled:opacity-50 disabled:pointer-events-none
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-[15px] font-semibold
+      transition-[transform,background-color,box-shadow,border-color,color] duration-150 ease-out
+      active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-paper;
   }
   .btn-primary {
-    @apply btn bg-brand-500 text-white hover:bg-brand-600;
+    @apply btn bg-brand-500 text-white shadow-pop hover:bg-brand-600;
   }
   .btn-lime {
-    @apply btn bg-lime-400 text-navy hover:bg-lime-300;
+    @apply btn bg-lime-400 text-navy shadow-lime hover:bg-lime-300;
   }
   .btn-dark {
     @apply btn bg-navy text-white hover:bg-navy-800;
   }
   .btn-outline {
-    @apply btn border border-navy/15 bg-transparent text-navy hover:border-navy/30 hover:bg-navy/[0.03];
+    @apply btn border border-paper-line bg-white text-navy hover:border-brand-300 hover:text-brand-600;
   }
   .btn-ghost {
     @apply btn bg-paper-soft text-navy hover:bg-paper-line;
@@ -68,23 +68,24 @@
 
   /* -------- inputs -------- */
   .field {
-    @apply w-full rounded-xl border border-paper-line bg-white px-3.5 py-2.5 text-[15px] text-navy
-      placeholder:text-navy-300 transition-[border-color,box-shadow] duration-100
-      focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20;
+    @apply w-full rounded-2xl border border-paper-line bg-white px-4 py-3 text-[15px] text-navy
+      placeholder:text-navy-300 transition-[border-color,box-shadow] duration-150
+      focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-400/15;
   }
 
   /* -------- surfaces --------
-     Flat, bordered by default. `card-raised` gets one quiet shadow for
-     things that genuinely float (modals, the swipe deck, sticky bars). */
+     Flat, editorial by default: a hairline border, no float. `card-raised`
+     is the exception for things that genuinely sit above the page
+     (modals, the swipe deck, sticky bars). */
   .card {
-    @apply rounded-2xl border border-paper-line bg-paper-card;
+    @apply rounded-3xl border border-paper-line bg-paper-card;
   }
   .card-raised {
-    @apply rounded-2xl border border-paper-line bg-paper-card shadow-card;
+    @apply rounded-3xl bg-paper-card shadow-card;
   }
   /* Hairline-divided group: wrap rows/cells, they share 1px seams. */
   .hairline {
-    @apply overflow-hidden rounded-2xl border border-paper-line bg-paper-line;
+    @apply overflow-hidden rounded-3xl border border-paper-line bg-paper-line;
     display: grid;
     gap: 1px;
   }
@@ -94,13 +95,14 @@
 
   /* -------- labels -------- */
   .eyebrow {
-    @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-navy-400;
+    @apply text-xs font-bold uppercase tracking-[0.18em] text-navy-400;
   }
 
   /* -------- chips / pills -------- */
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-lg border border-paper-line bg-white px-2.5 py-1
-      text-[13px] font-medium text-navy transition-[background-color,border-color,color] duration-100;
+    @apply inline-flex items-center gap-1.5 rounded-full border border-paper-line bg-white px-3 py-1.5
+      text-sm font-medium text-navy transition-[background-color,border-color,color,transform] duration-150
+      active:scale-[0.97];
   }
   .chip-on {
     @apply chip border-transparent bg-brand-500 text-white;
@@ -126,39 +128,71 @@
     animation: shimmer 1.6s infinite;
   }
 
+  /* subtle dot texture for coloured fills (hero card, plan header, empties) */
+  .dot-grid {
+    background-image: radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0);
+    background-size: 22px 22px;
+  }
 }
 
 @layer utilities {
-  /* Tactile press for tappables that aren't already a .btn */
+  /* Tactile press — pair with any button/link that isn't already a .btn */
   .press {
-    @apply transition-opacity duration-100 active:opacity-70;
+    @apply transition-transform duration-150 ease-spring active:scale-[0.97];
   }
+  /* Hover lift for cards / list rows on pointer devices */
+  .lift {
+    @apply transition-[transform,box-shadow,border-color] duration-200 ease-out;
+  }
+  @media (hover: hover) {
+    .lift:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 18px 40px -20px rgba(16, 20, 38, 0.3);
+    }
+  }
+  /* Staggered entrance for a list: parent gets .stagger, children animate in
+     with an increasing delay. Cap keeps late items from lagging. */
+  .stagger > * {
+    animation: enter-up 0.44s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .stagger > *:nth-child(1)  { animation-delay: 0.02s; }
+  .stagger > *:nth-child(2)  { animation-delay: 0.06s; }
+  .stagger > *:nth-child(3)  { animation-delay: 0.10s; }
+  .stagger > *:nth-child(4)  { animation-delay: 0.14s; }
+  .stagger > *:nth-child(5)  { animation-delay: 0.18s; }
+  .stagger > *:nth-child(6)  { animation-delay: 0.22s; }
+  .stagger > *:nth-child(7)  { animation-delay: 0.26s; }
+  .stagger > *:nth-child(8)  { animation-delay: 0.30s; }
+  .stagger > *:nth-child(n + 9) { animation-delay: 0.34s; }
 
-  /* Route content entrance — one short, quiet fade+rise. Applied by
-     <RouteFade> keyed on pathname. Deliberately subtle. */
+  /* Route content entrance — applied by <RouteFade> keyed on pathname */
   .route-fade {
-    animation: route-in 0.18s ease-out both;
-  }
-  @keyframes route-in {
-    from { opacity: 0; transform: translateY(4px); }
-    to   { opacity: 1; transform: translateY(0); }
+    animation: enter-up 0.36s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   .gpu {
     will-change: transform;
+    transform: translateZ(0);
   }
 }
 
-/* swipe stack perspective — kept shallow so the top card reads as a real
-   card being lifted, not a spinning panel. */
+/* swipe stack perspective */
 .swipe-stack {
-  perspective: 1600px;
-  perspective-origin: 50% 40%;
+  perspective: 1400px;
+  perspective-origin: 50% 30%;
+}
+.swipe-stack > * {
+  transform-style: preserve-3d;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .stagger > *,
   .route-fade {
     animation: none !important;
+  }
+  .lift:hover {
+    transform: none !important;
+    box-shadow: none !important;
   }
 }
 

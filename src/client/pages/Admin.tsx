@@ -97,7 +97,7 @@ export function Admin() {
       </div>
 
       {tab === "overview" && stats && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="stagger grid grid-cols-2 gap-3">
           {(
             [
               ["Users", stats.users, "bg-brand-500"],
@@ -113,7 +113,7 @@ export function Admin() {
               />
               <p
                 key={n}
-                className="text-3xl font-extrabold tracking-[-0.03em]"
+                className="text-3xl font-extrabold tracking-[-0.03em] motion-safe:animate-count-pop"
               >
                 {n}
               </p>

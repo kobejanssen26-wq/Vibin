@@ -53,7 +53,7 @@ export function CreateGroup() {
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-        <div className="flex flex-wrap gap-2">
+        <div className="stagger flex flex-wrap gap-2">
           {IDEAS.map((i) => (
             <button
               key={i}
@@ -65,7 +65,7 @@ export function CreateGroup() {
             </button>
           ))}
         </div>
-        {err && <p className="text-sm font-medium text-danger-600">{err}</p>}
+        {err && <p className="text-sm font-medium text-danger-600 motion-safe:animate-shake">{err}</p>}
         <Button type="submit" loading={busy} className="w-full">
           Create group
         </Button>

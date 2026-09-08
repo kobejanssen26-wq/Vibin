@@ -94,14 +94,23 @@ export function DateMatch() {
     return (
       <div className="relative py-20 text-center">
         <Confetti fire />
-        <span className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-lime-400 text-navy">
-          <IconCheck size={22} />
+        <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-lime-400 text-navy shadow-lime motion-safe:animate-check-pop">
+          <IconCheck size={30} />
         </span>
-        <h1 className="mt-3 text-xl font-extrabold tracking-[-0.02em]">
+        <h1 className="mt-3 text-2xl font-extrabold motion-safe:animate-enter-up">
           A time everyone can make
         </h1>
-        <p className="mt-1 text-sm text-navy-400">Locking in your plan…</p>
-        <Link to={`/groups/${id}/plan`} className="btn-primary mt-6">
+        <p
+          className="mt-1 text-sm text-navy-400 motion-safe:animate-enter-up"
+          style={{ animationDelay: "0.08s" }}
+        >
+          Locking in your plan…
+        </p>
+        <Link
+          to={`/groups/${id}/plan`}
+          className="btn-primary mt-6 motion-safe:animate-enter-up"
+          style={{ animationDelay: "0.16s" }}
+        >
           See the plan
         </Link>
       </div>
@@ -138,12 +147,14 @@ export function DateMatch() {
         </div>
       )}
 
-      <ul className="space-y-3">
+      <ul className="stagger space-y-3">
         {state.options.map((o) => (
           <li
             key={o.id}
-            className={`card overflow-hidden transition-colors duration-200 ${
-              o.unanimous ? "border-lime-500" : ""
+            className={`card overflow-hidden transition-[border-color,box-shadow] duration-300 ${
+              o.unanimous
+                ? "border-lime-400 shadow-lime ring-1 ring-lime-400"
+                : ""
             }`}
           >
             <div className="flex items-center justify-between px-4 pt-3.5">
@@ -154,7 +165,7 @@ export function DateMatch() {
                 <p className="text-sm text-navy-400">{formatTime(o.startsAt)}</p>
               </div>
               {o.unanimous && (
-                <span className="chip-lime px-2.5 py-1 text-xs font-bold">
+                <span className="chip-lime motion-safe:animate-check-pop px-2.5 py-1 text-xs font-bold">
                   <IconCheck size={13} /> Works for all
                 </span>
               )}
@@ -228,7 +239,7 @@ function Tally({ n, label, dot }: { n: number; label: string; dot: string }) {
   return (
     <span className="inline-flex items-center gap-1">
       <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-      <span key={n} className="inline-block tabular-nums">
+      <span key={n} className="inline-block motion-safe:animate-count-pop tabular-nums">
         {n}
       </span>{" "}
       {label}

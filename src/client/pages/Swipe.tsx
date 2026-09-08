@@ -95,6 +95,7 @@ export function Swipe() {
   if (state.status === "configuring") {
     return (
       <EmptyState
+        emoji="⚙️"
         title="Not swiping yet"
         message="The group setup isn’t finished."
         action={
@@ -144,6 +145,7 @@ export function Swipe() {
 
       {done ? (
         <EmptyState
+          emoji={state.status === "planned" ? "🎉" : state.status === "date_matching" ? "📅" : "✓"}
           title={
             state.status === "planned"
               ? "You've got a plan"
@@ -205,7 +207,7 @@ export function Swipe() {
             )}
           </div>
 
-          <div className="mt-5 flex items-center justify-center gap-4">
+          <div className="stagger mt-5 flex items-center justify-center gap-4">
             <CircleBtn label="Pass" tone="pass" onClick={() => vote("nope")} disabled={busy}>
               <IconClose size={26} />
             </CircleBtn>
@@ -275,20 +277,20 @@ function CircleBtn({
   tone?: Tone;
   small?: boolean;
 }) {
-  const size = small ? "h-11 w-11" : "h-14 w-14";
+  const size = small ? "h-12 w-12" : "h-16 w-16";
   const toneCls: Record<Tone, string> = {
-    pass: "border border-navy/15 bg-paper-card text-navy hover:border-navy/30",
-    like: "bg-brand-500 text-white hover:bg-brand-600",
-    lime: "border border-lime-500/40 bg-lime-400 text-navy hover:bg-lime-300",
-    plain: "border border-navy/15 bg-paper-card text-navy-400 hover:text-navy",
+    pass: "bg-white text-navy hover:text-danger-500",
+    like: "bg-brand-500 text-white shadow-pop hover:bg-brand-600",
+    lime: "bg-lime-400 text-navy shadow-lime hover:bg-lime-300",
+    plain: "bg-white text-navy-400 hover:text-navy",
   };
   return (
     <button
       aria-label={label}
       onClick={onClick}
       disabled={disabled}
-      className={`grid ${size} place-items-center rounded-full transition
-        active:opacity-70 disabled:opacity-30 disabled:pointer-events-none
+      className={`grid ${size} place-items-center rounded-full shadow-card transition
+        active:scale-90 disabled:opacity-40 disabled:pointer-events-none
         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-paper
         ${toneCls[tone]}`}
     >

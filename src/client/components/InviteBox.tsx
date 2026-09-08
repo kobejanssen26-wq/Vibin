@@ -26,7 +26,7 @@ export function InviteBox({
       try {
         await navigator.share({ title: "Join my VIBIN group", url });
       } catch {
-        /* cancelled */
+        /* user cancelled */
       }
     } else {
       void copy("link", url);
@@ -35,29 +35,28 @@ export function InviteBox({
 
   return (
     <div className="card overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3">
-        <div>
-          <p className="eyebrow">Invite code</p>
-          <button
-            type="button"
-            onClick={() => copy("code", code)}
-            className="press mt-1 font-mono text-xl font-bold tracking-[0.2em] text-navy"
-          >
-            {code}
-          </button>
-        </div>
+      <div className="flex items-center justify-between px-4 pt-3.5">
+        <p className="eyebrow">Invite your crew</p>
+      </div>
+
+      <div className="px-4 py-3">
         <button
           type="button"
           onClick={() => copy("code", code)}
-          className="btn-outline px-3 py-1.5 text-[13px]"
+          className="group flex w-full items-center gap-3 rounded-2xl border border-dashed border-paper-line bg-paper-soft/60 px-4 py-3 transition-colors hover:border-brand-300"
         >
-          {copied === "code" ? (
-            <span className="inline-flex items-center gap-1 text-lime-600">
-              <IconCheck size={13} /> Copied
-            </span>
-          ) : (
-            "Copy"
-          )}
+          <span className="flex-1 text-left font-mono text-2xl font-extrabold tracking-[0.35em] text-navy">
+            {code}
+          </span>
+          <span className="text-xs font-bold text-navy-400 group-hover:text-brand-600">
+            {copied === "code" ? (
+              <span className="inline-flex items-center gap-1 text-lime-600 motion-safe:animate-check-pop">
+                <IconCheck size={14} /> Copied
+              </span>
+            ) : (
+              "Tap to copy"
+            )}
+          </span>
         </button>
       </div>
 
@@ -69,10 +68,16 @@ export function InviteBox({
           className="field flex-1 truncate bg-paper-soft/60 text-xs"
         />
         <button
-          className="btn-primary shrink-0 px-3 py-2.5 text-[13px]"
-          onClick={share}
+          className="btn-outline shrink-0 px-3 py-2.5 text-sm"
+          onClick={() => copy("link", url)}
         >
-          <IconShare size={14} /> Share
+          {copied === "link" ? "Copied" : "Copy"}
+        </button>
+      </div>
+
+      <div className="border-t border-paper-line p-3">
+        <button className="btn-primary w-full" onClick={share}>
+          <IconShare size={16} /> Share invite link
         </button>
       </div>
     </div>

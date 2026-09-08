@@ -13,7 +13,7 @@ import { InviteBox } from "../components/InviteBox";
 import { GroupChat } from "../components/GroupChat";
 import { PageHeader } from "../components/PageHeader";
 import { useConfirm } from "../components/Confirm";
-import { CategoryIcon, IconChevronRight } from "../components/icons";
+import { IconChevronRight } from "../components/icons";
 import { formatWhen } from "../lib/format";
 import type { GroupDTO, MatchDTO, PlanDTO } from "@shared/types";
 
@@ -38,7 +38,7 @@ export function GroupHome() {
   const cta = primaryCta(group);
 
   return (
-    <div className="space-y-5">
+    <div className="stagger space-y-5">
       <PageHeader
         back={{ to: "/app", label: "Groups" }}
         title={group.name}
@@ -53,11 +53,11 @@ export function GroupHome() {
         </p>
       )}
 
-      <div className="flex gap-1 rounded-xl border border-paper-line bg-paper-soft p-1 text-sm font-semibold">
+      <div className="flex gap-1 rounded-2xl border border-paper-line bg-paper-soft p-1 text-sm font-semibold">
         {(["plan", "chat"] as const).map((t) => (
           <button
             key={t}
-            className={`flex-1 rounded-lg py-1.5 capitalize transition-colors ${
+            className={`flex-1 rounded-xl py-2 capitalize transition-[background-color,color] ${
               tab === t
                 ? "bg-paper-card text-navy shadow-sm"
                 : "text-navy-400 hover:text-navy"
@@ -74,14 +74,14 @@ export function GroupHome() {
       ) : (
         <>
           {cta && (
-            <div className="rounded-2xl bg-vibin-match p-5 text-white">
-              <p className="eyebrow text-lime-400">Next step</p>
-              <p className="mt-1 text-lg font-bold tracking-[-0.01em]">
-                {cta.title}
-              </p>
-              <p className="mt-0.5 text-sm text-white/70">{cta.sub}</p>
+            <div className="relative overflow-hidden rounded-3xl bg-vibin-match p-5 text-white">
+              <div className="dot-grid pointer-events-none absolute inset-0 text-white/60 opacity-[0.06]" />
+              <div className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-white/10 blur-md motion-safe:animate-[sheen_1.4s_ease-out_0.35s_both] motion-reduce:hidden" />
+              <p className="relative eyebrow text-lime-400">Next step</p>
+              <p className="relative mt-1 text-lg font-extrabold">{cta.title}</p>
+              <p className="relative mt-0.5 text-sm text-white/80">{cta.sub}</p>
               <button
-                className="btn-lime mt-4 w-full"
+                className="btn-lime relative mt-4 w-full"
                 onClick={() => nav(cta.to)}
               >
                 {cta.label}
@@ -146,8 +146,8 @@ export function GroupHome() {
                     to={`/plans/${p.id}`}
                     className="flex items-center gap-3 p-3.5 transition-colors hover:bg-paper-soft"
                   >
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-paper-soft text-navy-500">
-                      <CategoryIcon id={p.activity.category} size={18} />
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-lime-400/20 text-lg">
+                      {p.activity.categoryIcon}
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold">
@@ -174,8 +174,8 @@ export function GroupHome() {
               <div className="hairline">
                 {matches.data.matches.map((m) => (
                   <div key={m.id} className="flex items-center gap-3 p-3.5">
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-paper-soft text-navy-500">
-                      <CategoryIcon id={m.activity.category} size={18} />
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-500/10 text-lg">
+                      {m.activity.categoryIcon}
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold">

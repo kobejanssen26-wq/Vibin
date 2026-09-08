@@ -88,40 +88,47 @@ export default {
           "sans-serif",
         ],
       },
-      /* Restrained, deliberate radius scale — no giant pill corners. */
       borderRadius: {
-        lg: "0.5rem",
-        xl: "0.625rem",
-        "2xl": "0.75rem",
-        "3xl": "1rem",
-        "4xl": "1.25rem",
+        xl: "0.9rem",
+        "2xl": "1.25rem",
+        "3xl": "1.75rem",
+        "4xl": "2.25rem",
       },
-      /* One quiet elevation. No coloured glows. */
       boxShadow: {
-        card: "0 1px 2px rgba(16,20,38,0.04), 0 8px 24px -16px rgba(16,20,38,0.18)",
-        pop: "0 1px 2px rgba(16,20,38,0.04), 0 8px 24px -16px rgba(16,20,38,0.18)",
-        lime: "0 1px 2px rgba(16,20,38,0.04), 0 8px 24px -16px rgba(16,20,38,0.18)",
-        focus: "0 0 0 3px rgba(49, 85, 255, 0.28)",
+        card: "0 18px 48px -18px rgba(16, 20, 38, 0.28)",
+        pop: "0 14px 40px -12px rgba(49, 85, 255, 0.45)",
+        lime: "0 14px 40px -12px rgba(184, 242, 61, 0.5)",
+        focus: "0 0 0 3px rgba(49, 85, 255, 0.35)",
       },
       backgroundImage: {
-        "vibin-blue": "linear-gradient(150deg, #3155ff 0%, #2a49df 100%)",
-        "vibin-match": "linear-gradient(155deg, #101426 0%, #182353 60%, #24398f 100%)",
+        "vibin-blue": "linear-gradient(135deg, #3155ff 0%, #5b6bff 55%, #6f80ff 100%)",
+        "vibin-hero":
+          "radial-gradient(1200px 600px at 12% -10%, rgba(49,85,255,0.16), transparent 60%), radial-gradient(900px 500px at 100% 0%, rgba(184,242,61,0.16), transparent 55%)",
+        "vibin-match":
+          "linear-gradient(160deg, #101426 0%, #1c2a6b 55%, #3155ff 100%)",
       },
       transitionTimingFunction: {
         spring: "cubic-bezier(0.22, 1, 0.36, 1)",
+        "spring-back": "cubic-bezier(0.34, 1.56, 0.64, 1)",
         "out-expo": "cubic-bezier(0.16, 1, 0.3, 1)",
       },
       keyframes: {
+        "pop-in": {
+          "0%": { transform: "scale(0.86)", opacity: "0" },
+          "60%": { transform: "scale(1.03)", opacity: "1" },
+          "100%": { transform: "scale(1)", opacity: "1" },
+        },
         "float-up": {
-          "0%": { transform: "translateY(8px)", opacity: "0" },
+          "0%": { transform: "translateY(10px)", opacity: "0" },
           "100%": { transform: "translateY(0)", opacity: "1" },
         },
         "slide-up": {
-          "0%": { transform: "translateY(16px)", opacity: "0" },
+          "0%": { transform: "translateY(24px)", opacity: "0" },
           "100%": { transform: "translateY(0)", opacity: "1" },
         },
         "avatar-in": {
-          "0%": { transform: "translateY(10px) scale(0.7)", opacity: "0" },
+          "0%": { transform: "translateY(14px) scale(0.6)", opacity: "0" },
+          "70%": { transform: "translateY(-3px) scale(1.06)", opacity: "1" },
           "100%": { transform: "translateY(0) scale(1)", opacity: "1" },
         },
         "lime-sweep": {
@@ -129,21 +136,83 @@ export default {
           "40%": { opacity: "1" },
           "100%": { transform: "translateX(120%) skewX(-12deg)", opacity: "0" },
         },
+        "ring-pulse": {
+          "0%": { transform: "scale(0.9)", opacity: "0.7" },
+          "100%": { transform: "scale(1.8)", opacity: "0" },
+        },
         shimmer: {
           "100%": { transform: "translateX(100%)" },
+        },
+        "bar-grow": {
+          "0%": { transform: "scaleX(0)" },
+          "100%": { transform: "scaleX(1)" },
+        },
+        /* page + list entrance */
+        "enter-up": {
+          "0%": { transform: "translateY(16px)", opacity: "0" },
+          "100%": { transform: "translateY(0)", opacity: "1" },
         },
         "enter-fade": {
           "0%": { opacity: "0" },
           "100%": { opacity: "1" },
         },
+        "enter-scale": {
+          "0%": { transform: "scale(0.96)", opacity: "0" },
+          "100%": { transform: "scale(1)", opacity: "1" },
+        },
+        /* feedback */
+        shake: {
+          "0%,100%": { transform: "translateX(0)" },
+          "20%": { transform: "translateX(-6px)" },
+          "40%": { transform: "translateX(5px)" },
+          "60%": { transform: "translateX(-3px)" },
+          "80%": { transform: "translateX(2px)" },
+        },
+        "check-pop": {
+          "0%": { transform: "scale(0.4) rotate(-12deg)", opacity: "0" },
+          "60%": { transform: "scale(1.12) rotate(0)", opacity: "1" },
+          "100%": { transform: "scale(1) rotate(0)", opacity: "1" },
+        },
+        "count-pop": {
+          "0%": { transform: "translateY(4px) scale(0.9)", opacity: "0" },
+          "100%": { transform: "translateY(0) scale(1)", opacity: "1" },
+        },
+        /* ambient */
+        "logo-breathe": {
+          "0%,100%": { transform: "translateY(0) rotate(0)" },
+          "50%": { transform: "translateY(-2px) rotate(-2deg)" },
+        },
+        "dot-blink": {
+          "0%,100%": { transform: "scale(1)", opacity: "1" },
+          "50%": { transform: "scale(1.35)", opacity: "0.75" },
+        },
+        "gradient-pan": {
+          "0%,100%": { backgroundPosition: "0% 50%" },
+          "50%": { backgroundPosition: "100% 50%" },
+        },
+        "sheen": {
+          "0%": { transform: "translateX(-140%) skewX(-18deg)" },
+          "100%": { transform: "translateX(240%) skewX(-18deg)" },
+        },
       },
       animation: {
-        "float-up": "float-up 0.22s ease-out both",
-        "slide-up": "slide-up 0.24s cubic-bezier(0.22, 1, 0.36, 1) both",
-        "avatar-in": "avatar-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both",
-        "lime-sweep": "lime-sweep 0.8s ease-out both",
+        "pop-in": "pop-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) both",
+        "float-up": "float-up 0.32s ease-out both",
+        "slide-up": "slide-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both",
+        "avatar-in": "avatar-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both",
+        "lime-sweep": "lime-sweep 0.9s ease-out both",
+        "ring-pulse": "ring-pulse 1.4s ease-out infinite",
         shimmer: "shimmer 1.6s infinite",
-        "enter-fade": "enter-fade 0.2s ease-out both",
+        "enter-up": "enter-up 0.44s cubic-bezier(0.16, 1, 0.3, 1) both",
+        "enter-fade": "enter-fade 0.3s ease-out both",
+        "enter-scale": "enter-scale 0.4s cubic-bezier(0.22, 1, 0.36, 1) both",
+        shake: "shake 0.4s ease-in-out both",
+        "check-pop": "check-pop 0.44s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+        "count-pop": "count-pop 0.28s ease-out both",
+        "logo-breathe": "logo-breathe 4.5s ease-in-out infinite",
+        "dot-blink": "dot-blink 2.4s ease-in-out infinite",
+        "gradient-pan": "gradient-pan 8s ease-in-out infinite",
+        sheen: "sheen 2.6s ease-in-out infinite",
       },
     },
   },

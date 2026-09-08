@@ -106,7 +106,7 @@ export function Profile() {
   if (!user) return null;
 
   return (
-    <div className="space-y-7">
+    <div className="stagger space-y-7">
       <PageHeader
         back={{ to: "/app", label: "Groups" }}
         title="Profile & settings"

@@ -66,12 +66,13 @@ export function Dashboard() {
 
       {groups.length === 0 ? (
         <EmptyState
+          emoji="👋"
           title="Nothing planned yet"
           message="Start a group, add your friends, and swipe on what to do together."
           action={<LinkButton to="/groups/new">Create your first group</LinkButton>}
         />
       ) : (
-        <ul className="space-y-2.5">
+        <ul className="stagger space-y-3">
           {groups.map((g) => {
             const s = STATUS[g.status] ?? STATUS.configuring!;
             const pct =
@@ -82,10 +83,10 @@ export function Dashboard() {
               <li key={g.id}>
                 <Link
                   to={`/groups/${g.id}`}
-                  className="card relative block overflow-hidden p-4 pl-5 transition-colors duration-100 hover:border-navy/20"
+                  className="card relative block overflow-hidden p-4 pl-5 transition-[transform,border-color] duration-150 hover:-translate-y-0.5 hover:border-brand-300"
                 >
                   <span
-                    className={`absolute inset-y-0 left-0 w-[3px] ${s.edge}`}
+                    className={`absolute inset-y-0 left-0 w-1 ${s.edge}`}
                     aria-hidden="true"
                   />
                   <div className="flex items-start justify-between gap-3">
@@ -108,7 +109,7 @@ export function Dashboard() {
                     <div className="mt-3.5">
                       <div className="h-1.5 w-full overflow-hidden rounded-full bg-paper-soft">
                         <div
-                          className="h-full rounded-full bg-brand-500 transition-[width] duration-300"
+                          className="h-full origin-left rounded-full bg-brand-500 transition-all duration-500 motion-safe:animate-[bar-grow_0.6s_cubic-bezier(0.16,1,0.3,1)_both]"
                           style={{ width: `${pct}%` }}
                         />
                       </div>
