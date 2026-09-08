@@ -14,6 +14,15 @@ type Ctx = { Bindings: Env; Variables: Vars };
 export const withSession: MiddlewareHandler<Ctx> = async (c, next) => {
   c.set("userId", null);
   c.set("sessionId", null);
+
+  // The Owner Command Center has its own session + CSRF scheme
+  // (vibin_admin / x-vibin-admin-csrf). Don't let a normal-user vibin_session
+  // that the owner also happens to hold trip the app CSRF check on
+  // /api/admin/* — those routes never read the normal session anyway.
+  if (new URL(c.req.url).pathname.startsWith("/api/admin/")) {
+    return next();
+  }
+
   const sid = getCookie(c, SESSION_COOKIE);
   if (sid) {
     const session = await getSession(c.env, sid);

@@ -108,6 +108,32 @@ app.post("/setup/begin", async (c) => {
   const db = createDb(c.env);
   const now = nowS();
 
+  /*
+   * Single-owner invariant. Setup is only reachable while
+   * `owner_setup_completed_at` is unset, but a half-finished run can leave an
+   * owner row with no confirmed authenticator. If one exists:
+   *   - a confirmed authenticator on it => setup effectively done => refuse
+   *   - otherwise it's a broken attempt => demote it and any other stray
+   *     owner, then continue for the submitted email.
+   */
+  const strayOwners = await db.query.users.findMany({
+    where: eq(users.role, "owner"),
+    columns: { id: true },
+  });
+  for (const so of strayOwners) {
+    const t = await db.query.adminTotp.findFirst({
+      where: eq(adminTotp.userId, so.id),
+    });
+    if (t?.confirmedAt) {
+      throw forbidden("An owner account already exists.");
+    }
+  }
+  await db.delete(adminTotp);
+  await db.delete(adminRecoveryCodes);
+  if (strayOwners.length) {
+    await db.update(users).set({ role: "user" }).where(eq(users.role, "owner"));
+  }
+
   let userId: string;
   const existing = await ownerByEmail(c.env, body.email);
   if (existing) {

@@ -122,7 +122,26 @@ const run = async () => {
   );
   ok("normal user -> 401 on /cc mutation", ru2.status === 401);
 
-  // 3. become the owner
+  // 2b. a POST to /api/admin/* while ALSO holding a normal vibin_session must
+  //     not be tripped by the app's own CSRF check (the admin tree has its own
+  //     session + CSRF). Regression: this used to 403 with "missing CSRF token".
+  const both = jar();
+  await call(both, "POST", "/api/auth/signup", {
+    displayName: "Both",
+    email: `both${Date.now()}@x.com`,
+    password: "normal-user-pw-123",
+  });
+  const rb = await call(both, "POST", "/api/admin/auth/setup/begin", {
+    email: `owner-both${Date.now()}@vibin.local`,
+    password: "owner-super-secret-123",
+  });
+  ok(
+    "admin setup POST works even with a normal vibin_session present",
+    rb.status === 200 && /^[A-Z2-7]{32}$/.test(rb.data?.secret ?? ""),
+  );
+
+  // 3. become the owner (fresh jar — setup/begin above left a half-owner which
+  //    /setup/begin here demotes, per the single-owner invariant)
   const admin = jar();
   const email = `secowner${Date.now()}@vibin.local`;
   const PW = "owner-super-secret-123";
