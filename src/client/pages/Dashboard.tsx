@@ -72,7 +72,7 @@ export function Dashboard() {
           action={<LinkButton to="/groups/new">Create your first group</LinkButton>}
         />
       ) : (
-        <ul className="stagger space-y-3">
+        <ul className="space-y-3">
           {groups.map((g) => {
             const s = STATUS[g.status] ?? STATUS.configuring!;
             const pct =
@@ -109,7 +109,7 @@ export function Dashboard() {
                     <div className="mt-3.5">
                       <div className="h-1.5 w-full overflow-hidden rounded-full bg-paper-soft">
                         <div
-                          className="h-full origin-left rounded-full bg-brand-500 transition-all duration-500 motion-safe:animate-[bar-grow_0.6s_cubic-bezier(0.16,1,0.3,1)_both]"
+                          className="h-full rounded-full bg-brand-500 transition-all duration-500"
                           style={{ width: `${pct}%` }}
                         />
                       </div>

@@ -110,7 +110,6 @@ export function Swipe() {
   const done = state.queue.length === 0;
   const top = state.queue[0];
   const next = state.queue[1];
-  const third = state.queue[2];
 
   return (
     <div className="flex min-h-[calc(100vh-8rem)] flex-col">
@@ -179,15 +178,6 @@ export function Swipe() {
       ) : (
         <>
           <div className="swipe-stack relative mx-auto aspect-[3/4.1] w-full max-w-sm flex-1">
-            {third && (
-              <SwipeCard
-                key={third.activity.id}
-                activity={third.activity}
-                interactive={false}
-                z={0}
-                offset={32}
-              />
-            )}
             {next && (
               <SwipeCard
                 key={next.activity.id}
@@ -207,7 +197,7 @@ export function Swipe() {
             )}
           </div>
 
-          <div className="stagger mt-5 flex items-center justify-center gap-4">
+          <div className="mt-5 flex items-center justify-center gap-4">
             <CircleBtn label="Pass" tone="pass" onClick={() => vote("nope")} disabled={busy}>
               <IconClose size={26} />
             </CircleBtn>

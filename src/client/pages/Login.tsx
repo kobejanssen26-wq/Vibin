@@ -57,7 +57,7 @@ export function Login() {
           value={form.password}
           onChange={(e) => setForm({ ...form, password: e.target.value })}
         />
-        {err && <p className="text-sm font-medium text-danger-600 motion-safe:animate-shake">{err}</p>}
+        {err && <p className="text-sm font-medium text-danger-600">{err}</p>}
         <Button type="submit" loading={busy} className="w-full">
           Log in
         </Button>

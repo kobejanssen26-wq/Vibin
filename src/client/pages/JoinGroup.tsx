@@ -58,8 +58,8 @@ export function JoinGroup() {
   if (!preview) return null;
 
   return (
-    <div className="stagger py-8 text-center">
-      <div className="mb-3 text-4xl motion-safe:animate-pop-in">🎟️</div>
+    <div className="py-8 text-center">
+      <div className="mb-3 text-4xl">🎟️</div>
       <h1 className="text-2xl font-extrabold">You’re invited to</h1>
       <p className="mt-1 text-lg font-bold text-brand-600">
         {preview.groupName}

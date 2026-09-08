@@ -76,12 +76,12 @@ export function PlanView() {
   };
 
   return (
-    <div className="stagger space-y-5">
+    <div className="space-y-5">
       <PageHeader
         back={{ to: `/groups/${plan.groupId}`, label: plan.groupName }}
         title="It's a plan"
         action={
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-lime-400 text-navy shadow-lime motion-safe:animate-check-pop">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-lime-400 text-navy">
             <IconCheck size={22} />
           </span>
         }
@@ -133,7 +133,7 @@ export function PlanView() {
 
         <div className="space-y-3 p-4">
           <p className="text-sm leading-relaxed text-navy-500">{a.description}</p>
-          <div className="stagger grid gap-2 border-t border-paper-line pt-3 text-sm">
+          <div className="grid gap-2 border-t border-paper-line pt-3 text-sm">
             <Row icon={<IconMapPin size={16} />} text={plan.locationLabel} />
             <Row icon={<IconCalendar size={16} />} text={formatWhen(plan.startsAt)} />
             <Row icon={<IconTag size={16} />} text={a.priceLabel} />

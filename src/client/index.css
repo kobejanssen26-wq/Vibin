@@ -135,65 +135,9 @@
   }
 }
 
-@layer utilities {
-  /* Tactile press — pair with any button/link that isn't already a .btn */
-  .press {
-    @apply transition-transform duration-150 ease-spring active:scale-[0.97];
-  }
-  /* Hover lift for cards / list rows on pointer devices */
-  .lift {
-    @apply transition-[transform,box-shadow,border-color] duration-200 ease-out;
-  }
-  @media (hover: hover) {
-    .lift:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 18px 40px -20px rgba(16, 20, 38, 0.3);
-    }
-  }
-  /* Staggered entrance for a list: parent gets .stagger, children animate in
-     with an increasing delay. Cap keeps late items from lagging. */
-  .stagger > * {
-    animation: enter-up 0.44s cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-  .stagger > *:nth-child(1)  { animation-delay: 0.02s; }
-  .stagger > *:nth-child(2)  { animation-delay: 0.06s; }
-  .stagger > *:nth-child(3)  { animation-delay: 0.10s; }
-  .stagger > *:nth-child(4)  { animation-delay: 0.14s; }
-  .stagger > *:nth-child(5)  { animation-delay: 0.18s; }
-  .stagger > *:nth-child(6)  { animation-delay: 0.22s; }
-  .stagger > *:nth-child(7)  { animation-delay: 0.26s; }
-  .stagger > *:nth-child(8)  { animation-delay: 0.30s; }
-  .stagger > *:nth-child(n + 9) { animation-delay: 0.34s; }
-
-  /* Route content entrance — applied by <RouteFade> keyed on pathname */
-  .route-fade {
-    animation: enter-up 0.36s cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-
-  .gpu {
-    will-change: transform;
-    transform: translateZ(0);
-  }
-}
-
 /* swipe stack perspective */
 .swipe-stack {
-  perspective: 1400px;
-  perspective-origin: 50% 30%;
-}
-.swipe-stack > * {
-  transform-style: preserve-3d;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .stagger > *,
-  .route-fade {
-    animation: none !important;
-  }
-  .lift:hover {
-    transform: none !important;
-    box-shadow: none !important;
-  }
+  perspective: 1200px;
 }
 
 /* ------------------------------------------------------------------ *

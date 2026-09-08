@@ -97,26 +97,17 @@ export function SwipeCard({
   const superOp = Math.max(0, Math.min(1, -pos.y / (THRESHOLD * 1.3)));
 
   const transition = exit
-    ? "transform 0.26s cubic-bezier(0.4, 0, 1, 1), opacity 0.26s ease"
+    ? "transform 0.24s cubic-bezier(0.4, 0, 1, 1), opacity 0.24s ease"
     : drag.active
       ? "none"
-      : "transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)"; // springy snap-back
-
-  // 3D perspective while the top card is handled: yaw toward the drag
-  // direction, pitch against vertical drag, and lift off the stack. Clamped so
-  // it stays a hint, never a flip. Peek cards (interactive:false) stay flat.
-  const clamp = (v: number, m: number) => Math.max(-m, Math.min(m, v));
-  const yaw = interactive && !exit ? clamp(drag.x / 14, 12) : 0;
-  const pitch = interactive && !exit ? clamp(-drag.y / 22, 8) : 0;
-  const lift = drag.active ? 1.03 : 1 - offset / 1100;
-  const depth = drag.active ? 40 : 0;
+      : "transform 0.4s cubic-bezier(0.22, 1.4, 0.4, 1)"; // springy snap-back
 
   return (
     <div
-      className="gpu absolute inset-0 select-none"
+      className="absolute inset-0 select-none"
       style={{
         zIndex: z,
-        transform: `translate3d(${pos.x}px, ${pos.y + offset}px, ${depth}px) rotate(${rot}deg) rotateY(${yaw}deg) rotateX(${pitch}deg) scale(${lift})`,
+        transform: `translate(${pos.x}px, ${pos.y + offset}px) rotate(${rot}deg) scale(${1 - offset / 1100})`,
         opacity: exit ? 0 : 1,
         transition,
         touchAction: "none",
@@ -127,22 +118,7 @@ export function SwipeCard({
       onPointerUp={onUp}
       onPointerCancel={onUp}
     >
-      <article
-        className="card-raised relative h-full overflow-hidden transition-shadow duration-200"
-        style={{
-          boxShadow: drag.active
-            ? "0 40px 80px -24px rgba(16,20,38,0.45)"
-            : undefined,
-        }}
-      >
-        {/* moving light — sells the perspective tilt */}
-        <div
-          className="pointer-events-none absolute inset-0 z-10 opacity-0 transition-opacity duration-200"
-          style={{
-            opacity: drag.active ? 0.5 : 0,
-            background: `linear-gradient(${105 + drag.x / 6}deg, rgba(255,255,255,0) 40%, rgba(255,255,255,0.35) 50%, rgba(255,255,255,0) 60%)`,
-          }}
-        />
+      <article className="card-raised relative h-full overflow-hidden">
         {/* edge glow feedback */}
         <div
           className="pointer-events-none absolute inset-0 z-10 rounded-3xl ring-4 ring-inset ring-brand-500 transition-opacity"

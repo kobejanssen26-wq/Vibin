@@ -53,14 +53,14 @@ export function GroupChat({ groupId }: { groupId: string }) {
             m.kind === "system" ? (
               <p
                 key={m.id}
-                className="mx-auto w-fit rounded-full border border-paper-line bg-paper-soft px-3 py-1 text-center text-xs font-medium text-navy-500 motion-safe:animate-enter-up"
+                className="mx-auto w-fit rounded-full border border-paper-line bg-paper-soft px-3 py-1 text-center text-xs font-medium text-navy-500"
               >
                 {m.body}
               </p>
             ) : (
               <div
                 key={m.id}
-                className={`flex gap-2 motion-safe:animate-enter-up ${m.isYou ? "flex-row-reverse" : ""}`}
+                className={`flex gap-2 ${m.isYou ? "flex-row-reverse" : ""}`}
               >
                 {!m.isYou && (
                   <Avatar

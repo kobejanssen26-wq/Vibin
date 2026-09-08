@@ -80,7 +80,7 @@ export function Field({
         <span className="mt-1 block text-xs text-navy-400">{hint}</span>
       )}
       {error && (
-        <span className="mt-1 block text-xs font-medium text-danger-600 motion-safe:animate-shake">
+        <span className="mt-1 block text-xs font-medium text-danger-600">
           {error}
         </span>
       )}
@@ -124,13 +124,9 @@ export function LoadingScreen({ label = "Loading…" }: { label?: string }) {
     >
       <span className="relative grid h-12 w-12 place-items-center">
         <span className="absolute inset-0 animate-ring-pulse rounded-full bg-brand-500/25 motion-reduce:hidden" />
-        <span
-          className="absolute inset-0 animate-ring-pulse rounded-full bg-lime-400/20 motion-reduce:hidden"
-          style={{ animationDelay: "0.7s" }}
-        />
-        <LogoMark className="h-10 w-10" animated />
+        <LogoMark className="h-10 w-10" />
       </span>
-      <p className="animate-enter-fade text-sm">{label}</p>
+      <p className="text-sm">{label}</p>
     </div>
   );
 }
@@ -255,7 +251,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-navy/50 p-4 backdrop-blur-sm motion-safe:animate-enter-fade sm:items-center"
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-navy/50 p-4 backdrop-blur-sm sm:items-center"
       role="dialog"
       aria-modal="true"
       aria-label={title}
