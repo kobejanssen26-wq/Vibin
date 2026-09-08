@@ -521,6 +521,54 @@ app.delete("/users/:id", async (c) => {
   return c.json({ ok: true });
 });
 
+/** Bulk delete. Same rules as the single delete: one fresh password re-entry,
+ *  owner + self are always skipped. Capped at 200 ids. */
+app.post("/users/bulk-delete", async (c) => {
+  const { ids, password } = await parseBody(
+    c,
+    z.object({
+      ids: z.array(z.string().min(1).max(40)).min(1).max(200),
+      password: z.string().min(1).max(200),
+    }),
+  );
+  const db = createDb(c.env);
+  const me = await db.query.users.findFirst({
+    where: eq(users.id, c.get("adminUserId")!),
+    columns: { passwordHash: true },
+  });
+  const { ok } = await verifyPassword(password, me?.passwordHash ?? "");
+  if (!ok) throw forbidden("Password re-entry failed.");
+
+  const requested = [...new Set(ids)];
+  const uniq = requested.filter((x) => x !== c.get("adminUserId"));
+  const rows = uniq.length
+    ? await db.query.users.findMany({
+        where: inArray(users.id, uniq),
+        columns: { id: true, role: true, email: true },
+      })
+    : [];
+  const deletable = rows.filter((r) => r.role !== "owner");
+
+  let deleted = 0;
+  for (const r of deletable) {
+    await db.delete(users).where(eq(users.id, r.id));
+    await audit(c, {
+      action: "user.deleted",
+      targetType: "user",
+      targetId: r.id,
+      meta: { email: r.email, bulk: true },
+    });
+    deleted++;
+  }
+  // skipped = everything asked for that wasn't deleted (self, owner, not found)
+  const skipped = requested.length - deleted;
+  await audit(c, {
+    action: "user.bulk_deleted",
+    meta: { requested: requested.length, deleted, skipped },
+  });
+  return c.json({ deleted, skipped });
+});
+
 /* -------------------------------- groups -------------------------------- */
 
 const GROUP_SORT: Record<string, string> = {

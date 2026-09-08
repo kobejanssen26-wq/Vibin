@@ -287,6 +287,41 @@ const run = async () => {
   );
   ok("owner account cannot be deleted -> 400", r.status === 400);
 
+  // 6c. bulk delete: wrong pw -> 403; owner id in the list is skipped, not fatal
+  const b1 = jar();
+  const b2 = jar();
+  await call(b1, "POST", "/api/auth/signup", {
+    displayName: "B1",
+    email: `bulk1${Date.now()}@x.com`,
+    password: "bulk-pw-12345",
+  });
+  await call(b2, "POST", "/api/auth/signup", {
+    displayName: "B2",
+    email: `bulk2${Date.now()}@x.com`,
+    password: "bulk-pw-12345",
+  });
+  const b1Id = (await call(b1, "GET", "/api/auth/session")).data?.user?.id;
+  const b2Id = (await call(b2, "GET", "/api/auth/session")).data?.user?.id;
+  r = await call(
+    admin,
+    "POST",
+    "/api/admin/cc/users/bulk-delete",
+    { ids: [b1Id, b2Id], password: "nope" },
+    csrf(),
+  );
+  ok("bulk-delete wrong password -> 403", r.status === 403);
+  r = await call(
+    admin,
+    "POST",
+    "/api/admin/cc/users/bulk-delete",
+    { ids: [b1Id, b2Id, ownerId], password: PW },
+    csrf(),
+  );
+  ok(
+    "bulk-delete removes 2, skips the owner",
+    r.status === 200 && r.data.deleted === 2 && r.data.skipped >= 1,
+  );
+
   // 7. maintenance mode: normal API 503, command center still 200
   await call(
     admin,
