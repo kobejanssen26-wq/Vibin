@@ -43,6 +43,10 @@ jobs:
             sleep 2
           done
           BASE=http://127.0.0.1:8787 node tests/admin-auth.mjs
+          # both admin suites do their own first-run owner setup — reset owner
+          # state between them so each starts from a clean slate
+          npx wrangler d1 execute vibin-db --local --command "DELETE FROM admin_sessions; DELETE FROM admin_totp; DELETE FROM admin_recovery_codes; DELETE FROM credentials; DELETE FROM credential_access_log; DELETE FROM feature_flags; DELETE FROM system_settings WHERE key IN ('owner_setup_completed_at','maintenance_mode','maintenance_message'); UPDATE users SET role='user' WHERE role='owner';"
+          BASE=http://127.0.0.1:8787 node tests/admin-security.mjs
           BASE=http://127.0.0.1:8787 node tests/integration.mjs
 
   deploy:

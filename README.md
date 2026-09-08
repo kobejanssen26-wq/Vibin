@@ -321,22 +321,72 @@ listed under **Security**; *Revoke all* logs out every other device.
   clears MFA so you can re-enrol. There is **no master password and no
   backdoor** — if `OWNER_RECOVERY_SECRET` is unset, this path is disabled.
 
+### What's in it
+
+- **Dashboard** — users / groups / swipes / matches / catalogue counts with a
+  date-range picker (Today … Custom) and period-over-period deltas, honest
+  service checks, and a "needs attention" list. Every number is a live query;
+  where there genuinely isn't data yet the UI says so rather than inventing
+  one.
+- **Data browsers** — Users, Groups, Activities, Providers: search, filter,
+  sort, pagination, and detail pages that cross-link (user ↔ group ↔ activity
+  ↔ provider). No passwords, hashes, tokens or cookies are ever in a payload.
+- **Analytics** — per-activity behaviour (views, likes, passes, like rate,
+  matches, match rate, plans, plan conversion, booking clicks), category
+  roll-ups, ranking leaderboards, a signup-cohort **funnel**, and **D1/D7/D30
+  retention** (both gated behind a minimum sample size).
+- **Ops** — error centre (server + client errors grouped, no bodies/PII),
+  system health (timed D1/KV probes, table sizes, migrations, event volume),
+  feature flags, and **maintenance mode**: when on, the whole normal-user API
+  returns 503 and the SPA shows a maintenance screen, while `/api/health`,
+  `/api/status` and the entire Command Center stay reachable.
+- **Security** — audit-log viewer (filter by action/actor/range), admin
+  session list + revoke / revoke-all, recovery-code regeneration and 2FA
+  reset (password re-entry required).
+
+### Provider CRM
+
+Each provider has a pipeline **status** (`not_contacted` → `contacted` →
+`interested` → `partner` / `not_interested` / `follow_up` / …), a set of
+**business contacts** (name, email, phone, website, contact page, person,
+role, address — business data only, kept where legitimately obtained), and a
+manual **communication log** (email / call / meeting / note). Nothing is sent
+automatically and nothing is fabricated — you open the mail client or website
+yourself and record what happened. The provider page also shows aggregated
+performance across that provider's activities.
+
 ### Credential vault
 
 Provider/portal/test credentials are stored in a dedicated table, each value
 **AES-256-GCM encrypted** with `ENCRYPTION_KEY` (which lives only in deployment
-secrets — never in the DB, the frontend, logs or analytics). Values are masked
-in the UI and require a password re-entry to reveal. Every view/create/update/
-delete is written to the **audit log** — the action only, never the secret.
+secrets — never in the DB, the frontend, logs or analytics). List and detail
+responses omit the ciphertext entirely; values are masked in the UI and
+revealing one requires a fresh **password re-entry** (wrong password → 403).
+Every create / view / update / delete is written to a per-credential access
+log **and** the audit log — the action and the credential name only, never the
+secret.
 
 ### Data model added for the Command Center
 
-`admin_sessions`, `admin_totp`, `admin_recovery_codes`, `audit_log`,
-`analytics_events`, `feature_flags`, `system_settings` (migration
-`0001_*.sql`), plus `role='owner'` on `users`. Analytics events are emitted
-from the existing swipe/match/date/plan routes and a rate-limited
-`/api/events` endpoint for client-only signals (impressions, booking clicks,
-front-end errors).
+Migration `0001`: `admin_sessions`, `admin_totp`, `admin_recovery_codes`,
+`audit_log`, `analytics_events`, `feature_flags`, `system_settings`, plus
+`role='owner'` on `users`.
+Migration `0002`: `provider_contacts`, `provider_communications`,
+`providers.crm_status`, `credentials`, `credential_access_log`.
+
+Analytics events are emitted from the existing swipe/match/date/plan routes
+and a rate-limited `/api/events` endpoint for client-only signals
+(impressions, booking clicks, calendar actions, front-end errors). Server
+5xx faults are recorded as `server_error` events (route + status + truncated
+message only).
+
+### Tests
+
+`tests/admin-auth.mjs` (24 checks — setup, TOTP, recovery codes, session
+management) and `tests/admin-security.mjs` (16 checks — unauthorized access to
+every surface, privilege escalation, admin CSRF, vault ciphertext isolation,
+password-gated reveal, audit-log secret hygiene, maintenance-mode bypass).
+Both run in CI against a live local Worker.
 
 ## Security & GDPR
 

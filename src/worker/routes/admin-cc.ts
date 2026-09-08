@@ -1708,7 +1708,7 @@ app.put("/flags/:key", async (c) => {
   const nowS = Math.floor(Date.now() / 1000);
   await c.env.DB.prepare(
     `INSERT INTO feature_flags (key, enabled, description, updated_at, updated_by)
-     VALUES (?1, ?2, ?3, ?4, ?5)
+     VALUES (?1, ?2, COALESCE(?3, ''), ?4, ?5)
      ON CONFLICT(key) DO UPDATE SET
        enabled = ?2,
        description = COALESCE(?3, feature_flags.description),
