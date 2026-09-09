@@ -4,6 +4,7 @@ import { cc } from "../api";
 import { useDebounced, useResource } from "../lib";
 import {
   Badge,
+  Btn,
   ErrorNote,
   Input,
   Loading,
@@ -88,6 +89,17 @@ export function Activities() {
     query,
   );
 
+  const [verifying, setVerifying] = useState<string | null>(null);
+  const verify = async (id: string) => {
+    setVerifying(id);
+    try {
+      await cc(`/activities/${id}/verify`, { method: "POST" });
+      reload();
+    } finally {
+      setVerifying(null);
+    }
+  };
+
   const sortBtn = (key: string, label: string) => (
     <button
       className="inline-flex items-center gap-1"
@@ -158,6 +170,7 @@ export function Activities() {
                   <Th>{sortBtn("plans", "Plans")}</Th>
                   <Th>{sortBtn("bookingClicks", "Booking clicks")}</Th>
                   <Th>Verified</Th>
+                  <Th />
                 </tr>
               </thead>
               <tbody>
@@ -195,6 +208,18 @@ export function Activities() {
                     <Td>{fmtNum(a.metrics.bookingClicks)}</Td>
                     <Td className="text-xs text-slate-500">
                       {a.lastVerifiedAt ? fmtDay(a.lastVerifiedAt) : "—"}
+                    </Td>
+                    <Td>
+                      {a.status !== "verified" && (
+                        <Btn
+                          variant="ghost"
+                          className="!py-1 !text-xs"
+                          loading={verifying === a.id}
+                          onClick={() => verify(a.id)}
+                        >
+                          ✓ Verify
+                        </Btn>
+                      )}
                     </Td>
                   </Tr>
                 ))}

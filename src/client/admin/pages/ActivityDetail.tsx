@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { cc } from "../api";
 import { useResource } from "../lib";
 import {
   Badge,
+  Btn,
   ErrorNote,
   Loading,
   Panel,
@@ -12,6 +14,14 @@ import {
   fmtNum,
   fmtPct,
 } from "../ui";
+
+const STATUS_TONE: Record<string, string> = {
+  verified: "green",
+  needs_review: "amber",
+  outdated: "red",
+  inactive: "slate",
+};
+const statusTone = (s: string | undefined) => STATUS_TONE[s ?? ""] ?? "slate";
 
 interface Detail {
   activity: Record<string, unknown>;
@@ -42,6 +52,24 @@ export function ActivityDetail() {
   );
 
   const a = data?.activity as Record<string, unknown> | undefined;
+  const status = a?.status as string | undefined;
+
+  const [busy, setBusy] = useState<string | null>(null);
+  const [actErr, setActErr] = useState<string | null>(null);
+  const act = async (key: string, fn: () => Promise<unknown>) => {
+    setBusy(key);
+    setActErr(null);
+    try {
+      await fn();
+      reload();
+    } catch (e) {
+      setActErr(e instanceof Error ? e.message : "Action failed");
+    } finally {
+      setBusy(null);
+    }
+  };
+  const setStatus = (s: string) =>
+    act(s, () => cc(`/activities/${id}`, { method: "PUT", body: { status: s } }));
 
   return (
     <>
@@ -57,6 +85,65 @@ export function ActivityDetail() {
       {loading && !data && <Loading />}
       {data && a && (
         <div className="space-y-4">
+          <Panel
+            title="Review"
+            subtitle="Confirm this against the operator before it counts as verified"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[13px] text-slate-500">Current:</span>
+              <Badge tone={(statusTone(status) ?? "slate") as never}>
+                {status}
+              </Badge>
+              <span className="mx-1 h-4 w-px bg-slate-200" />
+              <Btn
+                variant="primary"
+                loading={busy === "verify"}
+                disabled={status === "verified"}
+                onClick={() =>
+                  act("verify", () =>
+                    cc(`/activities/${id}/verify`, { method: "POST" }),
+                  )
+                }
+              >
+                Mark verified
+              </Btn>
+              <Btn
+                variant="neutral"
+                loading={busy === "needs_review"}
+                disabled={status === "needs_review"}
+                onClick={() => setStatus("needs_review")}
+              >
+                Needs review
+              </Btn>
+              <Btn
+                variant="neutral"
+                loading={busy === "outdated"}
+                disabled={status === "outdated"}
+                onClick={() => setStatus("outdated")}
+              >
+                Mark outdated
+              </Btn>
+              <Btn
+                variant="danger"
+                loading={busy === "archive"}
+                onClick={() =>
+                  act("archive", () =>
+                    cc(`/activities/${id}`, { method: "DELETE" }),
+                  )
+                }
+              >
+                Archive
+              </Btn>
+            </div>
+            {actErr && (
+              <p className="mt-2 text-xs text-rose-600">{actErr}</p>
+            )}
+            <p className="mt-2 text-xs text-slate-500">
+              “Mark verified” also stamps the verification date. Archived
+              activities leave the swipe deck immediately.
+            </p>
+          </Panel>
+
           <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
             <Panel title="Details">
               <dl className="grid gap-x-6 gap-y-2 text-[13px] sm:grid-cols-2">
@@ -64,7 +151,9 @@ export function ActivityDetail() {
                   <code className="font-mono text-xs">{a.id as string}</code>
                 </Row>
                 <Row k="Status">
-                  <Badge tone="amber">{a.status as string}</Badge>
+                  <Badge tone={statusTone(a.status as string) as never}>
+                    {a.status as string}
+                  </Badge>
                 </Row>
                 <Row k="Category">{a.category_id as string}</Row>
                 <Row k="Subcategory">{(a.subcategory as string) || "—"}</Row>
