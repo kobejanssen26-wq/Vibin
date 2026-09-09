@@ -345,6 +345,12 @@ const run = async () => {
     { key: "maintenance_mode", value: "0" },
     csrf(),
   );
+  // Leave a clean slate for whatever runs next: wait out the /api/status
+  // per-isolate cache (15s TTL) and assert maintenance is actually back off,
+  // so a follow-on suite (integration.mjs in CI) isn't hit by a stale 503.
+  await new Promise((res) => setTimeout(res, 16_000));
+  const after = await call(jar(), "GET", "/api/status");
+  ok("maintenance mode is cleared for the next suite", after.data?.maintenance === false);
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

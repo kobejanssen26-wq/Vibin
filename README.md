@@ -192,25 +192,29 @@ Never edit a migration that has been committed/applied — add a new one.
 
 ## Activity data (real, verified)
 
-Every activity in `seed/activities.ts` is a **real, publicly-listed Belgian
-venue** (Antwerp, Brussels, Ghent, Leuven, Bruges…). For each one the provider
-name, official website, city, address and booking URL were taken from public
-sources on the date in `SEED_VERIFIED_ON`.
+`seed/activities.ts` holds **~100 real, publicly-listed Belgian venues** across
+all 12 categories and every province (Antwerp, Brussels, Ghent, Leuven, Bruges,
+Liège, Namur, Hasselt…). Names, cities and operator websites come from public
+knowledge of each operator.
 
-- Prices are **indicative** and typed honestly — `per_person`, `per_group`,
-  `from_per_person`, `free` or `varies`. A group price is never shown as a
-  per-person price.
+- Prices, opening hours and exact street addresses are **indicative**. Price is
+  typed honestly — `per_person`, `per_group`, `from_per_person`, `free` or
+  `varies`; an unknown amount is `null` + `varies`. A group price is never shown
+  as a per-person price.
 - Every seeded activity ships as **`status: "needs_review"`** with
   `last_verified_at` = the seed date. **Nothing is marked `verified`
-  automatically.**
-- Seeded activities have **no photo** yet — the card falls back to a branded
-  category treatment. Provider-approved photos are the launch upgrade path and
-  can be added per activity in the admin.
+  automatically** — a human confirms each one against the operator first.
+- A subset carry a hand-matched free-licence photo; the rest fall back to a
+  branded category treatment (never a broken image). Provider-approved photos
+  are the launch upgrade path and can be set per activity in the admin.
+- Coordinates: precise where known, otherwise the municipality centroid
+  (`CITY_COORDS` in `seed/activities.ts`), so every row is geolocated and the
+  group radius filter has a signal.
 
-**Before a public launch:** an admin should open each `needs_review` activity,
-re-check it against the provider, and click **Verify** (which stamps
-`last_verified_at`). The deck already excludes `outdated` and `inactive`
-activities. See the admin at `/admin` (requires the `admin` role).
+**Before a public launch:** the owner opens each `needs_review` activity in the
+Command Center (`/admin`, owner role + MFA), re-checks it against the operator,
+and marks it **Verified** (which stamps `last_verified_at`). The deck already
+excludes `outdated` and `inactive` activities.
 
 The `providers` table + `source` / `sourceUrl` fields are the abstraction point
 for adding real activity-provider integrations later.
@@ -383,9 +387,10 @@ message only).
 ### Tests
 
 `tests/admin-auth.mjs` (24 checks — setup, TOTP, recovery codes, session
-management) and `tests/admin-security.mjs` (16 checks — unauthorized access to
+management) and `tests/admin-security.mjs` (24 checks — unauthorized access to
 every surface, privilege escalation, admin CSRF, vault ciphertext isolation,
-password-gated reveal, audit-log secret hygiene, maintenance-mode bypass).
+password-gated reveal, audit-log secret hygiene, user suspend/delete +
+bulk-delete password gating, owner-undeletable, maintenance-mode bypass).
 Both run in CI against a live local Worker.
 
 ## Security & GDPR
