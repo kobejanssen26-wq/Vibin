@@ -11,12 +11,14 @@ import {
   messages,
   notificationPrefs,
   notifications,
+  plans,
   profiles,
   pushTokens,
   users,
 } from "../db/schema";
 import { parseBody } from "../lib/validate";
 import { loadMe } from "../lib/me";
+import { planRowToDTO } from "../lib/plan-view";
 import { AppError, badRequest, notFound } from "../lib/errors";
 import { verifyPassword } from "../lib/password";
 import { destroyAllSessions } from "../lib/session";
@@ -179,6 +181,42 @@ app.delete("/push-tokens", async (c) => {
   const db = createDb(c.env);
   await db.delete(pushTokens).where(eq(pushTokens.token, body.token));
   return c.json({ ok: true });
+});
+
+/* ----------------------- plans across all groups -------------------- */
+/** Every plan from a group the user is in — for the mobile "Plans" tab. */
+app.get("/plans", async (c) => {
+  const db = createDb(c.env);
+  const memberships = await db
+    .select({ groupId: groupMembers.groupId })
+    .from(groupMembers)
+    .where(
+      and(
+        eq(groupMembers.userId, uid(c)),
+        inArray(groupMembers.status, ["active", "inactive"]),
+      ),
+    );
+  const groupIds = memberships.map((m) => m.groupId);
+  if (groupIds.length === 0) return c.json({ plans: [] });
+
+  const rows = await db
+    .select()
+    .from(plans)
+    .where(inArray(plans.groupId, groupIds))
+    .orderBy(desc(plans.createdAt))
+    .limit(100);
+
+  const dtos = await Promise.all(
+    rows.map((p) => planRowToDTO(db, p, c.env.APP_URL)),
+  );
+  // upcoming first (nulls / past last), then most-recently created
+  dtos.sort((a, b) => {
+    const now = Math.floor(Date.now() / 1000);
+    const av = a.startsAt && a.startsAt >= now ? a.startsAt : Infinity;
+    const bv = b.startsAt && b.startsAt >= now ? b.startsAt : Infinity;
+    return av - bv;
+  });
+  return c.json({ plans: dtos });
 });
 
 /* ------------------------ GDPR: export & delete ---------------------- */

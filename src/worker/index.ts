@@ -192,6 +192,37 @@ api.notFound((c) => c.json({ error: "not_found", message: "Unknown endpoint." },
 const app = new Hono<Ctx>();
 app.route("/api", api);
 
+/* ---- Deep-link association files for the iOS / Android apps ----------
+ * Served from the Worker so the content-type is guaranteed `application/json`
+ * (iOS rejects the AASA file otherwise). The Apple Team ID and the Android
+ * signing-cert SHA-256 come from the app's store accounts — set them via the
+ * env vars below (wrangler secret / vars) once known. */
+app.get("/.well-known/apple-app-site-association", (c) => {
+  const appId = `${c.env.APPLE_TEAM_ID ?? "TEAMID"}.be.vibin.app`;
+  return c.json({
+    applinks: {
+      apps: [],
+      details: [
+        { appID: appId, paths: ["/join/*", "/reset-password", "/verify-email", "/plans/*"] },
+      ],
+    },
+    webcredentials: { apps: [appId] },
+  });
+});
+app.get("/.well-known/assetlinks.json", (c) => {
+  const sha = c.env.ANDROID_CERT_SHA256 ?? "AA:BB:CC:DD:...";
+  return c.json([
+    {
+      relation: ["delegate_permission/common.handle_all_urls"],
+      target: {
+        namespace: "android_app",
+        package_name: "be.vibin.app",
+        sha256_cert_fingerprints: [sha],
+      },
+    },
+  ]);
+});
+
 // Static SPA — assets binding handles hashing, caching and the SPA fallback
 // (not_found_handling: single-page-application in wrangler.jsonc).
 app.all("*", (c) => c.env.ASSETS.fetch(c.req.raw));

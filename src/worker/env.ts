@@ -26,6 +26,10 @@ export interface Env {
    * sent to the frontend, never logged.
    */
   ENCRYPTION_KEY?: string;
+  /** iOS app Team ID + Android signing-cert SHA-256, for the deep-link
+   *  association files at /.well-known/*. Placeholders are served until set. */
+  APPLE_TEAM_ID?: string;
+  ANDROID_CERT_SHA256?: string;
   /**
    * Owner Command Center — break-glass recovery. A high-entropy string held
    * only in deployment secrets. Presenting it (server-side, rate-limited,
