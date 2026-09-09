@@ -32,23 +32,28 @@ export async function sendEmail(env: Env, msg: OutboundEmail): Promise<void> {
     }
     return;
   }
-  // Example: Resend. Replace with your provider of choice.
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.EMAIL_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: env.EMAIL_FROM ?? "VIBIN <hello@vibin.be>",
-      to: msg.to,
-      subject: msg.subject,
-      text: msg.text,
-    }),
-  });
-  if (!res.ok) {
-    console.error("Email send failed:", res.status, await res.text());
-    throw new Error("email_send_failed");
+  // Resend. A provider hiccup (outage, rate-limit, transient 5xx) must never
+  // break the caller's flow — a failed verification / reset mail is recoverable
+  // (the user can ask for another), a 500 on signup is not. Log and move on.
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.EMAIL_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: env.EMAIL_FROM ?? "VIBIN <noreply@vibin.be>",
+        to: msg.to,
+        subject: msg.subject,
+        text: msg.text,
+      }),
+    });
+    if (!res.ok) {
+      console.error("Email send failed:", res.status, (await res.text()).slice(0, 300));
+    }
+  } catch (err) {
+    console.error("Email send threw:", err instanceof Error ? err.message : String(err));
   }
 }
 
