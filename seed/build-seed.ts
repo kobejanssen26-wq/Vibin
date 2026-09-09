@@ -18,6 +18,7 @@ import {
   ACTIVITY_IMAGE_ATTRIBUTION,
   ACTIVITY_IMAGE_SOURCE,
   CATEGORIES,
+  CITY_COORDS,
   SEED_VERIFIED_ON,
   activityImageUrl,
 } from "./activities";
@@ -63,8 +64,13 @@ const COLS = [
 
 for (const a of ACTIVITIES) {
   const id = `act_${a.slug}`;
-  const locationLabel = a.address ? `${a.provider}, ${a.city}` : `${a.provider}, ${a.city}`;
+  const locationLabel = `${a.provider}, ${a.city}`;
   const imageUrl = activityImageUrl(a.slug);
+  // Precise venue coordinates win; otherwise fall back to the city centroid so
+  // the group radius filter still has a signal. null only if the city is unknown.
+  const cc = CITY_COORDS[a.city];
+  const lat = a.lat ?? cc?.lat ?? null;
+  const lng = a.lng ?? cc?.lng ?? null;
   const vals = [
     q(id),
     q(PROVIDER_ID),
@@ -79,8 +85,8 @@ for (const a of ACTIVITIES) {
     q(a.address ?? null),
     q(a.city),
     q("BE"),
-    n(a.lat != null ? Math.round(a.lat * 1e6) : null),
-    n(a.lng != null ? Math.round(a.lng * 1e6) : null),
+    n(lat != null ? Math.round(lat * 1e6) : null),
+    n(lng != null ? Math.round(lng * 1e6) : null),
     n(a.priceCents),
     q(a.priceType),
     q(a.priceBand),
