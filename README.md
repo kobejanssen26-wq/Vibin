@@ -11,9 +11,9 @@ link where one exists.
 
 </div>
 
-> **Production domain:** https://vibin.be (see [Domain configuration](#domain-configuration))
-> **Currently deployed at:** the `*.workers.dev` URL printed by `wrangler deploy`
-> (until `vibin.be` DNS is pointed at the Worker).
+> **Live:** https://vibin.be (also reachable at the `*.workers.dev` URL).
+> Domain, SSL, inbound email (`contact@vibin.be`) and outbound email (Resend,
+> `noreply@vibin.be`) are all configured — see [Domain configuration](#domain-configuration).
 
 ---
 
@@ -147,7 +147,7 @@ and deploy values go in env files — see [`.env.example`](.env.example):
 | `APP_ENV`              | `.dev.vars` / `wrangler.jsonc` | `development` locally, `production` deployed. Rate-limiting is disabled when `development`. |
 | `APP_URL`              | `.dev.vars` / `wrangler.jsonc` | Canonical origin for invite links, emails, `.ics`. |
 | `AUTH_SECRET`          | `.dev.vars` / `wrangler secret` | Reserved for signed tokens (not yet used). Set a strong random in prod. |
-| `EMAIL_API_KEY` / `EMAIL_FROM` | secret / var            | Transactional email. Blank → links logged to console. |
+| `EMAIL_API_KEY` / `EMAIL_FROM` | secret                  | Transactional email via **Resend** (`src/worker/lib/email.ts`). `EMAIL_FROM` e.g. `VIBIN <noreply@vibin.be>`. Blank in prod → send is skipped with a warning (never throws); blank in dev → the link is logged. |
 | `ENCRYPTION_KEY`       | `.dev.vars` / `wrangler secret` | **Owner Command Center.** AES-256-GCM key (base64 of 32 bytes) for the credential vault + TOTP secrets. Required before owner setup. Never commit. |
 | `OWNER_RECOVERY_SECRET`| `.dev.vars` / `wrangler secret` | **Owner Command Center.** Break-glass recovery string. Presenting it triggers a one-shot owner password-reset email + MFA clear. Leave blank to disable recovery. |
 | `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` | GitHub secrets | CI deploy. |
@@ -231,31 +231,42 @@ deploy after a schema change.
 
 ## Domain configuration
 
-The app is configured for **`https://vibin.be`** (canonical URL, Open Graph,
-`APP_URL`, sitemap, robots, PWA, email links).
+**Live.** `vibin.be` + `www.vibin.be` are Custom Domains on the `vibin` Worker
+(certs issued), `APP_URL` is `https://vibin.be`, and it is also reachable at the
+`*.workers.dev` URL.
 
-DNS/hosting is **not** wired up automatically. To make `vibin.be` live:
+- **Inbound email** — Cloudflare Email Routing on the `vibin.be` zone:
+  `contact@vibin.be` and a catch-all forward to the owner's mailbox.
+- **Outbound email** — Resend, domain `vibin.be` verified (`send.` subdomain
+  SPF/MX + `resend._domainkey` DKIM); `EMAIL_API_KEY` / `EMAIL_FROM` set as
+  Worker secrets.
 
-1. Add `vibin.be` as a zone in the Cloudflare account that owns the Worker
-   (or move the existing registration into it).
-2. Cloudflare dashboard → Workers & Pages → **vibin** → Settings → **Domains &
-   Routes** → *Add* → Custom Domain → `vibin.be` (and `www.vibin.be`).
-   Cloudflare provisions the certificate and routes automatically.
-3. No code change needed — `APP_URL` already points at `https://vibin.be`.
-
-Until then the deployed Worker is reachable at its `*.workers.dev` URL, and the
-app works there; only outbound links/emails assume the final domain.
+To reproduce on a fresh account: add `vibin.be` as a Cloudflare zone, point the
+registrar's nameservers at Cloudflare, then Workers & Pages → **vibin** →
+Settings → **Domains & Routes** → add the Custom Domains. No code change —
+`APP_URL` already points at `https://vibin.be`.
 
 ## GitHub & CI
 
+First push to a new GitHub repo:
+
+```bash
+gh repo create vibin --private --source=. --remote=origin --push   # gh CLI
+# or, without gh:
+git remote add origin https://github.com/<you>/vibin.git
+git push -u origin main --tags
+```
+
 - `.github/workflows/ci.yml` runs typecheck + lint + unit tests + build + the
-  integration suite on every push / PR.
+  admin-auth, admin-security and integration suites on every push / PR.
 - On push to `main` it additionally runs D1 migrations and `wrangler deploy`,
-  using repo secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+  using repo secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`
+  (Settings → Secrets and variables → Actions).
 - Create the API token from the Cloudflare dashboard (*Edit Cloudflare Workers*
   template + **D1 Edit** + **Workers KV Storage Edit**).
 - `.gitignore` excludes `dist/`, `.wrangler/`, `.dev.vars`, `.env*`,
-  `seed/seed.sql`, `node_modules/`. Secrets are never committed.
+  `seed/seed.sql`, `node_modules/`. No secret has ever been committed
+  (history-scanned); see [`SECURITY.md`](SECURITY.md).
 
 ## Testing
 
@@ -414,19 +425,21 @@ Both run in CI against a live local Worker.
 
 - Realtime is polling (4–15s). Every endpoint returns a discrete state snapshot,
   so a Durable Object per group can drop in later without changing callers.
-- Seed activities are `needs_review` and photo-less — see
-  [Activity data](#activity-data-real-verified). Verify + add provider photos
-  before a public launch.
-- Email needs a provider wired in `src/worker/lib/email.ts` (Resend stub).
-- Radius filtering is done in JS over a small dataset (correct haversine).
-- `vibin.be` DNS must be attached manually (above).
-- Admin UI is functional but minimal.
-- Legal pages are templates — have them reviewed before launch.
+- The ~100 seeded activities are curated from public knowledge and ship
+  `needs_review`. A human confirms each against the operator in the Command
+  Center (per-row **✓ Verify** or the detail page) before it counts as
+  `verified`. Most rows have no photo yet — the card falls back to a branded
+  category treatment.
+- Radius filtering: `locationLabel` is geocoded offline against a Belgian
+  town/postcode table (`src/shared/be-places.ts`); the deck then filters by
+  haversine distance. Unknown place → no radius (full catalogue).
+- Legal pages are templates — the owner must add real legal-entity details and
+  have them reviewed before a public launch.
 
 **Next steps:** Durable Object realtime · real `ActivityProvider` integrations
 behind the existing abstraction · provider-approved photos + an image pipeline ·
-web-push on the existing `notification_prefs` · spatial index for radius ·
-richer admin (bulk verify, provider config, analytics).
+web-push on the existing `notification_prefs` · a proper spatial index for the
+radius filter · richer admin (bulk provider config).
 
 ## License
 

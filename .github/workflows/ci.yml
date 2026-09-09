@@ -26,6 +26,11 @@ jobs:
       - run: npm run build
 
       # Boot the built Worker and run the black-box suites against a fresh DB.
+      # The two values below are THROWAWAY CI-ONLY test values (the encryption
+      # key is base64 of the literal "test-ci-32-byte-key-do-not-ship!"). They
+      # exist so the suite runs on a fresh fork with no configured secrets and
+      # are worthless outside this ephemeral job — real keys go to
+      # `wrangler secret put` / GitHub Actions secrets, never a file.
       - name: Integration tests
         run: |
           cat > .dev.vars <<'EOF'
