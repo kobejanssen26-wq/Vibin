@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { adminApi } from "./api";
+import { adminApi, setAdminUnauthorizedHandler } from "./api";
 
 export interface AdminUser {
   id: string;
@@ -64,6 +64,15 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void refresh();
+  }, [refresh]);
+
+  // A 401 mid-session (expired / revoked) re-checks the session, which drops the
+  // shell back to the login or MFA stage instead of leaving a dead page.
+  useEffect(() => {
+    setAdminUnauthorizedHandler(() => {
+      void refresh();
+    });
+    return () => setAdminUnauthorizedHandler(null);
   }, [refresh]);
 
   const logout = useCallback(async () => {

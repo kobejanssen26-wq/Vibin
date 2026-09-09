@@ -19,6 +19,17 @@ function csrfToken(): string {
   return m ? decodeURIComponent(m[1]!) : "";
 }
 
+/**
+ * Called once when an authenticated request comes back 401 (session expired or
+ * revoked mid-use). AuthProvider registers a handler that drops the user, which
+ * bounces protected routes to /login instead of leaving the page stuck on an
+ * error. Not fired for /auth/* calls (login failures handle their own errors).
+ */
+let onUnauthorized: (() => void) | null = null;
+export function setUnauthorizedHandler(fn: (() => void) | null): void {
+  onUnauthorized = fn;
+}
+
 type Options = Omit<RequestInit, "body"> & { body?: unknown };
 
 export async function api<T>(path: string, opts: Options = {}): Promise<T> {
@@ -50,6 +61,7 @@ export async function api<T>(path: string, opts: Options = {}): Promise<T> {
   const payload = isJson ? await res.json() : await res.text();
 
   if (!res.ok) {
+    if (res.status === 401 && !path.startsWith("/auth/")) onUnauthorized?.();
     const err = (isJson ? payload : { message: payload }) as ApiError;
     throw new ApiRequestError(
       res.status,

@@ -25,6 +25,17 @@ function adminCsrf(): string {
   return m ? decodeURIComponent(m[1]!) : "";
 }
 
+/**
+ * Fired when an admin request returns 401 (the 12h admin session expired or was
+ * revoked mid-use). AdminAuthProvider registers a handler that re-runs
+ * /auth/session, which drops the shell back to the login/MFA stage. Not fired
+ * for /auth/* calls — those own their error handling.
+ */
+let onAdminUnauthorized: (() => void) | null = null;
+export function setAdminUnauthorizedHandler(fn: (() => void) | null): void {
+  onAdminUnauthorized = fn;
+}
+
 type Options = Omit<RequestInit, "body"> & { body?: unknown };
 
 export async function adminApi<T>(path: string, opts: Options = {}): Promise<T> {
@@ -56,6 +67,7 @@ export async function adminApi<T>(path: string, opts: Options = {}): Promise<T> 
   const payload = isJson ? await res.json() : await res.text();
 
   if (!res.ok) {
+    if (res.status === 401 && !path.startsWith("/auth/")) onAdminUnauthorized?.();
     const err = (isJson ? payload : { message: payload }) as ApiError;
     throw new AdminApiError(
       res.status,

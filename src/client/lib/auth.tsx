@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { api } from "./api";
+import { api, setUnauthorizedHandler } from "./api";
 import type { Me } from "@shared/types";
 
 interface AuthState {
@@ -43,6 +43,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // A 401 on any authed request (expired / revoked session) drops the user, so
+  // protected routes redirect to /login instead of getting stuck on an error.
+  useEffect(() => {
+    setUnauthorizedHandler(() => setUser(null));
+    return () => setUnauthorizedHandler(null);
+  }, []);
 
   const signup: AuthState["signup"] = async (input) => {
     const { user } = await api<{ user: Me }>("/auth/signup", {
