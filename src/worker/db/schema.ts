@@ -584,6 +584,31 @@ export const notifications = sqliteTable(
   }),
 );
 
+/**
+ * Push notification device tokens for the iOS / Android apps. One row per
+ * (device, user). `token` is an Expo push token; `platform` records where it
+ * came from so analytics and troubleshooting can split by OS. Removed on
+ * logout, on 401, and when Expo reports it as unregistered.
+ */
+export const pushTokens = sqliteTable(
+  "push_tokens",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    token: text("token").notNull(),
+    platform: text("platform", { enum: ["ios", "android", "web"] }).notNull(),
+    deviceName: text("device_name"),
+    createdAt: integer("created_at").notNull().default(now),
+    lastSeenAt: integer("last_seen_at").notNull().default(now),
+  },
+  (t) => ({
+    tokenUnq: uniqueIndex("push_tokens_token_unq").on(t.token),
+    userIdx: index("push_tokens_user_idx").on(t.userId),
+  }),
+);
+
 export const reports = sqliteTable(
   "reports",
   {

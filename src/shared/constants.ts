@@ -80,6 +80,17 @@ export const SESSION_COOKIE = "vibin_session";
 export const CSRF_COOKIE = "vibin_csrf";
 export const CSRF_HEADER = "x-vibin-csrf";
 
+/**
+ * Native (iOS / Android) clients can't rely on a cookie jar and have no
+ * cross-site attack surface, so they authenticate with a bearer token instead:
+ * `Authorization: Bearer <token>` where the token IS the KV session id. They
+ * send `X-Vibin-Client: mobile` on every request; the server then accepts the
+ * bearer header and skips the double-submit CSRF check (there is no ambient
+ * credential to forge). The web app is unchanged — it never sends this header.
+ */
+export const CLIENT_HEADER = "x-vibin-client";
+export const CLIENT_MOBILE = "mobile";
+
 /* Owner Command Center — a separate, shorter-lived privileged session. */
 export const ADMIN_SESSION_COOKIE = "vibin_admin";
 export const ADMIN_CSRF_COOKIE = "vibin_admin_csrf";

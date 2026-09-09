@@ -40,7 +40,13 @@ api.use("*", async (c, next) => {
   return cors({
     origin: allowed,
     credentials: true,
-    allowHeaders: ["content-type", "x-vibin-csrf", "x-vibin-admin-csrf"],
+    allowHeaders: [
+      "content-type",
+      "authorization",
+      "x-vibin-csrf",
+      "x-vibin-admin-csrf",
+      "x-vibin-client",
+    ],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     maxAge: 600,
   })(c, next);

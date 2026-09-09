@@ -27,6 +27,7 @@ import { rateLimit, clientIp } from "../lib/ratelimit";
 import { newId } from "../lib/id";
 import { track } from "../lib/analytics";
 import { loadMe } from "../lib/me";
+import { CLIENT_HEADER, CLIENT_MOBILE } from "@shared/constants";
 import {
   resetEmailBody,
   sendEmail,
@@ -44,6 +45,23 @@ async function startSession(c: Context<Ctx>, userId: string) {
   await trackUserSession(c.env, userId, sessionId);
   setSessionCookie(c, sessionId);
   setCsrfCookie(c, csrf);
+  return { sessionId, csrf };
+}
+
+/**
+ * Auth response body. Web gets `{ user }` and relies on the Set-Cookie headers.
+ * A native client (`X-Vibin-Client: mobile`) additionally gets the bearer
+ * `token` (= session id) and `csrf` to keep in secure storage.
+ */
+function authBody(
+  c: Context<Ctx>,
+  user: unknown,
+  session: { sessionId: string; csrf: string },
+) {
+  if (c.req.header(CLIENT_HEADER) === CLIENT_MOBILE) {
+    return { user, token: session.sessionId, csrf: session.csrf };
+  }
+  return { user };
 }
 
 /* ------------------------------- signup --------------------------------- */
@@ -115,9 +133,9 @@ app.post("/signup", async (c) => {
     text: verifyEmailBody(`${c.env.APP_URL}/verify-email?token=${token}`),
   });
 
-  await startSession(c, userId);
+  const session = await startSession(c, userId);
   track(c, "user_registered", { userId, dedupeKey: `user_registered:${userId}` });
-  return c.json({ user: await loadMe(db, userId) }, 201);
+  return c.json(authBody(c, await loadMe(db, userId), session), 201);
 });
 
 /* -------------------------------- login --------------------------------- */
@@ -148,8 +166,8 @@ app.post("/login", async (c) => {
       .where(eq(users.id, user.id));
   }
 
-  await startSession(c, user.id);
-  return c.json({ user: await loadMe(db, user.id) });
+  const session = await startSession(c, user.id);
+  return c.json(authBody(c, await loadMe(db, user.id), session));
 });
 
 /* -------------------------------- logout -------------------------------- */

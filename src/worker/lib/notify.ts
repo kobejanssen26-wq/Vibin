@@ -3,6 +3,7 @@ import type { DB } from "../db/client";
 import { groupMembers, messages, notifications } from "../db/schema";
 import { newId } from "./id";
 import { chunk, rowsPerInsert } from "./chunk";
+import { pushToUsers } from "./push";
 
 export async function notifyUsers(
   db: DB,
@@ -23,6 +24,8 @@ export async function notifyUsers(
   for (const batch of chunk(rows, rowsPerInsert(7))) {
     await db.insert(notifications).values(batch);
   }
+  // Fan out to the mobile apps. Best-effort: pushToUsers never throws.
+  await pushToUsers(db, userIds, n);
 }
 
 export async function notifyGroup(

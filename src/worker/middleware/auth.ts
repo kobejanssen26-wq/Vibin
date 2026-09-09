@@ -10,7 +10,21 @@ import { getSession } from "../lib/session";
 
 type Ctx = { Bindings: Env; Variables: Vars };
 
-/** Resolve the session (if any) and stash userId/sessionId on the context. */
+/** `Authorization: Bearer <token>` — the token is the KV session id. */
+function bearer(c: { req: { header: (n: string) => string | undefined } }) {
+  const h = c.req.header("authorization");
+  if (!h) return null;
+  const m = /^Bearer\s+([A-Za-z0-9._-]+)$/i.exec(h.trim());
+  return m ? m[1]! : null;
+}
+
+/**
+ * Resolve the session (if any) and stash userId/sessionId on the context.
+ * The session id comes from the `vibin_session` cookie (web) or an
+ * `Authorization: Bearer` header (native apps). Cookie-backed mutating requests
+ * still get the double-submit CSRF check; bearer-backed requests skip it — the
+ * token is not an ambient credential and can't be attached cross-site.
+ */
 export const withSession: MiddlewareHandler<Ctx> = async (c, next) => {
   c.set("userId", null);
   c.set("sessionId", null);
@@ -23,15 +37,22 @@ export const withSession: MiddlewareHandler<Ctx> = async (c, next) => {
     return next();
   }
 
-  const sid = getCookie(c, SESSION_COOKIE);
+  const cookieSid = getCookie(c, SESSION_COOKIE);
+  const bearerSid = cookieSid ? null : bearer(c);
+  const sid = cookieSid ?? bearerSid;
   if (sid) {
     const session = await getSession(c.env, sid);
     if (session) {
       c.set("userId", session.userId);
       c.set("sessionId", sid);
-      // Double-submit CSRF check for mutating requests.
+      // Double-submit CSRF check — only for cookie (ambient) credentials.
       const method = c.req.method.toUpperCase();
-      if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
+      if (
+        !bearerSid &&
+        method !== "GET" &&
+        method !== "HEAD" &&
+        method !== "OPTIONS"
+      ) {
         const header = c.req.header(CSRF_HEADER);
         if (!header || header !== session.csrf) {
           throw forbidden("Invalid or missing CSRF token. Refresh and retry.");

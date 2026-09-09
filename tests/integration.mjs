@@ -220,6 +220,47 @@ async function run() {
   const bad = await kobe("GET", `/invites/ZZZZZZ`);
   ok("unknown invite code is rejected", bad.status === 404 || bad.status === 400);
 
+  // --- native (bearer-token) auth: no cookie jar, no CSRF ---
+  const mob = { "content-type": "application/json", "x-vibin-client": "mobile" };
+  let r = await fetch(`${BASE}/api/auth/signup`, {
+    method: "POST",
+    headers: mob,
+    body: JSON.stringify({
+      displayName: "Mobile",
+      email: `mob-${Date.now()}@x.com`,
+      password: "mobile-pw-123456",
+    }),
+  });
+  const mobBody = await r.json();
+  ok("mobile signup returns a bearer token", r.status === 201 && typeof mobBody.token === "string");
+  const bh = { ...mob, authorization: `Bearer ${mobBody.token}` };
+  r = await fetch(`${BASE}/api/groups`, {
+    method: "POST",
+    headers: bh,
+    body: JSON.stringify({ name: "Bearer grp" }),
+  });
+  ok("bearer mutation works without a CSRF token", r.status === 201);
+  r = await fetch(`${BASE}/api/me/push-tokens`, {
+    method: "POST",
+    headers: bh,
+    body: JSON.stringify({ token: `ExponentPushToken[${Date.now()}]`, platform: "android" }),
+  });
+  ok("push token registers", r.status === 200);
+  r = await fetch(`${BASE}/api/groups`, {
+    headers: { ...mob, authorization: "Bearer nope" },
+  });
+  ok("a bad bearer token is anonymous (401)", r.status === 401);
+  r = await fetch(`${BASE}/api/auth/signup`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      displayName: "Web",
+      email: `web-${Date.now()}@x.com`,
+      password: "web-pw-12345678",
+    }),
+  });
+  ok("web signup still returns no token (unchanged)", !("token" in (await r.json())));
+
   console.log(`\n${passed} passed, ${failed} failed\n`);
   process.exit(failed === 0 ? 0 : 1);
 }

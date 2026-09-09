@@ -12,6 +12,7 @@ import {
   notificationPrefs,
   notifications,
   profiles,
+  pushTokens,
   users,
 } from "../db/schema";
 import { parseBody } from "../lib/validate";
@@ -139,6 +140,45 @@ app.put("/notification-prefs", async (c) => {
     })
     .where(eq(notificationPrefs.userId, uid(c)));
   return c.json({ prefs: body });
+});
+
+/* ----------------------- push notification tokens ------------------- */
+/** Register (or refresh) this device's Expo push token. Idempotent. */
+app.post("/push-tokens", async (c) => {
+  const body = await parseBody(
+    c,
+    z.object({
+      token: z.string().trim().min(1).max(400),
+      platform: z.enum(["ios", "android", "web"]),
+      deviceName: z.string().trim().max(120).nullish(),
+    }),
+  );
+  const db = createDb(c.env);
+  const now = Math.floor(Date.now() / 1000);
+  await db
+    .insert(pushTokens)
+    .values({
+      id: newId(),
+      userId: uid(c),
+      token: body.token,
+      platform: body.platform,
+      deviceName: body.deviceName ?? null,
+      createdAt: now,
+      lastSeenAt: now,
+    })
+    .onConflictDoUpdate({
+      target: pushTokens.token,
+      set: { userId: uid(c), platform: body.platform, lastSeenAt: now },
+    });
+  return c.json({ ok: true });
+});
+
+/** Drop this device's token (called on sign-out). */
+app.delete("/push-tokens", async (c) => {
+  const body = await parseBody(c, z.object({ token: z.string().min(1).max(400) }));
+  const db = createDb(c.env);
+  await db.delete(pushTokens).where(eq(pushTokens.token, body.token));
+  return c.json({ ok: true });
 });
 
 /* ------------------------ GDPR: export & delete ---------------------- */
