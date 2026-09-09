@@ -12,6 +12,7 @@ import {
   RADIUS_OPTIONS_KM,
   TIME_BANDS,
 } from "@shared/constants";
+import { resolvePlace } from "@shared/be-places";
 
 type Draft = GroupSettingsDTO;
 
@@ -111,6 +112,11 @@ export function GroupConfig() {
     [draft],
   );
 
+  const placeResolved = useMemo(
+    () => (draft.locationLabel ? resolvePlace(draft.locationLabel) != null : null),
+    [draft.locationLabel],
+  );
+
   if (loading) return <LoadingScreen />;
   if (!group) return <ErrorState message={err ?? "Group not found."} />;
   if (!group.isCreator)
@@ -173,7 +179,13 @@ export function GroupConfig() {
             setDraft((d) => ({ ...d, locationLabel: e.target.value }))
           }
         />
-        <div>
+        {placeResolved === false && (
+          <p className="text-xs text-navy-400">
+            We don’t recognise that place, so the radius won’t be applied — the
+            group will see the whole catalogue. Try a Belgian city or postcode.
+          </p>
+        )}
+        <div className={placeResolved === false ? "opacity-50" : ""}>
           <span className="mb-1.5 block text-sm font-semibold text-navy-700">
             Radius
           </span>

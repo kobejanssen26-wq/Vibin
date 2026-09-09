@@ -198,6 +198,7 @@ export function DateMatch() {
             type="datetime-local"
             className="field"
             value={newSlot}
+            min={minSlotValue()}
             onChange={(e) => setNewSlot(e.target.value)}
           />
           <div className="mt-2.5 flex gap-2">
@@ -220,6 +221,13 @@ export function DateMatch() {
       )}
     </div>
   );
+}
+
+/** `min` for the datetime-local picker: ~1h out (the server's floor), local time. */
+function minSlotValue(): string {
+  const d = new Date(Date.now() + 60 * 60 * 1000);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
 }
 
 function Tally({ n, label, dot }: { n: number; label: string; dot: string }) {

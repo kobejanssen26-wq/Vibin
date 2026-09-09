@@ -1,5 +1,4 @@
 import {
-  useEffect,
   useState,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
@@ -409,64 +408,6 @@ export function ErrorNote({
 export function NotEnough({ label = "Not enough data yet" }: { label?: string }) {
   return (
     <div className="py-10 text-center text-sm text-slate-400">{label}</div>
-  );
-}
-
-/* ----------------------------- masked secret --------------------- */
-
-export function MaskedValue({
-  reveal,
-  masked = "••••••••••••",
-  onReveal,
-}: {
-  reveal: () => Promise<string>;
-  masked?: string;
-  onReveal?: () => void;
-}) {
-  const [shown, setShown] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (shown == null) return;
-    const t = setTimeout(() => setShown(null), 20_000);
-    return () => clearTimeout(t);
-  }, [shown]);
-
-  return (
-    <span className="inline-flex items-center gap-2">
-      <code className="font-mono text-xs">{shown ?? masked}</code>
-      {shown == null ? (
-        <Btn
-          variant="ghost"
-          className="!px-1.5 !py-0.5 !text-[11px]"
-          loading={busy}
-          onClick={async () => {
-            setBusy(true);
-            setErr(null);
-            try {
-              setShown(await reveal());
-              onReveal?.();
-            } catch (e) {
-              setErr(e instanceof Error ? e.message : "Reveal failed");
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          Reveal
-        </Btn>
-      ) : (
-        <Btn
-          variant="ghost"
-          className="!px-1.5 !py-0.5 !text-[11px]"
-          onClick={() => setShown(null)}
-        >
-          Hide
-        </Btn>
-      )}
-      {err && <span className="text-[11px] text-rose-600">{err}</span>}
-    </span>
   );
 }
 

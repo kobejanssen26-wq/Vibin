@@ -34,6 +34,7 @@ import {
   ACTIVITY_CATEGORIES,
   LIMITS,
 } from "@shared/constants";
+import { resolvePlace } from "@shared/be-places";
 import type { GroupSummaryDTO } from "@shared/types";
 
 type Ctx = { Bindings: Env; Variables: Vars };
@@ -212,6 +213,18 @@ app.put("/:id/settings", async (c) => {
   if (body.dateMode === "specific" && !body.dateSpecific) {
     throw badRequest("Choose a specific date.");
   }
+  // Resolve the free-text place to a coordinate so the radius filter actually
+  // applies. An explicit lat/lng from the client wins; otherwise geocode the
+  // label offline (known Belgian towns + postcodes). Unresolved -> no radius.
+  let lat = body.lat;
+  let lng = body.lng;
+  if ((lat == null || lng == null) && body.locationLabel) {
+    const hit = resolvePlace(body.locationLabel);
+    if (hit) {
+      lat = hit.lat;
+      lng = hit.lng;
+    }
+  }
   const now = Math.floor(Date.now() / 1000);
   await db
     .update(groupSettings)
@@ -219,8 +232,8 @@ app.put("/:id/settings", async (c) => {
       categories: JSON.stringify(body.categories),
       allActivities: body.allActivities ? 1 : 0,
       locationLabel: body.locationLabel,
-      lat: body.lat != null ? Math.round(body.lat * 1e6) : null,
-      lng: body.lng != null ? Math.round(body.lng * 1e6) : null,
+      lat: lat != null ? Math.round(lat * 1e6) : null,
+      lng: lng != null ? Math.round(lng * 1e6) : null,
       radiusKm: body.radiusKm,
       budgetBand: body.budgetBand as never,
       dateMode: body.dateMode as never,

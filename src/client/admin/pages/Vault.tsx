@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { cc } from "../api";
 import { useResource } from "../lib";
 import {
@@ -8,7 +8,6 @@ import {
   Field,
   Input,
   Loading,
-  MaskedValue,
   Panel,
   PageTitle,
   Select,
@@ -240,8 +239,8 @@ export function Vault() {
                 </tr>
               )}
               {data.rows.map((c) => (
-                <>
-                  <Tr key={c.id}>
+                <Fragment key={c.id}>
+                  <Tr>
                     <Td>
                       <span className="font-medium text-slate-800">
                         {c.name}
@@ -311,13 +310,13 @@ export function Vault() {
                     </Td>
                   </Tr>
                   {logFor === c.id && (
-                    <tr key={`${c.id}-log`}>
-                      <Td className="bg-slate-50" >
+                    <tr>
+                      <Td className="bg-slate-50">
                         <AccessLog id={c.id} />
                       </Td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </Table>
@@ -327,19 +326,105 @@ export function Vault() {
   );
 }
 
+/**
+ * Reveal a stored secret. The password is entered into a real masked field (never
+ * window.prompt), sent once to /vault/:id/reveal, and the plaintext is shown for
+ * 20 seconds then auto-hidden. Every reveal is logged server-side.
+ */
 function RevealCell({ id }: { id: string }) {
+  const [phase, setPhase] = useState<"masked" | "asking" | "shown">("masked");
+  const [pw, setPw] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [value, setValue] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (phase !== "shown") return;
+    const t = setTimeout(() => {
+      setPhase("masked");
+      setValue(null);
+    }, 20_000);
+    return () => clearTimeout(t);
+  }, [phase]);
+
+  const cancel = () => {
+    setPhase("masked");
+    setPw("");
+    setErr(null);
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pw) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const r = await cc<{ secret: string }>(`/vault/${id}/reveal`, {
+        method: "POST",
+        body: { password: pw },
+      });
+      setValue(r.secret);
+      setPhase("shown");
+      setPw("");
+    } catch (e2) {
+      setErr(e2 instanceof Error ? e2.message : "Reveal failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (phase === "asking") {
+    return (
+      <form onSubmit={submit} className="inline-flex items-center gap-1.5">
+        <Input
+          type="password"
+          autoFocus
+          value={pw}
+          onChange={(ev) => setPw(ev.target.value)}
+          placeholder="your password"
+          aria-label="Confirm your password to reveal this secret"
+          className="w-36"
+        />
+        <Btn type="submit" variant="primary" className="!py-1 !text-[11px]" loading={busy} disabled={!pw}>
+          Reveal
+        </Btn>
+        <Btn type="button" variant="ghost" className="!px-1.5 !py-0.5 !text-[11px]" onClick={cancel}>
+          Cancel
+        </Btn>
+        {err && <span className="text-[11px] text-rose-600">{err}</span>}
+      </form>
+    );
+  }
+
   return (
-    <MaskedValue
-      reveal={async () => {
-        const pw = window.prompt("Confirm your password to reveal this secret:");
-        if (!pw) throw new Error("cancelled");
-        const r = await cc<{ secret: string }>(`/vault/${id}/reveal`, {
-          method: "POST",
-          body: { password: pw },
-        });
-        return r.secret;
-      }}
-    />
+    <span className="inline-flex items-center gap-2">
+      <code className="font-mono text-xs">
+        {phase === "shown" && value != null ? value : "••••••••••••"}
+      </code>
+      {phase === "shown" ? (
+        <Btn
+          variant="ghost"
+          className="!px-1.5 !py-0.5 !text-[11px]"
+          onClick={() => {
+            setPhase("masked");
+            setValue(null);
+          }}
+        >
+          Hide
+        </Btn>
+      ) : (
+        <Btn
+          variant="ghost"
+          className="!px-1.5 !py-0.5 !text-[11px]"
+          onClick={() => {
+            setErr(null);
+            setPhase("asking");
+          }}
+        >
+          Reveal
+        </Btn>
+      )}
+    </span>
   );
 }
 

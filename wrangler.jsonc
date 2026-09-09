@@ -7,7 +7,8 @@
   "workers_dev": true,
   "alias": {
     "@shared/constants": "./src/shared/constants.ts",
-    "@shared/types": "./src/shared/types.ts"
+    "@shared/types": "./src/shared/types.ts",
+    "@shared/be-places": "./src/shared/be-places.ts"
   },
   "assets": {
     "directory": "./dist",
