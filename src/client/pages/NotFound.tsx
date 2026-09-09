@@ -3,7 +3,7 @@ import { LogoMark } from "../components/Logo";
 
 export function NotFound() {
   return (
-    <div className="relative min-h-full bg-paper">
+    <div className="relative min-h-full overflow-x-clip bg-paper">
       <div className="pointer-events-none absolute inset-0 bg-vibin-hero" />
       <div className="relative mx-auto flex min-h-full max-w-md flex-col items-center justify-center px-5 py-20 text-center">
         <span className="grid h-16 w-16 place-items-center rounded-3xl border border-paper-line bg-paper-card">

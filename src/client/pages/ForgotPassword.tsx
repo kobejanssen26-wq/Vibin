@@ -33,7 +33,7 @@ export function ForgotPassword() {
       {sent ? (
         <p className="text-sm text-navy-400">
           If an account exists for <strong>{email}</strong>, a reset link is on
-          its way. In development the link is printed to the server console.
+          its way. Check your inbox (and spam). The link expires in an hour.
         </p>
       ) : (
         <form onSubmit={submit} className="space-y-4">

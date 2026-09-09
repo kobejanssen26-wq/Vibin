@@ -5,10 +5,10 @@ import { api, ApiRequestError } from "../lib/api";
 import type { GroupDTO } from "@shared/types";
 
 const IDEAS = [
-  "Weekend with the boys",
-  "Family",
+  "Weekend with the crew",
+  "Family day out",
   "Date night",
-  "Holiday",
+  "Holiday plans",
   "Team outing",
 ];
 
@@ -45,7 +45,7 @@ export function CreateGroup() {
       <form onSubmit={submit} className="mt-6 space-y-4">
         <Field
           label="Group name"
-          placeholder="Weekend with the boys"
+          placeholder="Weekend with the crew"
           required
           autoFocus
           value={name}

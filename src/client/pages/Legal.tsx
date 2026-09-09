@@ -1,6 +1,9 @@
 import { Link } from "react-router-dom";
 import { IconArrowLeft } from "../components/icons";
 
+/** Date these documents were last revised. Bump when the text below changes. */
+const LAST_UPDATED = "2026-09-09";
+
 export function Legal({ tab }: { tab: "privacy" | "terms" }) {
   return (
     <div className="mx-auto max-w-2xl px-5 py-10">
@@ -57,7 +60,7 @@ function Privacy() {
   return (
     <article>
       <h1 className="text-2xl font-extrabold">Privacy Policy</h1>
-      <P>Last updated: {new Date().toISOString().slice(0, 10)}</P>
+      <P>Last updated: {LAST_UPDATED}</P>
       <H>What we collect</H>
       <P>
         Account data: your email address and a hashed password. Profile data you
@@ -105,7 +108,7 @@ function Terms() {
   return (
     <article>
       <h1 className="text-2xl font-extrabold">Terms of Service</h1>
-      <P>Last updated: {new Date().toISOString().slice(0, 10)}</P>
+      <P>Last updated: {LAST_UPDATED}</P>
       <H>The service</H>
       <P>
         VIBIN helps groups decide what to do together. Activity information in
