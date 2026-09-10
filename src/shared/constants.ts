@@ -41,6 +41,42 @@ export type PriceBand = Exclude<BudgetBand, "any">;
 
 export const RADIUS_OPTIONS_KM = [1, 2, 5, 10, 15, 25, 50, 100] as const;
 
+/* ------------------------------- live events ------------------------------ */
+
+export const EVENT_KIND_META = [
+  { id: "sports", label: "Sport", icon: "⚽" },
+  { id: "music", label: "Music", icon: "🎵" },
+  { id: "culture", label: "Culture", icon: "🎭" },
+  { id: "market", label: "Market", icon: "🛍️" },
+  { id: "festival", label: "Festival", icon: "🎪" },
+  { id: "seasonal", label: "Seasonal", icon: "🎄" },
+  { id: "food", label: "Food & Drink", icon: "🍽️" },
+  { id: "family", label: "Family", icon: "🧸" },
+  { id: "community", label: "Local", icon: "📣" },
+  { id: "nightlife", label: "Nightlife", icon: "🌃" },
+  { id: "other", label: "Other", icon: "✨" },
+] as const;
+
+export const EVENT_KINDS = EVENT_KIND_META.map((k) => k.id);
+export type EventKindId = (typeof EVENT_KIND_META)[number]["id"];
+
+export const EVENT_KIND_LABEL: Record<string, string> = Object.fromEntries(
+  EVENT_KIND_META.map((k) => [k.id, k.label]),
+);
+export const EVENT_KIND_ICON: Record<string, string> = Object.fromEntries(
+  EVENT_KIND_META.map((k) => [k.id, k.icon]),
+);
+
+export const EVENT_STATUSES = [
+  "upcoming",
+  "live",
+  "completed",
+  "cancelled",
+  "postponed",
+  "sold_out",
+  "unknown",
+] as const;
+
 export const DATE_MODES = [
   { id: "tonight", label: "Tonight", known: true },
   { id: "tomorrow", label: "Tomorrow", known: true },

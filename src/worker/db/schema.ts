@@ -377,6 +377,166 @@ export const activityImages = sqliteTable(
 );
 
 /* -------------------------------------------------------------------------- */
+/*  Live events (temporary happenings) & their ingestion sources             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A configured feed that events are ingested from. `manual` is admin-entered and
+ * always available; the API/feed kinds stay `enabled = 0` until an operator adds
+ * credentials/config (see src/worker/events/sources). `config` is opaque JSON
+ * interpreted by that source's adapter (endpoint, apiKeyRef, filters, region…).
+ */
+export const eventSources = sqliteTable(
+  "event_sources",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    kind: text("kind", {
+      enum: [
+        "manual",
+        "sports_api",
+        "ticket_feed",
+        "city_calendar",
+        "ics",
+        "rss",
+      ],
+    })
+      .notNull()
+      .default("manual"),
+    enabled: integer("enabled").notNull().default(0),
+    /** how trustworthy this source is — drives the default verification_status */
+    trust: text("trust", { enum: ["official", "trusted", "third_party"] })
+      .notNull()
+      .default("third_party"),
+    config: text("config").notNull().default("{}"),
+    /** minutes between automatic syncs */
+    syncEveryMin: integer("sync_every_min").notNull().default(720),
+    lastRunAt: integer("last_run_at"),
+    nextRunAt: integer("next_run_at"),
+    /** JSON: { ok, added, updated, skipped, errors, message } from the last run */
+    lastResult: text("last_result"),
+    createdAt: integer("created_at").notNull().default(now),
+    updatedAt: integer("updated_at").notNull().default(now),
+  },
+  (t) => ({
+    enabledIdx: index("event_sources_enabled_idx").on(t.enabled),
+    dueIdx: index("event_sources_next_run_idx").on(t.nextRunAt),
+  }),
+);
+
+export const events = sqliteTable(
+  "events",
+  {
+    id: text("id").primaryKey(),
+    sourceId: text("source_id").references(() => eventSources.id, {
+      onDelete: "set null",
+    }),
+    /** the source's own id for this event (for stable re-sync) */
+    externalId: text("external_id"),
+    /** normalised name+day+city hash — cross-source de-duplication key */
+    dedupeHash: text("dedupe_hash").notNull(),
+
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    /** activity-category slug ("culture", "music", …) for filtering parity */
+    categoryId: text("category_id").references(() => activityCategories.id),
+    kind: text("kind", {
+      enum: [
+        "sports",
+        "music",
+        "culture",
+        "market",
+        "festival",
+        "seasonal",
+        "food",
+        "family",
+        "community",
+        "nightlife",
+        "other",
+      ],
+    })
+      .notNull()
+      .default("other"),
+    subcategory: text("subcategory"),
+
+    // where
+    venueName: text("venue_name"),
+    address: text("address"),
+    city: text("city"),
+    country: text("country").notNull().default("BE"),
+    lat: integer("lat"), // * 1e6
+    lng: integer("lng"),
+
+    // when (unix seconds, Europe/Brussels)
+    startsAt: integer("starts_at").notNull(),
+    endsAt: integer("ends_at"),
+    allDay: integer("all_day").notNull().default(0),
+    timezone: text("timezone").notNull().default("Europe/Brussels"),
+
+    status: text("status", {
+      enum: [
+        "upcoming",
+        "live",
+        "completed",
+        "cancelled",
+        "postponed",
+        "sold_out",
+        "unknown",
+      ],
+    })
+      .notNull()
+      .default("upcoming"),
+
+    // pricing (best-effort; null = unknown, never invented)
+    priceType: text("price_type", {
+      enum: ["free", "paid", "varies", "unknown"],
+    })
+      .notNull()
+      .default("unknown"),
+    priceMinCents: integer("price_min_cents"),
+    priceMaxCents: integer("price_max_cents"),
+    currency: text("currency").notNull().default("EUR"),
+
+    // links & media
+    url: text("url"),
+    ticketUrl: text("ticket_url"),
+    imageUrl: text("image_url"),
+    imageSource: text("image_source"),
+    imageAttribution: text("image_attribution"),
+    tags: text("tags").notNull().default("[]"),
+
+    // provenance & sync
+    source: text("source").notNull().default("manual"),
+    sourceUrl: text("source_url"),
+    verificationStatus: text("verification_status", {
+      enum: ["verified", "needs_review", "unverified", "archived"],
+    })
+      .notNull()
+      .default("needs_review"),
+    /** admin-touched fields are frozen against source overwrites (JSON array) */
+    lockedFields: text("locked_fields").notNull().default("[]"),
+    lastSyncedAt: integer("last_synced_at"),
+    nextSyncAt: integer("next_sync_at"),
+
+    active: integer("active").notNull().default(1),
+    createdAt: integer("created_at").notNull().default(now),
+    updatedAt: integer("updated_at").notNull().default(now),
+  },
+  (t) => ({
+    startsIdx: index("events_starts_at_idx").on(t.startsAt),
+    statusIdx: index("events_status_idx").on(t.status),
+    cityIdx: index("events_city_idx").on(t.city),
+    kindIdx: index("events_kind_idx").on(t.kind),
+    activeIdx: index("events_active_idx").on(t.active),
+    dedupeIdx: index("events_dedupe_idx").on(t.dedupeHash),
+    srcExtUnq: uniqueIndex("events_source_external_unq").on(
+      t.sourceId,
+      t.externalId,
+    ),
+  }),
+);
+
+/* -------------------------------------------------------------------------- */
 /*  Swipe deck & activity votes                                              */
 /* -------------------------------------------------------------------------- */
 
@@ -949,6 +1109,8 @@ export type Message = typeof messages.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type Report = typeof reports.$inferSelect;
 export type Provider = typeof providers.$inferSelect;
+export type EventRow = typeof events.$inferSelect;
+export type EventSourceRow = typeof eventSources.$inferSelect;
 export type AdminSession = typeof adminSessions.$inferSelect;
 export type AdminTotp = typeof adminTotp.$inferSelect;
 export type AdminRecoveryCode = typeof adminRecoveryCodes.$inferSelect;

@@ -7,6 +7,8 @@ import { trackNow } from "./lib/analytics";
 import { getSetting, SETTINGS } from "./lib/system-settings";
 import { withSession, requireAuth } from "./middleware/auth";
 import { withAdminSession, requireOwner } from "./middleware/admin";
+import { createDb } from "./db/client";
+import { runDueSources } from "./events/sync";
 
 import authRoutes from "./routes/auth";
 import adminAuthRoutes from "./routes/admin-auth";
@@ -21,8 +23,10 @@ import messageRoutes from "./routes/messages";
 import reportRoutes from "./routes/reports";
 import eventRoutes from "./routes/events";
 import geoRoutes from "./routes/geo";
+import liveEventRoutes from "./routes/live-events";
 import adminRoutes from "./routes/admin";
 import adminCcRoutes from "./routes/admin-cc";
+import adminEventRoutes from "./routes/admin-events";
 import adminVaultRoutes from "./routes/admin-vault";
 import mediaRoutes from "./routes/media";
 
@@ -144,6 +148,7 @@ const commandCenter = new Hono<Ctx>();
 commandCenter.use("*", withAdminSession, requireOwner());
 commandCenter.route("/", adminCcRoutes); // dashboards, analytics, browsers, CRM
 commandCenter.route("/", adminRoutes); // catalogue + moderation actions
+commandCenter.route("/", adminEventRoutes); // live events + ingestion sources
 commandCenter.route("/vault", adminVaultRoutes); // encrypted credential vault
 api.route("/admin/cc", commandCenter);
 
@@ -160,6 +165,7 @@ authed.route("/", planRoutes); // /groups/:id/matches, /groups/:id/plans, /plans
 authed.route("/activities", activityRoutes);
 authed.route("/reports", reportRoutes);
 authed.route("/events", eventRoutes);
+authed.route("/live-events", liveEventRoutes);
 authed.route("/geo", geoRoutes);
 api.route("/", authed);
 
@@ -229,4 +235,24 @@ app.get("/.well-known/assetlinks.json", (c) => {
 // (not_found_handling: single-page-application in wrangler.jsonc).
 app.all("*", (c) => c.env.ASSETS.fetch(c.req.raw));
 
-export default app;
+export default {
+  fetch: app.fetch,
+  /**
+   * Cron (every 30 min, see wrangler.jsonc `triggers.crons`): pull any enabled
+   * event source that is due and roll event statuses forward. A no-op while no
+   * event source is enabled.
+   */
+  async scheduled(
+    _controller: ScheduledController,
+    env: Env,
+    ctx: ExecutionContext,
+  ) {
+    ctx.waitUntil(
+      runDueSources(createDb(env), env).catch((e) => {
+        void trackNow(env, "server_error", {
+          props: { route: "cron:events", message: String(e).slice(0, 200) },
+        });
+      }),
+    );
+  },
+} satisfies ExportedHandler<Env>;

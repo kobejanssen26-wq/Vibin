@@ -139,6 +139,77 @@ export interface ActivityDTO {
   availabilityNote: string;
 }
 
+/* --------------------------------- events -------------------------------- */
+
+export type EventKind =
+  | "sports"
+  | "music"
+  | "culture"
+  | "market"
+  | "festival"
+  | "seasonal"
+  | "food"
+  | "family"
+  | "community"
+  | "nightlife"
+  | "other";
+
+export type EventStatus =
+  | "upcoming"
+  | "live"
+  | "completed"
+  | "cancelled"
+  | "postponed"
+  | "sold_out"
+  | "unknown";
+
+export type EventPriceType = "free" | "paid" | "varies" | "unknown";
+export type EventVerification = "verified" | "needs_review" | "unverified" | "archived";
+
+export interface EventDTO {
+  id: string;
+  title: string;
+  description: string;
+  kind: EventKind;
+  category: CategoryId | null;
+  subcategory: string | null;
+  // where
+  venueName: string | null;
+  address: string | null;
+  city: string | null;
+  lat: number | null;
+  lng: number | null;
+  distanceKm: number | null;
+  // when
+  startsAt: number;
+  endsAt: number | null;
+  allDay: boolean;
+  timezone: string;
+  /** human countdown, e.g. "Tonight 20:00", "In 3 days", "Live now" */
+  whenLabel: string;
+  status: EventStatus;
+  // price (never invented — null means unknown)
+  priceType: EventPriceType;
+  priceMinCents: number | null;
+  priceMaxCents: number | null;
+  currency: string;
+  priceLabel: string;
+  // links & media
+  url: string | null;
+  ticketUrl: string | null;
+  imageUrl: string | null;
+  imageSource: string | null;
+  imageAttribution: string | null;
+  tags: string[];
+  // provenance
+  source: string;
+  sourceUrl: string | null;
+  verificationStatus: EventVerification;
+  lastSyncedAt: number | null;
+  /** events are third-party info — always shown with a freshness caveat */
+  freshnessNote: string;
+}
+
 export type ActivityVoteValue = "like" | "nope" | "superlike";
 
 export interface SwipeCardDTO {
