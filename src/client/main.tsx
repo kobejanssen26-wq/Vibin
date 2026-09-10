@@ -33,9 +33,31 @@ ReactDOM.createRoot(rootEl).render(
   </React.StrictMode>,
 );
 
-// PWA service worker (production only)
+// PWA service worker (production only). Registers, checks for an update on
+// every load, and when a new worker takes control, reloads once so the tab
+// isn't left running a stale build.
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {
-    void navigator.serviceWorker.register("/sw.js").catch(() => {});
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then((reg) => {
+        reg.update().catch(() => {});
+        reg.addEventListener("updatefound", () => {
+          const sw = reg.installing;
+          sw?.addEventListener("statechange", () => {
+            if (sw.state === "installed" && navigator.serviceWorker.controller) {
+              sw.postMessage("skipWaiting");
+            }
+          });
+        });
+      })
+      .catch(() => {});
+
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (reloaded) return;
+      reloaded = true;
+      window.location.reload();
+    });
   });
 }
