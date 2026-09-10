@@ -261,6 +261,76 @@ async function run() {
   });
   ok("web signup still returns no token (unchanged)", !("token" in (await r.json())));
 
+  // --- radius engine: a rural location + small radius must stay local ---
+  const geo = client();
+  await signup(geo, "Geo");
+  const gResolve = await geo("GET", "/geo/resolve?q=Hoogstraten");
+  ok(
+    "geocoder places a small town (Hoogstraten)",
+    gResolve.status === 200 &&
+      gResolve.json &&
+      Math.abs(gResolve.json.lat - 51.4) < 0.2 &&
+      Math.abs(gResolve.json.lng - 4.74) < 0.2,
+  );
+  const origin = gResolve.json;
+  const hav = (a, b, c, d) => {
+    const R = 6371;
+    const dLat = ((c - a) * Math.PI) / 180;
+    const dLng = ((d - b) * Math.PI) / 180;
+    const x =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((a * Math.PI) / 180) *
+        Math.cos((c * Math.PI) / 180) *
+        Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(x));
+  };
+  const rg = (await geo("POST", "/groups", { name: `Radius ${uniq()}` })).json.group;
+  const soon2 = Math.floor(Date.now() / 1000) + 5 * 86400;
+  await geo("PUT", `/groups/${rg.id}/settings`, {
+    categories: [],
+    allActivities: true,
+    locationLabel: "Hoogstraten",
+    lat: null,
+    lng: null,
+    radiusKm: 15,
+    budgetBand: "any",
+    dateMode: "specific",
+    dateSpecific: soon2,
+    timeBand: "evening",
+    timeSpecific: null,
+  });
+  await geo("POST", `/groups/${rg.id}/start`, {});
+  const rdeck = (await geo("GET", `/groups/${rg.id}/swipe`)).json;
+  const rcards = rdeck.queue ?? [];
+  const overRadius = rcards.filter((c) => {
+    const a = c.activity;
+    return (
+      a.lat != null &&
+      a.lng != null &&
+      hav(origin.lat, origin.lng, a.lat, a.lng) > 15.5
+    );
+  });
+  ok(
+    "Hoogstraten + 15 km deck contains nothing beyond 15 km",
+    overRadius.length === 0,
+  );
+  ok(
+    "Hoogstraten + 15 km deck excludes far cities (Brussels/Ghent/coast)",
+    !rcards.some((c) =>
+      ["Brussels", "Ghent", "Bruges", "Namur"].includes(c.activity.city),
+    ),
+  );
+
+  // --- live events discovery endpoint is reachable + geo-aware ---
+  const ev = await geo(
+    "GET",
+    `/live-events/nearby?lat=${origin.lat}&lng=${origin.lng}&radiusKm=25`,
+  );
+  ok(
+    "live-events nearby responds with an events array",
+    ev.status === 200 && Array.isArray(ev.json.events),
+  );
+
   console.log(`\n${passed} passed, ${failed} failed\n`);
   process.exit(failed === 0 ? 0 : 1);
 }
