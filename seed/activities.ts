@@ -140,20 +140,136 @@ export const CATEGORY_IMAGES: Record<string, string> = {
 const unsplash = (id: string) =>
   `https://images.unsplash.com/photo-${id}?w=1200&q=75&auto=format&fit=crop`;
 
+export const ACTIVITY_IMAGE_SOURCE = "Unsplash";
+export const ACTIVITY_IMAGE_ATTRIBUTION = "Photo via Unsplash";
+
 /**
- * Resolve an activity to a photo URL: its own hand-picked photo first, then the
- * category fallback, then null (branded category treatment).
+ * Real, free-licence photos sourced from Wikimedia Commons.
+ *
+ * VENUE_IMAGES: a photograph of THAT specific venue/site (the brewery building,
+ * the castle, the museum, the cave). Keyed by activity slug.
+ *
+ * SUBCATEGORY_IMAGES: a photograph that depicts THAT kind of activity (a bowling
+ * lane, a squash court, a hiking trail) — used for activities of that type that
+ * do not have their own venue photo.
+ *
+ * Every entry is Creative-Commons / public-domain licensed; `attribution` is the
+ * author + licence string that VIBIN shows as a caption on the card (CC-BY /
+ * CC-BY-SA require visible credit). URLs are 1280px Commons thumbnails.
+ */
+export const WIKIMEDIA_SOURCE = "Wikimedia Commons";
+
+export const VENUE_IMAGES: Record<string, { url: string; attribution: string }> = {
+  "halve-maan-brewery-tour-bruges": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/ff/Brugge_-_Brouwerij_Halve_Maan_-_Henri_Maes.jpg/1280px-Brugge_-_Brouwerij_Halve_Maan_-_Henri_Maes.jpg", attribution: "Spotter2 / CC BY-SA 3.0 — Wikimedia Commons" },
+  "cantillon-brewery-brussels": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/Brauerei_Cantillon_Getreidespeicher_asb_2001_104-0485_IMG.JPG/1280px-Brauerei_Cantillon_Getreidespeicher_asb_2001_104-0485_IMG.JPG", attribution: "Agon S. Buchholz / CC BY-SA 3.0 — Wikimedia Commons" },
+  "mas-museum-antwerp": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/54/MAS_Antwerpen_2016-05_--1.jpg/1280px-MAS_Antwerpen_2016-05_--1.jpg", attribution: "Zinneke / CC BY-SA 3.0 — Wikimedia Commons" },
+  "gravensteen-castle-ghent": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fd/Gent_Gravensteen_R01.jpg/1280px-Gent_Gravensteen_R01.jpg", attribution: "Marc Ryckaert (MJJR) / CC BY 3.0 — Wikimedia Commons" },
+  "grotte-de-han": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Gouffre_de_Belvaux_Luc_Viatour.JPG/1280px-Gouffre_de_Belvaux_Luc_Viatour.JPG", attribution: "Lviatour / CC BY-SA 3.0 — Wikimedia Commons" },
+  "hoge-kempen-connecterra": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/Mechelse_Hei_050806.JPG/1280px-Mechelse_Hei_050806.JPG", attribution: "KB72 / CC BY-SA 3.0 — Wikimedia Commons" },
+  "brasserie-de-la-senne-brussels": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Brasserie_de_la_Senne5827.jpg/1280px-Brasserie_de_la_Senne5827.jpg", attribution: "Filharmoniker / CC BY-SA 4.0 — Wikimedia Commons" },
+  "ancienne-belgique-brussels": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/Ancienne_Belgique_1.jpg/1280px-Ancienne_Belgique_1.jpg", attribution: "Nenea hartia / CC BY-SA 4.0 — Wikimedia Commons" },
+  "kmska-antwerp": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Koninklijk_Museum_voor_Schone_Kunsten_%28Antwerpen%29.jpg/1280px-Koninklijk_Museum_voor_Schone_Kunsten_%28Antwerpen%29.jpg", attribution: "Ad Meskens / CC BY-SA 3.0 — Wikimedia Commons" },
+  "walibi-belgium-wavre": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/67/Walibi_Belgium_Entr%C3%A9e_pour_les_50_ans.jpg/1280px-Walibi_Belgium_Entr%C3%A9e_pour_les_50_ans.jpg", attribution: "Roro00713 / CC0 — Wikimedia Commons" },
+  "bellewaerde-ieper": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Bellewaerde_%28ingang_1%29.jpg/1280px-Bellewaerde_%28ingang_1%29.jpg", attribution: "Druyts.t / CC BY-SA 4.0 — Wikimedia Commons" },
+  "plopsaland-de-panne": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Plopsaland.jpg/1280px-Plopsaland.jpg", attribution: "Pehuyghe at Dutch Wikipedia / CC BY-SA 3.0 — Wikimedia Commons" },
+  "bobbejaanland-lichtaart": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/39/Bobbejaanland_1988_tom_schoepen.jpg/1280px-Bobbejaanland_1988_tom_schoepen.jpg", attribution: "No machine-readable author provided. Peeper assumed (based on copyright claims). / CC BY 2.5 — Wikimedia Commons" },
+  "studio-skoop-ghent": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Studio_Skoop.jpg/1280px-Studio_Skoop.jpg", attribution: "Pere prlpz / CC BY-SA 3.0 — Wikimedia Commons" },
+  "red-star-line-museum-antwerp": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Red_Star_Line_Museum.jpg/1280px-Red_Star_Line_Museum.jpg", attribution: "DimiTalen / CC0 — Wikimedia Commons" },
+  "plantin-moretus-antwerp": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/28/Plantin_antwerp_07.jpg/1280px-Plantin_antwerp_07.jpg", attribution: "Klaus Graf / CC BY 2.5 — Wikimedia Commons" },
+  "magritte-museum-brussels": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/Belgique_-_Bruxelles_-_H%C3%B4tel_du_Lotto_-_02.JPG/1280px-Belgique_-_Bruxelles_-_H%C3%B4tel_du_Lotto_-_02.JPG", attribution: "EmDee / CC BY-SA 3.0 — Wikimedia Commons" },
+  "royal-museums-fine-arts-brussels": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Mus%C3%A9es_Royaux_des_Beaux-Arts_Belgique_1101.jpg/1280px-Mus%C3%A9es_Royaux_des_Beaux-Arts_Belgique_1101.jpg", attribution: "Michel wal / CC BY-SA 3.0 — Wikimedia Commons" },
+  "mim-brussels": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/Old_England_facade%2C_Brussels_%28DSCF7544%29.jpg/1280px-Old_England_facade%2C_Brussels_%28DSCF7544%29.jpg", attribution: "Trougnouf (Benoit Brummer) / CC BY 4.0 — Wikimedia Commons" },
+  "natural-sciences-museum-brussels": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Mus%C3%A9um_des_Sciences_naturelles_de_Belgique_%28entr%C3%A9e%29.JPG/1280px-Mus%C3%A9um_des_Sciences_naturelles_de_Belgique_%28entr%C3%A9e%29.JPG", attribution: "Unknown / CC BY-SA 3.0 — Wikimedia Commons" },
+  "belvue-museum-brussels": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/H%C3%B4tel_Bellevue.jpg/1280px-H%C3%B4tel_Bellevue.jpg", attribution: "You Are In Valhalla / CC BY-SA 4.0 — Wikimedia Commons" },
+  "herge-museum-lln": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Musee_Herge.JPG/1280px-Musee_Herge.JPG", attribution: "Peripatetic / CC BY-SA 3.0 — Wikimedia Commons" },
+  "in-flanders-fields-ieper": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Flanders_Fields_Museum.JPG/1280px-Flanders_Fields_Museum.JPG", attribution: "Zeisterre / CC BY-SA 3.0 — Wikimedia Commons" },
+  "africamuseum-tervuren": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/AfricaMuseum_-_2023-02-09_-_03.jpg/1280px-AfricaMuseum_-_2023-02-09_-_03.jpg", attribution: "Jmh2o / CC BY-SA 4.0 — Wikimedia Commons" },
+  "mini-europe-brussels": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Laeken_Mini_Europe_viewed_from_Atomium_3.jpg/1280px-Laeken_Mini_Europe_viewed_from_Atomium_3.jpg", attribution: "Zairon / CC BY-SA 4.0 — Wikimedia Commons" },
+  "comics-art-museum-brussels": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fb/Brussel_-_Zandstraat_20_-_Belgisch_Stripcentrum_in_het_voormalig_Waucquez-warenhuis_%281903_door_Victor_Horta%29_20230826.jpg/1280px-Brussel_-_Zandstraat_20_-_Belgisch_Stripcentrum_in_het_voormalig_Waucquez-warenhuis_%281903_door_Victor_Horta%29_20230826.jpg", attribution: "Otter / CC BY-SA 4.0 — Wikimedia Commons" },
+  "pairi-daiza-brugelette": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Pairi_Daiza_-_Hall.jpg/1280px-Pairi_Daiza_-_Hall.jpg", attribution: "JackyM59 / CC BY-SA 4.0 — Wikimedia Commons" },
+  "planckendael-mechelen": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Planckendael_-_Castle_1.jpg/1280px-Planckendael_-_Castle_1.jpg", attribution: "LimoWreck / CC BY-SA 3.0 — Wikimedia Commons" },
+  "zoo-antwerpen": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/Antwerpen_Zoo_Entrance_2.jpg/1280px-Antwerpen_Zoo_Entrance_2.jpg", attribution: "DRG-fan / CC BY-SA 4.0 — Wikimedia Commons" },
+  "zwin-nature-park-knokke": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Zwin.jpg/1280px-Zwin.jpg", attribution: "Joep Zander at nl.wikipedia / CC BY-SA 3.0 — Wikimedia Commons" },
+  "botanic-garden-meise": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/Meise_JPG03.jpg/1280px-Meise_JPG03.jpg", attribution: "Jean-Pol GRANDMONT / CC BY-SA 2.5 — Wikimedia Commons" },
+  "bokrijk-genk": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/Bokrijk_haspengouw.JPG/1280px-Bokrijk_haspengouw.JPG", attribution: "Bokrijkbart Bart Bosmans / CC BY-SA 3.0 — Wikimedia Commons" },
+  "technopolis-mechelen": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Technopolis_%28Mechelen%29_11.jpg/1280px-Technopolis_%28Mechelen%29_11.jpg", attribution: "Donarreiskoffer / CC BY-SA 4.0 — Wikimedia Commons" },
+  "planetarium-brussels": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Planetarium_Royal_Observatory_Belgium.jpg/1280px-Planetarium_Royal_Observatory_Belgium.jpg", attribution: "ZombieLeChuck / Public domain — Wikimedia Commons" },
+  "hallerbos-bluebell-walk": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Hallerbos20070421.jpg/1280px-Hallerbos20070421.jpg", attribution: "David Edgar / CC BY-SA 3.0 — Wikimedia Commons" },
+  "hautes-fagnes-botrange": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Belgium%2C_Botrange%2C_Monument.JPG/1280px-Belgium%2C_Botrange%2C_Monument.JPG", attribution: "Donar Reiskoffer / CC BY 3.0 — Wikimedia Commons" },
+  "grottes-de-remouchamps": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/RemouchampsRubicon.jpg/1280px-RemouchampsRubicon.jpg", attribution: "Pahles at li.wikipedia / CC BY-SA 3.0 — Wikimedia Commons" },
+  "dinant-evasion-meuse": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f7/Dinant_reflected.jpg/1280px-Dinant_reflected.jpg", attribution: "https://www.flickr.com/photos/jiuguangw/ / CC BY-SA 2.0 — Wikimedia Commons" },
+  "rodenbach-brewery-roeselare": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Rodenbach.jpg/1280px-Rodenbach.jpg", attribution: "unknown photographer / Public domain — Wikimedia Commons" },
+  "nemo33-brussels": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Nemo_33_2008_PD_10.JPG/1280px-Nemo_33_2008_PD_10.JPG", attribution: "Kaschkawalturist / GPL — Wikimedia Commons" },
+  "cinema-palace-brussels": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Path%C3%A9_Palace_%281%29.jpg/1280px-Path%C3%A9_Palace_%281%29.jpg", attribution: "Bernard Lee / CC0 — Wikimedia Commons" },
+  "jeu-de-balle-flea-market-brussels": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Jeu_de_Balle_Bxl_01.JPG/1280px-Jeu_de_Balle_Bxl_01.JPG", attribution: "User:Ben2 / CC BY-SA 3.0 — Wikimedia Commons" },
+  "dijle-floats-kayak-leuven": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Mechelen_Lange_Schipstraat_6-8_seen_across_the_Dijle.jpg/1280px-Mechelen_Lange_Schipstraat_6-8_seen_across_the_Dijle.jpg", attribution: "Ymblanter / CC BY-SA 4.0 — Wikimedia Commons" },
+  "3-fonteinen-beersel": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/3fonteinen.jpg/1280px-3fonteinen.jpg", attribution: "Tomixdf (talk) (Uploads) / Public domain — Wikimedia Commons" },
+  "choco-story-brussels": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/98/Photo_Fa%C3%A7ade.jpg/1280px-Photo_Fa%C3%A7ade.jpg", attribution: "Musée du Cacao et du Chocolat / CC BY-SA 2.0 be — Wikimedia Commons" },
+};
+
+export const SUBCATEGORY_IMAGES: Record<string, { url: string; attribution: string }> = {
+  "Squash": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/TrinqueteSportivoEscobar%281%29.jpg/1280px-TrinqueteSportivoEscobar%281%29.jpg", attribution: "fede.dirocco / CC BY-SA 3.0 — Wikimedia Commons" },
+  "Mini-golf": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Ferny_Crofts_Mini_Golf.jpg/1280px-Ferny_Crofts_Mini_Golf.jpg", attribution: "Rafmarham / CC BY-SA 4.0 — Wikimedia Commons" },
+  "Diving": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/DACOR_Photo_%286%29.jpg/1280px-DACOR_Photo_%286%29.jpg", attribution: "Unknown authorUnknown author / Public domain — Wikimedia Commons" },
+  "Rafting": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Dinghies_rafting_So%C4%8Da.jpg/1280px-Dinghies_rafting_So%C4%8Da.jpg", attribution: "malenki / CC BY-SA 3.0 — Wikimedia Commons" },
+  "Bowling": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/2-7_split.jpg/1280px-2-7_split.jpg", attribution: "Hlfxcuc / CC BY-SA 4.0 — Wikimedia Commons" },
+  "Coffee tasting": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Ethiopia_coffee_tasters_%285762556065%29.jpg/1280px-Ethiopia_coffee_tasters_%285762556065%29.jpg", attribution: "USAID Africa Bureau / Public domain — Wikimedia Commons" },
+  "Live music": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Alice_Cooper_June_2014.jpg/1280px-Alice_Cooper_June_2014.jpg", attribution: "Jax 0677 / CC BY-SA 4.0 — Wikimedia Commons" },
+  "Escape room": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/33/Escape_Room_car_%2829667646897%29.jpg/1280px-Escape_Room_car_%2829667646897%29.jpg", attribution: "Eric Fischer / CC BY 2.0 — Wikimedia Commons" },
+  "Board games": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Card_and_Game_Day_2014_%2812001424334%29.jpg/1280px-Card_and_Game_Day_2014_%2812001424334%29.jpg", attribution: "Isles Yacht Club / CC BY 2.0 — Wikimedia Commons" },
+  "Hiking": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/33/Hiker_%2827248936995%29.jpg/1280px-Hiker_%2827248936995%29.jpg", attribution: "Luc.T from Buggenhout, België / CC BY 2.0 — Wikimedia Commons" },
+  "Nature reserve": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Rotsen_van_Sy.jpg/1280px-Rotsen_van_Sy.jpg", attribution: "FrDr / CC BY-SA 4.0 — Wikimedia Commons" },
+  "Historic site": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Catelo_de_Lierre%2C_B%C3%A9lgica_%283670889301%29.jpg/1280px-Catelo_de_Lierre%2C_B%C3%A9lgica_%283670889301%29.jpg", attribution: "Biblioteca de Arte / Art Library Fundação Calouste Gulbenkian / No restrictions — Wikimedia Commons" },
+  "Botanical garden": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Botanischer_Garten_14.jpg/1280px-Botanischer_Garten_14.jpg", attribution: "Asif Masimov / CC BY-SA 4.0 — Wikimedia Commons" },
+  "Brewery tour": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Brauerei-Gasthof_Eck_in_B%C3%B6brach.jpg/1280px-Brauerei-Gasthof_Eck_in_B%C3%B6brach.jpg", attribution: "Thomas Liskow / CC BY-SA 4.0 — Wikimedia Commons" },
+  "Brewery visit": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Brauerei-Gasthof_Eck_in_B%C3%B6brach.jpg/1280px-Brauerei-Gasthof_Eck_in_B%C3%B6brach.jpg", attribution: "Thomas Liskow / CC BY-SA 4.0 — Wikimedia Commons" },
+  "Brewery & tasting": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Brauerei-Gasthof_Eck_in_B%C3%B6brach.jpg/1280px-Brauerei-Gasthof_Eck_in_B%C3%B6brach.jpg", attribution: "Thomas Liskow / CC BY-SA 4.0 — Wikimedia Commons" },
+  "Beer experience": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Brauerei-Gasthof_Eck_in_B%C3%B6brach.jpg/1280px-Brauerei-Gasthof_Eck_in_B%C3%B6brach.jpg", attribution: "Thomas Liskow / CC BY-SA 4.0 — Wikimedia Commons" },
+  "Comedy": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/10.12.12JudahFriedlanderByLuigiNovi3.jpg/1280px-10.12.12JudahFriedlanderByLuigiNovi3.jpg", attribution: "Nightscream / CC BY 3.0 — Wikimedia Commons" },
+  "Market": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Fuyang_Street_Market_Area.jpeg/1280px-Fuyang_Street_Market_Area.jpeg", attribution: "Huihermit / CC0 — Wikimedia Commons" },
+  "Flea market": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Autumn_Sale_%28Flea_market%29.jpg/1280px-Autumn_Sale_%28Flea_market%29.jpg", attribution: "Star61 / CC BY-SA 4.0 — Wikimedia Commons" },
+  "Karting": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/Kartbahn_Norderstedt.jpg/1280px-Kartbahn_Norderstedt.jpg", attribution: "Wusel007 / CC BY-SA 3.0 — Wikimedia Commons" },
+  "Cooking class": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/Demonstrating_how_to_make_a_butterless%2C_sugarless_cake_8b06230v.jpg/1280px-Demonstrating_how_to_make_a_butterless%2C_sugarless_cake_8b06230v.jpg", attribution: "Ann Rosener / Public domain — Wikimedia Commons" },
+  "Chocolate workshop": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/0_Frameries_-_Chocolatier_-_P%C3%A2tisserie_Godefroid_%281%29.JPG/1280px-0_Frameries_-_Chocolatier_-_P%C3%A2tisserie_Godefroid_%281%29.JPG", attribution: "Jean-Pol GRANDMONT / CC BY-SA 3.0 — Wikimedia Commons" },
+  "Treetop course": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/59/Pontresina-Hochseilgarten-01.jpg/1280px-Pontresina-Hochseilgarten-01.jpg", attribution: "Asurnipal / CC BY-SA 4.0 — Wikimedia Commons" },
+  "Forest walk": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Autumn_scenery_002.JPG/1280px-Autumn_scenery_002.JPG", attribution: "Natubico / CC BY-SA 3.0 — Wikimedia Commons" },
+  "Painting workshop": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Paint_Nite.jpg/1280px-Paint_Nite.jpg", attribution: "Mcgrailsean / CC BY-SA 4.0 — Wikimedia Commons" },
+  "Perfume workshop": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/Perfume_Organ.jpg/1280px-Perfume_Organ.jpg", attribution: "Mx. Granger / CC0 — Wikimedia Commons" },
+};
+
+export interface ResolvedImage {
+  url: string;
+  source: string;
+  attribution: string;
+}
+
+/**
+ * Resolve an activity to a photo, best match first:
+ *   1. a real photo of that exact venue           (Wikimedia, credited)
+ *   2. its hand-picked Unsplash photo             (depicts the activity)
+ *   3. a real photo of that activity type         (Wikimedia, credited)
+ *   4. the per-category Unsplash fallback         (depicts the category)
+ *   5. null -> branded category treatment on the card
  */
 export function activityImageUrl(
   slug: string,
   category?: string,
-): string | null {
-  const id = ACTIVITY_IMAGES[slug] ?? (category ? CATEGORY_IMAGES[category] : undefined);
-  return id ? unsplash(id) : null;
-}
+  subcategory?: string,
+): ResolvedImage | null {
+  const venue = VENUE_IMAGES[slug];
+  if (venue) return { url: venue.url, source: WIKIMEDIA_SOURCE, attribution: venue.attribution };
 
-export const ACTIVITY_IMAGE_SOURCE = "Unsplash";
-export const ACTIVITY_IMAGE_ATTRIBUTION = "Photo via Unsplash";
+  const own = ACTIVITY_IMAGES[slug];
+  if (own) return { url: unsplash(own), source: ACTIVITY_IMAGE_SOURCE, attribution: ACTIVITY_IMAGE_ATTRIBUTION };
+
+  const sub = subcategory ? SUBCATEGORY_IMAGES[subcategory] : undefined;
+  if (sub) return { url: sub.url, source: WIKIMEDIA_SOURCE, attribution: sub.attribution };
+
+  const cat = category ? CATEGORY_IMAGES[category] : undefined;
+  if (cat) return { url: unsplash(cat), source: ACTIVITY_IMAGE_SOURCE, attribution: ACTIVITY_IMAGE_ATTRIBUTION };
+
+  return null;
+}
 
 export interface SeedActivity {
   slug: string;

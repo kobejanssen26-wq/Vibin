@@ -44,6 +44,7 @@ export function demoActivity(): ActivityDTO {
     images: [
       "https://images.unsplash.com/photo-1758273239313-6c703d089dd4?w=1200&q=75&auto=format&fit=crop",
     ],
+    imageSource: "Unsplash",
     imageAttribution: "Photo via Unsplash",
     tags: ["indoor", "tech", "teamwork"],
     source: "web",

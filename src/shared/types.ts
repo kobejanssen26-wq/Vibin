@@ -125,6 +125,9 @@ export interface ActivityDTO {
   // media
   imageUrl: string | null;
   images: string[];
+  /** where imageUrl came from, e.g. "Wikimedia Commons" | "Unsplash" | "provider" */
+  imageSource: string | null;
+  /** author + licence credit for imageUrl — shown as a caption when required */
   imageAttribution: string | null;
   tags: string[];
   // provenance

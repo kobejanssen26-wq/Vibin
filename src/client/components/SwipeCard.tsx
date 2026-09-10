@@ -166,6 +166,14 @@ export function SwipeCard({
           <span className="chip absolute left-3 top-3 border-white/20 bg-white/90 backdrop-blur">
             {activity.categoryIcon} {activity.categoryLabel}
           </span>
+          {showImage && activity.imageAttribution && (
+            <span
+              className="pointer-events-none absolute right-2 top-2 max-w-[62%] truncate rounded bg-navy/45 px-1.5 py-0.5 text-[10px] font-medium text-white/80 backdrop-blur-sm"
+              title={activity.imageAttribution}
+            >
+              {activity.imageAttribution}
+            </span>
+          )}
 
           <Stamp text="YES" cls="text-brand-500 border-brand-500" op={likeOp} rotate={-13} pos="left-4 top-6" />
           <Stamp text="PASS" cls="text-navy border-navy" op={nopeOp} rotate={13} pos="right-4 top-6" />

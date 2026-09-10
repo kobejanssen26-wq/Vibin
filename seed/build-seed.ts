@@ -15,8 +15,6 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
   ACTIVITIES,
-  ACTIVITY_IMAGE_ATTRIBUTION,
-  ACTIVITY_IMAGE_SOURCE,
   CATEGORIES,
   CITY_COORDS,
   SEED_VERIFIED_ON,
@@ -65,7 +63,7 @@ const COLS = [
 for (const a of ACTIVITIES) {
   const id = `act_${a.slug}`;
   const locationLabel = `${a.provider}, ${a.city}`;
-  const imageUrl = activityImageUrl(a.slug, a.category);
+  const image = activityImageUrl(a.slug, a.category, a.subcategory);
   // Precise venue coordinates win; otherwise fall back to the city centroid so
   // the group radius filter still has a signal. null only if the city is unknown.
   const cc = CITY_COORDS[a.city];
@@ -101,9 +99,9 @@ for (const a of ACTIVITIES) {
     q(a.providerWebsite),
     q(a.bookingUrl ?? null),
     q(a.ticketUrl ?? null),
-    q(imageUrl), // image_url — hand-matched free-licence photo per activity
-    q(imageUrl ? ACTIVITY_IMAGE_SOURCE : null),
-    q(imageUrl ? ACTIVITY_IMAGE_ATTRIBUTION : null),
+    q(image?.url ?? null), // image_url — free-licence venue/activity photo
+    q(image?.source ?? null), // "Wikimedia Commons" | "Unsplash"
+    q(image?.attribution ?? null), // author + licence — shown as a card caption
     q(JSON.stringify(a.tags)),
     q("web"),
     q(a.sourceUrl),

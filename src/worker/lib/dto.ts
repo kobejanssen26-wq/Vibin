@@ -130,6 +130,7 @@ export function toActivityDTO(
     ticketUrl: a.ticketUrl,
     imageUrl: a.imageUrl,
     images,
+    imageSource: a.imageSource,
     imageAttribution: a.imageAttribution,
     tags: safeJson<string[]>(a.tags, []),
     source: a.source,
