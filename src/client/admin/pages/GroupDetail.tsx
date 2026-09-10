@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { cc } from "../api";
 import { useResource } from "../lib";
 import {
   Badge,
+  Btn,
   ErrorNote,
   Loading,
   Panel,
@@ -220,6 +222,8 @@ export function GroupDetail() {
             </Panel>
           </div>
 
+          <RecommendationPanel groupId={id} />
+
           {data.settings && (
             <Panel title="Settings (raw)">
               <pre className="overflow-x-auto rounded bg-slate-50 p-3 text-[11px] text-slate-600">
@@ -230,6 +234,115 @@ export function GroupDetail() {
         </div>
       )}
     </>
+  );
+}
+
+/* --------- recommendation debug: why this order, for this group? --------- */
+interface RankRow {
+  id: string;
+  title: string;
+  category: string;
+  subcategory: string | null;
+  city: string | null;
+  source: string;
+  score: number;
+  breakdown: Record<string, number>;
+}
+interface RankResp {
+  groupSize: number;
+  personalSignalWeight: number;
+  groupSignalWeight: number;
+  candidatesScored: number;
+  weights: Record<string, number>;
+  ranked: RankRow[];
+}
+
+function RecommendationPanel({ groupId }: { groupId: string }) {
+  const [data, setData] = useState<RankResp | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const run = async () => {
+    setLoading(true);
+    setErr(null);
+    try {
+      setData(await cc<RankResp>(`/rank-explain?groupId=${groupId}&limit=40`));
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const keys = data ? Object.keys(data.ranked[0]?.breakdown ?? {}) : [];
+
+  return (
+    <Panel
+      title="Recommendation debug"
+      right={
+        <Btn variant="ghost" className="!py-1 !text-xs" loading={loading} onClick={run}>
+          {data ? "Re-run" : "Explain ranking"}
+        </Btn>
+      }
+    >
+      {err && <ErrorNote message={err} onRetry={run} />}
+      {!data && !err && (
+        <p className="text-xs text-slate-500">
+          Scores the real eligible candidate set for this group's current filters
+          with the live ranker (hard filters → then this breakdown decides
+          order). Read-only.
+        </p>
+      )}
+      {data && (
+        <div className="space-y-2">
+          <p className="text-xs text-slate-500">
+            group size {data.groupSize} · personal signal{" "}
+            {data.personalSignalWeight} · group signal {data.groupSignalWeight} ·{" "}
+            {data.candidatesScored} candidates scored
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-[11px]">
+              <thead>
+                <tr className="text-left text-slate-500">
+                  <th className="py-1 pr-2">#</th>
+                  <th className="py-1 pr-2">Activity</th>
+                  <th className="py-1 pr-2">Score</th>
+                  {keys.map((k) => (
+                    <th key={k} className="py-1 pr-2" title={`weight ${data.weights[k] ?? "—"}`}>
+                      {k.replace(/([A-Z])/g, " $1")}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.ranked.map((r, i) => (
+                  <tr key={r.id} className="border-t border-slate-100">
+                    <td className="py-1 pr-2 text-slate-400">{i + 1}</td>
+                    <td className="py-1 pr-2">
+                      <span className="font-medium">{r.title}</span>
+                      <span className="block text-slate-400">
+                        {r.subcategory} · {r.city} · {r.source}
+                      </span>
+                    </td>
+                    <td className="py-1 pr-2 font-semibold">{r.score}</td>
+                    {keys.map((k) => (
+                      <td
+                        key={k}
+                        className={`py-1 pr-2 tabular-nums ${
+                          r.breakdown[k]! < 0 ? "text-rose-600" : "text-slate-600"
+                        }`}
+                      >
+                        {r.breakdown[k]}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </Panel>
   );
 }
 

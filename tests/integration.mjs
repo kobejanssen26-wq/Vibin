@@ -436,6 +436,64 @@ async function run() {
     !fs.queue.some((c) => c.activity.category === "sport"),
   );
 
+  // --- ranking: group taste shapes the deck, without hard-hiding anything ---
+  const baseCfg = {
+    allActivities: true,
+    categories: [],
+    locationLabel: null,
+    lat: null,
+    lng: null,
+    radiusKm: 50,
+    budgetBand: "any",
+    dateMode: "specific",
+    dateSpecific: soon3,
+    timeBand: "evening",
+    timeSpecific: null,
+  };
+  // two solo groups, identical filters; one "likes" sport, the other "likes" culture
+  async function tasteRun(likeCategory) {
+    const cl = client();
+    await signup(cl, "Taste");
+    const grp = (await cl("POST", "/groups", { name: `Taste ${uniq()}` })).json.group;
+    await cl("PUT", `/groups/${grp.id}/settings`, baseCfg);
+    await cl("POST", `/groups/${grp.id}/start`, {});
+    let st = (await cl("GET", `/groups/${grp.id}/swipe`)).json;
+    // like up to 6 cards of the target category, pass the rest, for ~2 batches
+    let liked = 0;
+    for (let b = 0; b < 3 && (st.queue.length || st.hasMore); b++) {
+      for (const c of [...st.queue]) {
+        const want = c.activity.category === likeCategory && liked < 6;
+        await cl("POST", `/groups/${grp.id}/swipe`, {
+          activityId: c.activity.id,
+          value: want ? "like" : "nope",
+        });
+        if (want) liked++;
+      }
+      st = (await cl("POST", `/groups/${grp.id}/swipe/extend`, {})).json;
+    }
+    // the batch AFTER the learning phase
+    const fresh = (await cl("POST", `/groups/${grp.id}/swipe/extend`, {})).json;
+    const cats = fresh.queue.map((c) => c.activity.category);
+    return {
+      liked,
+      total: cats.length,
+      sport: cats.filter((x) => x === "sport").length,
+      culture: cats.filter((x) => x === "culture").length,
+    };
+  }
+  const sportRun = await tasteRun("sport");
+  const cultureRun = await tasteRun("culture");
+  ok(
+    "a group that liked sport sees proportionally more sport than a group that liked culture",
+    sportRun.total > 0 &&
+      cultureRun.total > 0 &&
+      sportRun.sport / sportRun.total > cultureRun.sport / cultureRun.total,
+  );
+  ok(
+    "ranking never hard-hides a category — the sport-liking group still sees some culture",
+    sportRun.culture > 0 || cultureRun.total < 8, // (only meaningful with a broad catalogue)
+  );
+
   console.log(`\n${passed} passed, ${failed} failed\n`);
   process.exit(failed === 0 ? 0 : 1);
 }
