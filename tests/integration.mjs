@@ -358,22 +358,18 @@ async function run() {
   ok("first batch is 40 cards", st.queue.length === 40 && st.deckSize === 40);
   ok("first batch reports more available", st.hasMore === true);
 
-  // pass on everything (a "like" in a solo group would match and end swiping)
+  // pass on the visible queue, then extend — a "like" would match (solo group)
   for (let guard = 0; guard < 12 && (st.queue.length > 0 || st.hasMore); guard++) {
-    while (st.queue.length > 0) {
-      const cardId = st.queue[0].activity.id;
-      if (seenIds.has(cardId)) dupes++;
-      seenIds.add(cardId);
+    for (const c of [...st.queue]) {
+      if (seenIds.has(c.activity.id)) dupes++;
+      seenIds.add(c.activity.id);
       await sw("POST", `/groups/${sg.id}/swipe`, {
-        activityId: cardId,
+        activityId: c.activity.id,
         value: "nope",
       });
-      st = (await sw("GET", `/groups/${sg.id}/swipe`)).json;
     }
-    if (st.hasMore) {
-      batches++;
-      st = (await sw("POST", `/groups/${sg.id}/swipe/extend`, {})).json;
-    }
+    if (st.hasMore) batches++;
+    st = (await sw("POST", `/groups/${sg.id}/swipe/extend`, {})).json;
   }
   ok("swiping continued well past 40 cards", seenIds.size > 80);
   ok("no card was ever shown twice across batches", dupes === 0);
