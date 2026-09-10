@@ -26,7 +26,11 @@ import { resolvePlace, allPlaces } from "../lib/be-places";
 import { dedupeHash } from "../events/dedupe";
 import { runSource } from "../events/ingest";
 import { EVENT_KINDS, EVENT_STATUSES } from "@shared/constants";
-import { haversineKm } from "../engine/deck";
+import { haversineKm, eligibleCandidates } from "../engine/deck";
+import { groups, groupSettings } from "../db/schema";
+import { loadRankContext } from "../engine/rank-context";
+import { scoreActivity, WEIGHTS } from "../engine/rank";
+import { activeMemberIds } from "../lib/access";
 
 type Ctx = { Bindings: Env; Variables: Vars };
 const app = new Hono<Ctx>();
@@ -366,6 +370,84 @@ app.get("/events-coverage", async (c) => {
     rows,
   });
 });
+
+/* --------------------- recommendation debug ------------------------- */
+/**
+ * "Why would this group see these activities, in this order?" — scores the real
+ * eligible candidate set for a group's current filters with the live ranker and
+ * returns the full per-signal breakdown. Read-only, owner-only.
+ *   GET /rank-explain?groupId=<id>&userId=<id?>&limit=40
+ */
+app.get("/rank-explain", async (c) => {
+  const q = parseQuery(
+    c,
+    z.object({
+      groupId: z.string().min(1),
+      userId: z.string().min(1).optional(),
+      limit: z.coerce.number().int().min(1).max(120).default(40),
+    }),
+  );
+  const db = createDb(c.env);
+  const group = await db.query.groups.findFirst({ where: eq(groups.id, q.groupId) });
+  if (!group) throw notFound("Group not found.");
+  const settings = await db.query.groupSettings.findFirst({
+    where: eq(groupSettings.groupId, q.groupId),
+  });
+  if (!settings) throw badRequest("Group has no settings yet.");
+
+  const userId = q.userId ?? group.creatorId;
+  const memberIds = await activeMemberIds(db, q.groupId);
+  const ctx = await loadRankContext(db, q.groupId, userId, memberIds.length || 1);
+  const candidates = await eligibleCandidates(db, settings, 250);
+
+  const scored = candidates
+    .map((a) => {
+      const b = scoreActivity(a, ctx);
+      return {
+        id: a.id,
+        title: a.title,
+        category: a.categoryId,
+        subcategory: a.subcategory,
+        city: a.city,
+        source: a.source,
+        score: Math.round(b.total * 1000) / 1000,
+        breakdown: {
+          distance: round(b.distance),
+          personalCategory: round(b.personalCategory),
+          personalSubcategory: round(b.personalSubcategory),
+          groupCategory: round(b.groupCategory),
+          groupSubcategory: round(b.groupSubcategory),
+          similarityToLiked: round(b.similarityToLiked),
+          similarityToPassed: round(b.similarityToPassed),
+          groupSizeFit: round(b.groupSizeFit),
+          freshness: round(b.freshness),
+          exploration: round(b.exploration),
+        },
+      };
+    })
+    .sort((x, y) => y.score - x.score)
+    .slice(0, q.limit);
+
+  return c.json({
+    groupId: q.groupId,
+    userId,
+    groupSize: memberIds.length,
+    filters: {
+      categories: JSON.parse(settings.categories),
+      allActivities: settings.allActivities === 1,
+      radiusKm: settings.radiusKm,
+      locationLabel: settings.locationLabel,
+      budgetBand: settings.budgetBand,
+    },
+    weights: WEIGHTS,
+    personalSignalWeight: Math.round(ctx.personal.totalWeight * 100) / 100,
+    groupSignalWeight: Math.round(ctx.group.totalWeight * 100) / 100,
+    candidatesScored: candidates.length,
+    ranked: scored,
+  });
+});
+
+const round = (x: number) => Math.round(x * 1000) / 1000;
 
 function safeArr(raw: string): string[] {
   try {

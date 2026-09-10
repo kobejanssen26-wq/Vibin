@@ -24,7 +24,7 @@ import { rateLimit } from "../lib/ratelimit";
 import { track } from "../lib/analytics";
 import { systemMessage, notifyGroup } from "../lib/notify";
 import { buildDeck } from "../engine/deck";
-import { rebuildPoolTail } from "./votes";
+import { rebuildPoolTail, contextForGroup } from "./votes";
 import { activityVoteProgress } from "../engine/match";
 import { activePlanDTO } from "../lib/plan-view";
 import {
@@ -251,7 +251,7 @@ app.put("/:id/settings", async (c) => {
   // pool to the new filters. Every existing like / pass / match is kept — only
   // unswiped cards change.
   if (group.status === "swiping") {
-    await rebuildPoolTail(db, groupId);
+    await rebuildPoolTail(db, groupId, uid(c));
   }
 
   return c.json({ group: await buildGroupDTO(db, group, uid(c), c.env.APP_URL) });
@@ -273,7 +273,12 @@ app.post("/:id/start", async (c) => {
   });
   if (!settings) throw badRequest("Configure the group first.");
 
-  const deck = await buildDeck(db, settings, groupId);
+  const deck = await buildDeck(
+    db,
+    settings,
+    groupId,
+    await contextForGroup(db, groupId, uid(c)),
+  );
   if (deck.length === 0) {
     throw badRequest(
       "No activities match those filters. Widen the radius, budget or categories.",

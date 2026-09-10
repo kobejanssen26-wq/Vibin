@@ -20,6 +20,8 @@ import { chunk, rowsPerInsert } from "../lib/chunk";
 import { requireActiveMember, requireGroupMember, activeMemberIds } from "../lib/access";
 import { activityVoteProgress } from "../engine/match";
 import { buildDeckBatch, countEligibleActivities, haversineKm } from "../engine/deck";
+import { loadRankContext, rankingWorthwhile } from "../engine/rank-context";
+import type { RankContext } from "../engine/rank";
 import { runActivityMatch } from "../lib/engine-run";
 import { matchDTO } from "../lib/match-view";
 import { settingsToDTO } from "../lib/group-view";
@@ -209,12 +211,28 @@ async function buildSwipeState(
   };
 }
 
+/**
+ * The recommendation context for a group's shared pool — the extending member's
+ * personal taste blended with the whole group's. `null` until there's enough
+ * swipe history to beat a fair shuffle.
+ */
+export async function contextForGroup(
+  db: DB,
+  groupId: string,
+  userId: string,
+): Promise<RankContext | null> {
+  const memberIds = await activeMemberIds(db, groupId);
+  const ctx = await loadRankContext(db, groupId, userId, memberIds.length || 1);
+  return rankingWorthwhile(ctx) ? ctx : null;
+}
+
 /** Append the next batch of cards to the shared pool. Race-safe (PK conflict). */
 export async function extendPool(
   db: DB,
   groupId: string,
-  batchLimit = LIMITS.deckSize,
+  opts: { batchLimit?: number; rank?: RankContext | null } = {},
 ): Promise<{ added: number; hasMore: boolean }> {
+  const batchLimit = opts.batchLimit ?? LIMITS.deckSize;
   const settings = await db.query.groupSettings.findFirst({
     where: eq(groupSettings.groupId, groupId),
   });
@@ -228,6 +246,7 @@ export async function extendPool(
   const { ids, hasMore } = await buildDeckBatch(db, settings, {
     groupId,
     limit: batchLimit,
+    rank: opts.rank ?? null,
   });
   if (ids.length === 0) return { added: 0, hasMore: false };
 
@@ -250,7 +269,11 @@ export async function extendPool(
  * and matches are untouched: only unswiped cards are swapped. Called after a
  * mid-swipe filter change.
  */
-export async function rebuildPoolTail(db: DB, groupId: string): Promise<void> {
+export async function rebuildPoolTail(
+  db: DB,
+  groupId: string,
+  userId: string,
+): Promise<void> {
   // Drop every not-yet-voted card (subquery keep-list — no big NOT IN param
   // list), then pull a fresh batch on the new filters.
   await db
@@ -268,7 +291,7 @@ export async function rebuildPoolTail(db: DB, groupId: string): Promise<void> {
       ),
     );
 
-  await extendPool(db, groupId);
+  await extendPool(db, groupId, { rank: await contextForGroup(db, groupId, userId) });
 }
 
 /* --------------------------- swipe state ----------------------------- */
@@ -288,7 +311,9 @@ app.post("/:id/swipe/extend", async (c) => {
     // still return current state so the client can settle gracefully
     return c.json(await buildSwipeState(db, group, uid(c)));
   }
-  await extendPool(db, groupId);
+  await extendPool(db, groupId, {
+    rank: await contextForGroup(db, groupId, uid(c)),
+  });
   return c.json(await buildSwipeState(db, group, uid(c)));
 });
 

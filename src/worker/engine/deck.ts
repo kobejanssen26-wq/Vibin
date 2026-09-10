@@ -11,6 +11,10 @@ import type { DB } from "../db/client";
 import { activities, activityVotes, groupActivityPool } from "../db/schema";
 import { LIMITS } from "@shared/constants";
 import type { Activity, GroupSettings } from "../db/schema";
+import { rankActivities, type RankContext } from "./rank";
+
+/** Share of each batch reserved for pure-random discovery (anti-filter-bubble). */
+const EXPLORE_FRACTION = 0.15;
 
 /** Straight-line distance in km between two WGS84 points. */
 export function haversineKm(
@@ -121,11 +125,16 @@ function seenByGroup(db: DB, groupId: string) {
 /**
  * The next slice of the deck for a group — never repeats a card the group has
  * already pooled or voted on. `limit` defaults to LIMITS.deckSize.
+ *
+ * With `opts.rank` the candidate pool is scored + diversified by the
+ * recommendation engine (see rank.ts); ~15% of every batch stays pure-random so
+ * the deck can't collapse into a filter bubble. Without it, the batch is a fair
+ * shuffle of the eligible set (used before a group has any swipe history).
  */
 export async function buildDeckBatch(
   db: DB,
   settings: GroupSettings,
-  opts: { groupId?: string; limit?: number } = {},
+  opts: { groupId?: string; limit?: number; rank?: RankContext | null } = {},
 ): Promise<DeckBatch> {
   const limit = opts.limit ?? LIMITS.deckSize;
   const hasRadius = settings.lat != null && settings.lng != null;
@@ -136,9 +145,9 @@ export async function buildDeckBatch(
     ...(opts.groupId ? seenByGroup(db, opts.groupId) : []),
   ];
 
-  // Pull a generous random sample, then (with a radius) keep only what's truly
-  // inside the circle, shuffle, and take `limit`.
-  const cap = hasRadius ? Math.max(limit * 8, 400) : Math.max(limit * 3, 120);
+  // Pull a generous random candidate sample (bounded — fair to the whole
+  // catalogue), then keep only what's truly inside the circle.
+  const cap = hasRadius ? Math.max(limit * 12, 600) : Math.max(limit * 6, 300);
   let rows = await db
     .select()
     .from(activities)
@@ -149,18 +158,32 @@ export async function buildDeckBatch(
   if (hasRadius) {
     const glat = settings.lat! / 1e6;
     const glng = settings.lng! / 1e6;
-    rows = shuffle(
-      rows.filter(
-        (a) =>
-          a.lat != null &&
-          a.lng != null &&
-          haversineKm(glat, glng, a.lat / 1e6, a.lng / 1e6) <=
-            settings.radiusKm,
-      ),
+    rows = rows.filter(
+      (a) =>
+        a.lat != null &&
+        a.lng != null &&
+        haversineKm(glat, glng, a.lat / 1e6, a.lng / 1e6) <= settings.radiusKm,
     );
   }
 
-  const ids = rows.slice(0, limit).map((a) => a.id);
+  let ids: string[];
+  if (opts.rank) {
+    const exploreN = Math.min(
+      rows.length,
+      Math.max(1, Math.round(limit * EXPLORE_FRACTION)),
+    );
+    const rankN = limit - exploreN;
+    const ranked = rankActivities(rows, opts.rank, rankN).map((r) => r.id);
+    const taken = new Set(ranked);
+    const explore = shuffle(rows.filter((a) => !taken.has(a.id)))
+      .slice(0, exploreN)
+      .map((a) => a.id);
+    ids = [...ranked, ...explore];
+  } else {
+    ids = shuffle(rows)
+      .slice(0, limit)
+      .map((a) => a.id);
+  }
 
   // hasMore: is the eligible-not-excluded set larger than what we just took?
   // Counted over the bounding box (a superset of the circle) so it can slightly
@@ -183,8 +206,36 @@ export async function buildDeck(
   db: DB,
   settings: GroupSettings,
   groupId?: string,
+  rank?: RankContext | null,
 ): Promise<string[]> {
-  return (await buildDeckBatch(db, settings, { groupId })).ids;
+  return (await buildDeckBatch(db, settings, { groupId, rank })).ids;
+}
+
+/**
+ * Eligible activities for a group's current filters (hard filters + exact
+ * radius), NOT excluding what's been pooled/voted. Used by the admin
+ * rank-explain tool to show scoring over the real candidate set.
+ */
+export async function eligibleCandidates(
+  db: DB,
+  settings: GroupSettings,
+  cap = 200,
+): Promise<Activity[]> {
+  const rows = await db
+    .select()
+    .from(activities)
+    .where(and(...baseWhere(settings), ...geoWhere(settings)))
+    .orderBy(sql`RANDOM()`)
+    .limit(cap);
+  if (settings.lat == null || settings.lng == null) return rows;
+  const glat = settings.lat / 1e6;
+  const glng = settings.lng / 1e6;
+  return rows.filter(
+    (a) =>
+      a.lat != null &&
+      a.lng != null &&
+      haversineKm(glat, glng, a.lat / 1e6, a.lng / 1e6) <= settings.radiusKm,
+  );
 }
 
 /**
