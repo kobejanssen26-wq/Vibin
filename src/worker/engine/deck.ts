@@ -1,9 +1,12 @@
 /**
- * Builds the ordered activity deck for a group from its settings. Materialised
- * into group_activity_pool once, when swiping starts, so every member — including
- * late joiners — swipes the same cards in the same order, and undo is stable.
+ * Builds the group's activity deck from its settings. The deck is materialised
+ * into `group_activity_pool` in batches: the first batch when swiping starts,
+ * then more are appended (see routes/votes.ts `/swipe/extend`) as members near
+ * the end, so it feels like one endless stack. Every member shares the same
+ * pool in the same order, so undo is stable and a match still means "everyone
+ * liked the same card".
  */
-import { and, eq, gte, inArray, lte, ne, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, ne, notInArray, sql } from "drizzle-orm";
 import type { DB } from "../db/client";
 import { activities } from "../db/schema";
 import { LIMITS } from "@shared/constants";
@@ -28,20 +31,16 @@ export function haversineKm(
 }
 
 /**
- * Latitude/longitude delta (in *1e6 integer units, matching the DB) that bounds
- * a `radiusKm` circle around `latE6`. Used as a cheap SQL pre-filter before the
- * exact haversine pass. A 2 km margin is added so nothing on the edge is lost to
- * rounding.
+ * Lat/lng delta (in *1e6 integer units, matching the DB) that bounds a
+ * `radiusKm` circle around `latE6`. Cheap SQL pre-filter before exact haversine;
+ * a 2 km margin covers rounding at the edge.
  */
 function boundingBoxE6(latE6: number, radiusKm: number) {
   const lat = latE6 / 1e6;
   const km = radiusKm + 2;
   const dLat = km / 111.32;
   const dLng = km / (111.32 * Math.max(0.01, Math.cos((lat * Math.PI) / 180)));
-  return {
-    dLatE6: Math.ceil(dLat * 1e6),
-    dLngE6: Math.ceil(dLng * 1e6),
-  };
+  return { dLatE6: Math.ceil(dLat * 1e6), dLngE6: Math.ceil(dLng * 1e6) };
 }
 
 const BUDGET_TO_BANDS: Record<string, string[]> = {
@@ -63,46 +62,61 @@ function shuffle<T>(xs: T[]): T[] {
   return xs;
 }
 
-export async function buildDeck(
-  db: DB,
-  settings: GroupSettings,
-): Promise<string[]> {
+/** The shared WHERE for "an activity this group could be shown", minus geo. */
+function baseWhere(settings: GroupSettings) {
   const bands = BUDGET_TO_BANDS[settings.budgetBand] ?? BUDGET_TO_BANDS.any!;
   const cats: string[] = settings.allActivities
     ? []
     : (JSON.parse(settings.categories) as string[]);
-
-  const hasRadius = settings.lat != null && settings.lng != null;
-
-  const where = [
+  return [
     eq(activities.active, 1),
-    // only surface activities that are current — never "outdated" or "inactive"
     ne(activities.status, "outdated"),
     ne(activities.status, "inactive"),
     inArray(activities.priceBand, bands as Activity["priceBand"][]),
     ...(cats.length ? [inArray(activities.categoryId, cats)] : []),
   ];
+}
 
-  if (hasRadius) {
-    // Cheap bounding-box pre-filter at the DB. NULL lat/lng fail these
-    // comparisons, so unplaceable activities are excluded once a radius is set —
-    // an activity with no coordinates can't be shown to be "within X km".
-    const { dLatE6, dLngE6 } = boundingBoxE6(settings.lat!, settings.radiusKm);
-    where.push(
-      gte(activities.lat, settings.lat! - dLatE6),
-      lte(activities.lat, settings.lat! + dLatE6),
-      gte(activities.lng, settings.lng! - dLngE6),
-      lte(activities.lng, settings.lng! + dLngE6),
-    );
-  }
+function geoWhere(settings: GroupSettings) {
+  if (settings.lat == null || settings.lng == null) return [];
+  const { dLatE6, dLngE6 } = boundingBoxE6(settings.lat, settings.radiusKm);
+  return [
+    gte(activities.lat, settings.lat - dLatE6),
+    lte(activities.lat, settings.lat + dLatE6),
+    gte(activities.lng, settings.lng - dLngE6),
+    lte(activities.lng, settings.lng + dLngE6),
+  ];
+}
 
-  // Pull a generous candidate set, then (when a radius is set) keep only the
-  // rows actually inside the circle, shuffle, and take the deck. Without a
-  // radius, RANDOM() ordering + a 3× cap is enough.
-  const cap = hasRadius
-    ? Math.max(LIMITS.deckSize * 8, 400)
-    : LIMITS.deckSize * 3;
+export interface DeckBatch {
+  ids: string[];
+  /** more eligible activities exist beyond this batch + the exclude set */
+  hasMore: boolean;
+}
 
+/**
+ * The next slice of the deck. `exclude` is every activity already in the pool
+ * or already voted on, so batches never repeat a card. `limit` defaults to
+ * LIMITS.deckSize.
+ */
+export async function buildDeckBatch(
+  db: DB,
+  settings: GroupSettings,
+  opts: { exclude?: string[]; limit?: number } = {},
+): Promise<DeckBatch> {
+  const limit = opts.limit ?? LIMITS.deckSize;
+  const exclude = opts.exclude ?? [];
+  const hasRadius = settings.lat != null && settings.lng != null;
+
+  const where = [
+    ...baseWhere(settings),
+    ...geoWhere(settings),
+    ...(exclude.length ? [notInArray(activities.id, exclude)] : []),
+  ];
+
+  // Pull a generous random sample, then (with a radius) keep only what's truly
+  // inside the circle, shuffle, and take `limit`.
+  const cap = hasRadius ? Math.max(limit * 8, 400) : Math.max(limit * 3, 120);
   let rows = await db
     .select()
     .from(activities)
@@ -124,5 +138,50 @@ export async function buildDeck(
     );
   }
 
-  return rows.slice(0, LIMITS.deckSize).map((a) => a.id);
+  const ids = rows.slice(0, limit).map((a) => a.id);
+
+  // hasMore: is the eligible-not-excluded set larger than what we just took?
+  // Counted over the bounding box (a superset of the circle) so it can slightly
+  // over-report near the edge — harmless: the next batch simply comes back
+  // empty and flips hasMore to false.
+  let hasMore = false;
+  if (ids.length === limit) {
+    const countRows = await db
+      .select({ n: sql<number>`count(*)` })
+      .from(activities)
+      .where(and(...where));
+    hasMore = (countRows[0]?.n ?? 0) > ids.length;
+  }
+
+  return { ids, hasMore };
+}
+
+/** First batch, used when swiping starts. */
+export async function buildDeck(
+  db: DB,
+  settings: GroupSettings,
+): Promise<string[]> {
+  return (await buildDeckBatch(db, settings)).ids;
+}
+
+/**
+ * How many activities match the filters and aren't in `exclude` yet. Counted
+ * over the bounding box, so with a radius it's an upper bound — good enough to
+ * decide "can the client ask for another batch?".
+ */
+export async function countEligibleActivities(
+  db: DB,
+  settings: GroupSettings,
+  exclude: string[],
+): Promise<number> {
+  const where = [
+    ...baseWhere(settings),
+    ...geoWhere(settings),
+    ...(exclude.length ? [notInArray(activities.id, exclude)] : []),
+  ];
+  const rows = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(activities)
+    .where(and(...where));
+  return rows[0]?.n ?? 0;
 }

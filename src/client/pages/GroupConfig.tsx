@@ -84,9 +84,17 @@ export function GroupConfig() {
     }
   };
 
+  // Editing filters mid-swipe: the group is already "swiping", so we just save
+  // (the server rebuilds the unswiped tail of the deck) and go back.
+  const midSwipe = group?.status === "swiping";
+
   const startSwiping = async () => {
     const ok = await save();
     if (!ok) return;
+    if (midSwipe) {
+      nav(`/groups/${id}/swipe`, { replace: true });
+      return;
+    }
     setStarting(true);
     setErr(null);
     try {
@@ -143,9 +151,17 @@ export function GroupConfig() {
   return (
     <div className="space-y-7 pb-40">
       <PageHeader
-        back={{ to: `/groups/${id}`, label: group.name }}
-        title="Set the vibe"
-        subtitle="What, where and when. You can change this before you start swiping."
+        back={
+          midSwipe
+            ? { to: `/groups/${id}/swipe`, label: "Swiping" }
+            : { to: `/groups/${id}`, label: group.name }
+        }
+        title={midSwipe ? "Change filters" : "Set the vibe"}
+        subtitle={
+          midSwipe
+            ? "New filters rebuild the deck. Your likes and passes so far are kept."
+            : "What, where and when. You can change this before you start swiping."
+        }
       />
 
       <InviteBox code={group.inviteCode} url={group.inviteUrl} />
@@ -323,16 +339,20 @@ export function GroupConfig() {
           disabled={!canStart}
           onClick={startSwiping}
         >
-          Save &amp; start swiping →
+          {midSwipe ? "Apply filters →" : "Save & start swiping →"}
         </Button>
         <button
           type="button"
           className="mt-1.5 w-full py-1.5 text-center text-sm font-medium text-navy-500 hover:text-navy"
           onClick={async () => {
+            if (midSwipe) {
+              nav(`/groups/${id}/swipe`);
+              return;
+            }
             if (await save()) nav(`/groups/${id}`);
           }}
         >
-          Save and come back later
+          {midSwipe ? "Cancel" : "Save and come back later"}
         </button>
         {!canStart && (
           <p className="mt-1 text-center text-xs text-navy-400">

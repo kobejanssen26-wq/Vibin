@@ -331,6 +331,115 @@ async function run() {
     ev.status === 200 && Array.isArray(ev.json.events),
   );
 
+  // --- infinite swipe: pool grows past 40 in batches, no duplicates ---
+  const sw = client();
+  await signup(sw, "Swiper");
+  const sg = (await sw("POST", "/groups", { name: `Infinite ${uniq()}` })).json.group;
+  const soon3 = Math.floor(Date.now() / 1000) + 6 * 86400;
+  await sw("PUT", `/groups/${sg.id}/settings`, {
+    categories: [],
+    allActivities: true,
+    locationLabel: null, // whole catalogue -> plenty for several batches
+    lat: null,
+    lng: null,
+    radiusKm: 25,
+    budgetBand: "any",
+    dateMode: "specific",
+    dateSpecific: soon3,
+    timeBand: "evening",
+    timeSpecific: null,
+  });
+  await sw("POST", `/groups/${sg.id}/start`, {});
+
+  const seenIds = new Set();
+  let dupes = 0;
+  let batches = 0;
+  let st = (await sw("GET", `/groups/${sg.id}/swipe`)).json;
+  ok("first batch is 40 cards", st.queue.length === 40 && st.deckSize === 40);
+  ok("first batch reports more available", st.hasMore === true);
+
+  // pass on everything (a "like" in a solo group would match and end swiping)
+  for (let guard = 0; guard < 12 && (st.queue.length > 0 || st.hasMore); guard++) {
+    while (st.queue.length > 0) {
+      const cardId = st.queue[0].activity.id;
+      if (seenIds.has(cardId)) dupes++;
+      seenIds.add(cardId);
+      await sw("POST", `/groups/${sg.id}/swipe`, {
+        activityId: cardId,
+        value: "nope",
+      });
+      st = (await sw("GET", `/groups/${sg.id}/swipe`)).json;
+    }
+    if (st.hasMore) {
+      batches++;
+      st = (await sw("POST", `/groups/${sg.id}/swipe/extend`, {})).json;
+    }
+  }
+  ok("swiping continued well past 40 cards", seenIds.size > 80);
+  ok("no card was ever shown twice across batches", dupes === 0);
+  ok("multiple batches were pulled automatically", batches >= 2);
+  ok(
+    "ends only when the backend truly has no more",
+    st.queue.length === 0 && st.hasMore === false && st.finished === true,
+  );
+
+  // --- change category mid-swipe: new results, votes kept ---
+  const fc = client();
+  await signup(fc, "FilterChanger");
+  const fg = (await fc("POST", "/groups", { name: `Filters ${uniq()}` })).json.group;
+  await fc("PUT", `/groups/${fg.id}/settings`, {
+    categories: ["sport"],
+    allActivities: false,
+    locationLabel: null,
+    lat: null,
+    lng: null,
+    radiusKm: 25,
+    budgetBand: "any",
+    dateMode: "specific",
+    dateSpecific: soon3,
+    timeBand: "evening",
+    timeSpecific: null,
+  });
+  await fc("POST", `/groups/${fg.id}/start`, {});
+  let fs = (await fc("GET", `/groups/${fg.id}/swipe`)).json;
+  ok(
+    "deck starts as sport-only",
+    fs.queue.length > 0 && fs.queue.every((c) => c.activity.category === "sport"),
+  );
+  for (let i = 0; i < 3 && fs.queue.length > 0; i++) {
+    await fc("POST", `/groups/${fg.id}/swipe`, {
+      activityId: fs.queue[0].activity.id,
+      value: "nope",
+    });
+    fs = (await fc("GET", `/groups/${fg.id}/swipe`)).json;
+  }
+  ok("3 sport passes recorded", fs.swipedByYou === 3);
+
+  await fc("PUT", `/groups/${fg.id}/settings`, {
+    categories: ["food_drinks"],
+    allActivities: false,
+    locationLabel: null,
+    lat: null,
+    lng: null,
+    radiusKm: 25,
+    budgetBand: "any",
+    dateMode: "specific",
+    dateSpecific: soon3,
+    timeBand: "evening",
+    timeSpecific: null,
+  });
+  fs = (await fc("GET", `/groups/${fg.id}/swipe`)).json;
+  ok(
+    "deck rebuilt to food_drinks after mid-swipe filter change",
+    fs.queue.length > 0 &&
+      fs.queue.every((c) => c.activity.category === "food_drinks"),
+  );
+  ok("earlier passes survived the filter change", fs.swipedByYou === 3);
+  ok(
+    "no sport card lingers in the new queue",
+    !fs.queue.some((c) => c.activity.category === "sport"),
+  );
+
   console.log(`\n${passed} passed, ${failed} failed\n`);
   process.exit(failed === 0 ? 0 : 1);
 }

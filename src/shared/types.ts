@@ -223,6 +223,7 @@ export interface SwipeCardDTO {
 export interface SwipeStateDTO {
   groupId: string;
   status: GroupStatus;
+  /** activities materialised into the shared pool so far (grows in batches) */
   deckSize: number;
   /** cards still awaiting this user's vote, in order */
   queue: SwipeCardDTO[];
@@ -231,6 +232,15 @@ export interface SwipeStateDTO {
   /** collective progress on the frontmost undecided card */
   currentProgress: { voted: number; total: number } | null;
   newMatch: MatchDTO | null;
+  /** more eligible activities exist — the client can pull another batch */
+  hasMore: boolean;
+  /** how many cards this user has already voted on (for a dynamic progress label) */
+  swipedByYou: number;
+  /** the filters this deck was built from — shown as chips, editable mid-swipe */
+  filters: GroupSettingsDTO | null;
+  /** whether this member may change the group's filters (creator only) */
+  canChangeFilters: boolean;
+  /** true only when the queue is empty AND the backend has nothing more */
   finished: boolean;
 }
 

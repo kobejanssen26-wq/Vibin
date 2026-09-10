@@ -24,6 +24,7 @@ import { rateLimit } from "../lib/ratelimit";
 import { track } from "../lib/analytics";
 import { systemMessage, notifyGroup } from "../lib/notify";
 import { buildDeck } from "../engine/deck";
+import { rebuildPoolTail } from "./votes";
 import { activityVoteProgress } from "../engine/match";
 import { activePlanDTO } from "../lib/plan-view";
 import {
@@ -245,6 +246,13 @@ app.put("/:id/settings", async (c) => {
     .where(eq(groupSettings.groupId, groupId));
   await db.update(groups).set({ updatedAt: now }).where(eq(groups.id, groupId));
   track(c, "group_config_saved", { userId: uid(c), groupId });
+
+  // Live filter change mid-swipe: swap the not-yet-voted tail of the shared
+  // pool to the new filters. Every existing like / pass / match is kept — only
+  // unswiped cards change.
+  if (group.status === "swiping") {
+    await rebuildPoolTail(db, groupId);
+  }
 
   return c.json({ group: await buildGroupDTO(db, group, uid(c), c.env.APP_URL) });
 });

@@ -1,9 +1,15 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { api, ApiRequestError } from "../lib/api";
 import { SwipeCard, type SwipeDir } from "../components/SwipeCard";
 import { MatchCelebration } from "../components/MatchCelebration";
-import { Button, EmptyState, ErrorState } from "../components/ui";
+import { EmptyState, ErrorState } from "../components/ui";
 import { SwipeSkeleton } from "../components/SwipeSkeleton";
 import { track } from "../lib/track";
 import {
@@ -13,48 +19,121 @@ import {
   IconStar,
   IconUndo,
 } from "../components/icons";
-import type { MatchDTO, SwipeStateDTO } from "@shared/types";
+import { BUDGET_BANDS } from "@shared/constants";
+import type {
+  MatchDTO,
+  SwipeCardDTO,
+  SwipeStateDTO,
+} from "@shared/types";
+
+/** Pull the next batch once the local queue runs this low. */
+const PREFETCH_AT = 8;
+
+type Meta = Omit<SwipeStateDTO, "queue">;
 
 export function Swipe() {
   const { id = "" } = useParams();
   const nav = useNavigate();
-  const [state, setState] = useState<SwipeStateDTO | null>(null);
+
+  const [meta, setMeta] = useState<Meta | null>(null);
+  const [queue, setQueue] = useState<SwipeCardDTO[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [celebrate, setCelebrate] = useState<MatchDTO | null>(null);
-  const [seenMatchIds, setSeenMatchIds] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      const s = await api<SwipeStateDTO>(`/groups/${id}/swipe`);
-      setState(s);
-      if (
-        s.newMatch &&
-        !seenMatchIds.has(s.newMatch.id) &&
-        (s.status === "date_matching" || s.status === "planned")
-      ) {
-        // a match happened elsewhere (someone else cast the deciding vote)
-        setCelebrate(s.newMatch);
-        setSeenMatchIds((prev) => new Set(prev).add(s.newMatch!.id));
-      }
-    } catch (e) {
-      setErr(e instanceof ApiRequestError ? e.message : "Could not load swipe.");
-    } finally {
-      setLoading(false);
+  const seenMatchIds = useRef<Set<string>>(new Set());
+  /** activityIds this client has voted on — never let a merge re-add them. */
+  const votedLocally = useRef<Set<string>>(new Set());
+  const extending = useRef(false);
+  const initialised = useRef(false);
+
+  /** Merge a server snapshot into local state without disturbing the queue head. */
+  const applyServer = useCallback((s: SwipeStateDTO, replace: boolean) => {
+    const { queue: serverQueue, ...rest } = s;
+    setMeta(rest);
+
+    if (
+      s.newMatch &&
+      !seenMatchIds.current.has(s.newMatch.id) &&
+      (s.status === "date_matching" || s.status === "planned")
+    ) {
+      seenMatchIds.current.add(s.newMatch.id);
+      setCelebrate(s.newMatch);
     }
-  }, [id, seenMatchIds]);
+
+    setQueue((prev) => {
+      if (replace || !initialised.current) {
+        initialised.current = true;
+        return serverQueue.filter((c) => !votedLocally.current.has(c.activity.id));
+      }
+      const localIds = new Set(prev.map((c) => c.activity.id));
+      const serverIds = new Set(serverQueue.map((c) => c.activity.id));
+      // drop cards the server no longer offers (e.g. a filter rebuild removed
+      // them), keep local order, then append genuinely-new cards from the pool.
+      const kept = prev.filter((c) => serverIds.has(c.activity.id));
+      const added = serverQueue.filter(
+        (c) =>
+          !localIds.has(c.activity.id) &&
+          !votedLocally.current.has(c.activity.id),
+      );
+      return [...kept, ...added];
+    });
+  }, []);
+
+  const load = useCallback(
+    async (replace = false) => {
+      try {
+        const s = await api<SwipeStateDTO>(`/groups/${id}/swipe`);
+        applyServer(s, replace);
+        setErr(null);
+      } catch (e) {
+        setErr(e instanceof ApiRequestError ? e.message : "Could not load swipe.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [id, applyServer],
+  );
+
+  const extend = useCallback(async () => {
+    if (extending.current || !meta?.hasMore) return;
+    extending.current = true;
+    try {
+      const s = await api<SwipeStateDTO>(`/groups/${id}/swipe/extend`, {
+        method: "POST",
+        body: {},
+      });
+      applyServer(s, false);
+    } catch {
+      /* a failed prefetch is silent — the next swipe retries */
+    } finally {
+      extending.current = false;
+    }
+  }, [id, meta?.hasMore, applyServer]);
 
   useEffect(() => {
-    void load();
+    void load(true);
     const t = setInterval(() => {
-      if (document.visibilityState === "visible") void load();
+      if (document.visibilityState === "visible") void load(false);
     }, 5000);
-    return () => clearInterval(t);
+    const onVis = () => {
+      if (document.visibilityState === "visible") void load(false);
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, [load]);
 
-  // Record an impression once per (group, activity) when a card reaches the top.
-  const topActivityId = state?.queue[0]?.activity.id;
+  // keep the buffer full
+  useEffect(() => {
+    if (queue.length <= PREFETCH_AT && meta?.hasMore) void extend();
+  }, [queue.length, meta?.hasMore, extend]);
+
+  // one impression per (group, activity) when a card reaches the top
+  const topActivityId = queue[0]?.activity.id;
   useEffect(() => {
     if (!topActivityId) return;
     track({
@@ -66,24 +145,26 @@ export function Swipe() {
   }, [id, topActivityId]);
 
   const vote = async (dir: SwipeDir) => {
-    if (!state || busy || state.queue.length === 0) return;
-    const card = state.queue[0]!;
+    if (busy || queue.length === 0) return;
+    const card = queue[0]!;
     setBusy(true);
-    // optimistic pop
-    setState({ ...state, queue: state.queue.slice(1) });
+    votedLocally.current.add(card.activity.id);
+    setQueue((q) => q.slice(1)); // optimistic pop
     try {
       const res = await api<{ newMatch: MatchDTO | null }>(
         `/groups/${id}/swipe`,
         { method: "POST", body: { activityId: card.activity.id, value: dir } },
       );
-      if (res.newMatch && !seenMatchIds.has(res.newMatch.id)) {
+      if (res.newMatch && !seenMatchIds.current.has(res.newMatch.id)) {
+        seenMatchIds.current.add(res.newMatch.id);
         setCelebrate(res.newMatch);
-        setSeenMatchIds((prev) => new Set(prev).add(res.newMatch!.id));
       }
-      await load();
+      // refresh meta (progress, hasMore, deckSize) without touching the queue head
+      void load(false);
     } catch (e) {
+      votedLocally.current.delete(card.activity.id);
       setErr(e instanceof ApiRequestError ? e.message : "Vote failed.");
-      await load();
+      await load(true);
     } finally {
       setBusy(false);
     }
@@ -92,8 +173,12 @@ export function Swipe() {
   const undo = async () => {
     setBusy(true);
     try {
-      await api(`/groups/${id}/swipe/undo`, { method: "POST", body: {} });
-      await load();
+      const res = await api<{ undoneActivityId: string }>(
+        `/groups/${id}/swipe/undo`,
+        { method: "POST", body: {} },
+      );
+      votedLocally.current.delete(res.undoneActivityId);
+      await load(true); // undo re-orders the deck — take the server's queue wholesale
     } catch (e) {
       setErr(e instanceof ApiRequestError ? e.message : "Nothing to undo.");
     } finally {
@@ -101,11 +186,11 @@ export function Swipe() {
     }
   };
 
-  if (loading && !state) return <SwipeSkeleton />;
-  if (err && !state) return <ErrorState message={err} onRetry={load} />;
-  if (!state) return null;
+  if (loading && !meta) return <SwipeSkeleton />;
+  if (err && !meta) return <ErrorState message={err} onRetry={() => load(true)} />;
+  if (!meta) return null;
 
-  if (state.status === "configuring") {
+  if (meta.status === "configuring") {
     return (
       <EmptyState
         emoji="⚙️"
@@ -120,66 +205,86 @@ export function Swipe() {
     );
   }
 
-  const done = state.queue.length === 0;
-  const top = state.queue[0];
-  const next = state.queue[1];
+  const top = queue[0];
+  const next = queue[1];
+  // "empty right now" — but the backend may still have more coming
+  const waitingForMore = queue.length === 0 && meta.hasMore;
+  const trulyDone = queue.length === 0 && !meta.hasMore;
 
   return (
     <div className="flex min-h-[calc(100vh-8rem)] flex-col">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between gap-2">
         <Link
           to={`/groups/${id}`}
           className="-ml-2 inline-flex h-10 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-navy-500 hover:bg-navy/5"
         >
           <IconArrowLeft size={18} /> Group
         </Link>
-        {state.currentProgress && state.currentProgress.total > 1 && (
+        {meta.currentProgress && meta.currentProgress.total > 1 && (
           <span
             className="inline-flex items-center gap-1.5 rounded-full bg-paper-soft px-3 py-1.5 text-xs font-bold text-navy"
-            aria-label={`${state.currentProgress.voted} of ${state.currentProgress.total} members voted on this card`}
+            aria-label={`${meta.currentProgress.voted} of ${meta.currentProgress.total} members voted on this card`}
           >
             <span className="flex gap-1">
-              {Array.from({ length: state.currentProgress.total }).map((_, i) => (
+              {Array.from({ length: meta.currentProgress.total }).map((_, i) => (
                 <span
                   key={i}
                   className={`h-1.5 w-1.5 rounded-full ${
-                    i < state.currentProgress!.voted
-                      ? "bg-brand-500"
-                      : "bg-navy/15"
+                    i < meta.currentProgress!.voted ? "bg-brand-500" : "bg-navy/15"
                   }`}
                 />
               ))}
             </span>
-            {state.currentProgress.voted}/{state.currentProgress.total} in
+            {meta.currentProgress.voted}/{meta.currentProgress.total} in
           </span>
         )}
       </div>
 
-      {done ? (
+      {meta.filters && (
+        <FilterBar
+          groupId={id}
+          filters={meta.filters}
+          canChange={meta.canChangeFilters}
+        />
+      )}
+
+      {trulyDone ? (
         <EmptyState
-          emoji={state.status === "planned" ? "🎉" : state.status === "date_matching" ? "📅" : "✓"}
+          emoji={
+            meta.status === "planned"
+              ? "🎉"
+              : meta.status === "date_matching"
+                ? "📅"
+                : "✓"
+          }
           title={
-            state.status === "planned"
+            meta.status === "planned"
               ? "You've got a plan"
-              : state.status === "date_matching"
+              : meta.status === "date_matching"
                 ? "Time to pick a date"
-                : "All caught up"
+                : "That's everything for now"
           }
           message={
-            state.status === "date_matching"
+            meta.status === "date_matching"
               ? "Everyone matched an activity. Now vote on when to go."
-              : state.status === "planned"
+              : meta.status === "planned"
                 ? "The plan has everything: place, time, price and the booking link."
-                : "You've voted on every card. Waiting on the others, or widen the filters for more."
+                : meta.canChangeFilters
+                  ? "You've seen every activity that fits. Widen the radius or change the category for more."
+                  : "You've seen every activity that fits these filters."
           }
           action={
-            state.status === "date_matching" ? (
+            meta.status === "date_matching" ? (
               <Link to={`/groups/${id}/date`} className="btn-primary">
                 Vote on dates
               </Link>
-            ) : state.status === "planned" ? (
+            ) : meta.status === "planned" ? (
               <Link to={`/groups/${id}/plan`} className="btn-primary">
                 View the plan
+              </Link>
+            ) : meta.canChangeFilters ? (
+              <Link to={`/groups/${id}/config`} className="btn-primary">
+                Change filters
               </Link>
             ) : (
               <Link to={`/groups/${id}`} className="btn-outline">
@@ -188,6 +293,11 @@ export function Swipe() {
             )
           }
         />
+      ) : waitingForMore ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-navy-400">
+          <span className="h-8 w-8 animate-spin rounded-full border-2 border-navy/15 border-t-brand-500" />
+          <p className="text-sm font-medium">Loading more…</p>
+        </div>
       ) : (
         <>
           <div className="swipe-stack relative mx-auto aspect-[3/4.1] w-full max-w-sm flex-1">
@@ -219,7 +329,7 @@ export function Swipe() {
               small
               tone="plain"
               onClick={undo}
-              disabled={busy || !state.lastVoted}
+              disabled={busy || !meta.lastVoted}
             >
               <IconUndo size={18} />
             </CircleBtn>
@@ -232,18 +342,14 @@ export function Swipe() {
             >
               <IconStar size={18} />
             </CircleBtn>
-            <CircleBtn
-              label="Yes"
-              tone="like"
-              onClick={() => vote("like")}
-              disabled={busy}
-            >
+            <CircleBtn label="Yes" tone="like" onClick={() => vote("like")} disabled={busy}>
               <IconHeart size={24} />
             </CircleBtn>
           </div>
           <p className="mt-3 text-center text-xs text-navy-400">
-            {state.queue.length} card{state.queue.length === 1 ? "" : "s"} left ·
-            drag the card or tap a button
+            {meta.swipedByYou > 0 && `${meta.swipedByYou} swiped · `}
+            {queue.length}
+            {meta.hasMore ? "+" : ""} to go · drag the card or tap a button
           </p>
         </>
       )}
@@ -256,12 +362,71 @@ export function Swipe() {
             setCelebrate(null);
             if (m.status === "complete") nav(`/groups/${id}/plan`);
             else if (m.needsDateMatch) nav(`/groups/${id}/date`);
-            else void load();
+            else void load(false);
           }}
         />
       )}
     </div>
   );
+}
+
+/* --------------------------- active-filter bar --------------------------- */
+function FilterBar({
+  groupId,
+  filters,
+  canChange,
+}: {
+  groupId: string;
+  filters: NonNullable<SwipeStateDTO["filters"]>;
+  canChange: boolean;
+}) {
+  const chips: string[] = [];
+  chips.push(
+    filters.allActivities
+      ? "All activities"
+      : filters.categories.length === 1
+        ? cap(filters.categories[0]!)
+        : `${filters.categories.length} categories`,
+  );
+  if (filters.locationLabel)
+    chips.push(`${filters.locationLabel} · ${filters.radiusKm} km`);
+  if (filters.budgetBand !== "any")
+    chips.push(BUDGET_BANDS.find((b) => b.id === filters.budgetBand)?.label ?? "");
+  if (filters.dateKnown) chips.push("Date set");
+
+  const inner = (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {chips.filter(Boolean).map((c) => (
+        <span
+          key={c}
+          className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-navy shadow-card"
+        >
+          {c}
+        </span>
+      ))}
+      {canChange && (
+        <span className="rounded-full bg-brand-500 px-2.5 py-1 text-xs font-semibold text-white">
+          Change ›
+        </span>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="mb-3">
+      {canChange ? (
+        <Link to={`/groups/${groupId}/config`} aria-label="Change filters">
+          {inner}
+        </Link>
+      ) : (
+        inner
+      )}
+    </div>
+  );
+}
+
+function cap(s: string): string {
+  return s.replace(/_/g, " ").replace(/^\w/, (m) => m.toUpperCase());
 }
 
 type Tone = "pass" | "like" | "lime" | "plain";
@@ -301,4 +466,3 @@ function CircleBtn({
     </button>
   );
 }
-
