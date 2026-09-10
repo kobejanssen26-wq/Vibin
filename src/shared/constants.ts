@@ -39,7 +39,7 @@ export type BudgetBand = (typeof BUDGET_BANDS)[number]["id"];
 /** Price bands attached to an activity (no "any"). */
 export type PriceBand = Exclude<BudgetBand, "any">;
 
-export const RADIUS_OPTIONS_KM = [5, 10, 25, 50] as const;
+export const RADIUS_OPTIONS_KM = [1, 2, 5, 10, 15, 25, 50, 100] as const;
 
 export const DATE_MODES = [
   { id: "tonight", label: "Tonight", known: true },

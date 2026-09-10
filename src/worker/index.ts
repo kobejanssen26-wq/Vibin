@@ -20,6 +20,7 @@ import planRoutes from "./routes/plans";
 import messageRoutes from "./routes/messages";
 import reportRoutes from "./routes/reports";
 import eventRoutes from "./routes/events";
+import geoRoutes from "./routes/geo";
 import adminRoutes from "./routes/admin";
 import adminCcRoutes from "./routes/admin-cc";
 import adminVaultRoutes from "./routes/admin-vault";
@@ -159,6 +160,7 @@ authed.route("/", planRoutes); // /groups/:id/matches, /groups/:id/plans, /plans
 authed.route("/activities", activityRoutes);
 authed.route("/reports", reportRoutes);
 authed.route("/events", eventRoutes);
+authed.route("/geo", geoRoutes);
 api.route("/", authed);
 
 api.onError((err, c) => {

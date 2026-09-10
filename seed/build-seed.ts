@@ -16,10 +16,10 @@ import { dirname, join } from "node:path";
 import {
   ACTIVITIES,
   CATEGORIES,
-  CITY_COORDS,
   SEED_VERIFIED_ON,
   activityImageUrl,
 } from "./activities";
+import { resolvePlace } from "../src/worker/lib/be-places";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const q = (s: string | null | undefined) =>
@@ -64,11 +64,15 @@ for (const a of ACTIVITIES) {
   const id = `act_${a.slug}`;
   const locationLabel = `${a.provider}, ${a.city}`;
   const image = activityImageUrl(a.slug, a.category, a.subcategory);
-  // Precise venue coordinates win; otherwise fall back to the city centroid so
-  // the group radius filter still has a signal. null only if the city is unknown.
-  const cc = CITY_COORDS[a.city];
+  // Precise venue coordinates win; otherwise fall back to the municipality
+  // centre from the offline geocoder so the group radius filter still has a
+  // signal. null only if the town can't be placed (should never happen for BE).
+  const cc = a.lat == null || a.lng == null ? resolvePlace(a.city) : null;
   const lat = a.lat ?? cc?.lat ?? null;
   const lng = a.lng ?? cc?.lng ?? null;
+  if (lat == null || lng == null) {
+    console.warn(`  ! no coordinates for ${a.slug} (city: ${a.city})`);
+  }
   const vals = [
     q(id),
     q(PROVIDER_ID),

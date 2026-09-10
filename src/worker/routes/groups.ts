@@ -34,7 +34,7 @@ import {
   ACTIVITY_CATEGORIES,
   LIMITS,
 } from "@shared/constants";
-import { resolvePlace } from "@shared/be-places";
+import { resolvePlace } from "../lib/be-places";
 import type { GroupSummaryDTO } from "@shared/types";
 
 type Ctx = { Bindings: Env; Variables: Vars };

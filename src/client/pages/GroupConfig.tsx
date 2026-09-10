@@ -12,7 +12,6 @@ import {
   RADIUS_OPTIONS_KM,
   TIME_BANDS,
 } from "@shared/constants";
-import { resolvePlace } from "@shared/be-places";
 
 type Draft = GroupSettingsDTO;
 
@@ -112,10 +111,24 @@ export function GroupConfig() {
     [draft],
   );
 
-  const placeResolved = useMemo(
-    () => (draft.locationLabel ? resolvePlace(draft.locationLabel) != null : null),
-    [draft.locationLabel],
-  );
+  // Ask the server (which has the full Belgian geocoder) whether the typed
+  // place can be placed, so the "radius won't apply" hint is accurate. Debounced.
+  const [placeResolved, setPlaceResolved] = useState<boolean | null>(null);
+  useEffect(() => {
+    const label = draft.locationLabel?.trim();
+    if (!label) {
+      setPlaceResolved(null);
+      return;
+    }
+    const t = setTimeout(() => {
+      api<{ lat: number; lng: number } | null>(
+        `/geo/resolve?q=${encodeURIComponent(label)}`,
+      )
+        .then((hit) => setPlaceResolved(hit != null))
+        .catch(() => setPlaceResolved(null));
+    }, 350);
+    return () => clearTimeout(t);
+  }, [draft.locationLabel]);
 
   if (loading) return <LoadingScreen />;
   if (!group) return <ErrorState message={err ?? "Group not found."} />;

@@ -25,50 +25,6 @@
 export const SEED_VERIFIED_ON = "2026-09-09"; // YYYY-MM-DD — first curation date
 
 /**
- * Approximate city-centre coordinates, used by build-seed.ts as a fallback when
- * an activity has no explicit lat/lng so the group radius filter still has a
- * signal to work with. A venue's own `lat`/`lng` (when given) always wins.
- */
-export const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
-  Antwerp: { lat: 51.2194, lng: 4.4025 },
-  Ghent: { lat: 51.0543, lng: 3.7174 },
-  Brussels: { lat: 50.8467, lng: 4.3525 },
-  Leuven: { lat: 50.8798, lng: 4.7005 },
-  Bruges: { lat: 51.2093, lng: 3.2247 },
-  Mechelen: { lat: 51.0259, lng: 4.4776 },
-  Namur: { lat: 50.4674, lng: 4.8719 },
-  Ieper: { lat: 50.851, lng: 2.8858 },
-  Genk: { lat: 50.9655, lng: 5.5005 },
-  Hasselt: { lat: 50.9307, lng: 5.3378 },
-  Dinant: { lat: 50.2607, lng: 4.9127 },
-  Stavelot: { lat: 50.395, lng: 5.9314 },
-  Aywaille: { lat: 50.473, lng: 5.6741 },
-  "Han-sur-Lesse": { lat: 50.1236, lng: 5.1889 },
-  Maasmechelen: { lat: 50.9667, lng: 5.6947 },
-  Halle: { lat: 50.7343, lng: 4.2364 },
-  Tervuren: { lat: 50.8236, lng: 4.5164 },
-  Brugelette: { lat: 50.5906, lng: 3.8508 },
-  "Knokke-Heist": { lat: 51.3407, lng: 3.2916 },
-  Meise: { lat: 50.9276, lng: 4.3273 },
-  Grimbergen: { lat: 50.9339, lng: 4.3728 },
-  Dilbeek: { lat: 50.8497, lng: 4.2603 },
-  Wavre: { lat: 50.7168, lng: 4.6118 },
-  "De Panne": { lat: 51.0973, lng: 2.5876 },
-  Kasterlee: { lat: 51.2417, lng: 4.9662 },
-  Roeselare: { lat: 50.9469, lng: 3.1256 },
-  "Puurs-Sint-Amands": { lat: 51.0783, lng: 4.2861 },
-  Beersel: { lat: 50.7671, lng: 4.3007 },
-  Wommelgem: { lat: 51.2003, lng: 4.5197 },
-  Liedekerke: { lat: 50.8676, lng: 4.0837 },
-  Rumst: { lat: 51.0797, lng: 4.4231 },
-  Waimes: { lat: 50.4165, lng: 6.1129 },
-  "Louvain-la-Neuve": { lat: 50.6689, lng: 4.6151 },
-  Wachtebeke: { lat: 51.1699, lng: 3.8734 },
-  Kalmthout: { lat: 51.3846, lng: 4.4636 },
-  Melsbroek: { lat: 50.9086, lng: 4.493 },
-};
-
-/**
  * Per-activity photography. Values are Unsplash photo ids (the `photo-<id>`
  * segment of images.unsplash.com URLs). Each was hand-checked to depict the
  * actual activity and confirmed on the free Unsplash licence (not Unsplash+).
