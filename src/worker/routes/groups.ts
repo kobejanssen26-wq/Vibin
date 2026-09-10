@@ -273,7 +273,7 @@ app.post("/:id/start", async (c) => {
   });
   if (!settings) throw badRequest("Configure the group first.");
 
-  const deck = await buildDeck(db, settings);
+  const deck = await buildDeck(db, settings, groupId);
   if (deck.length === 0) {
     throw badRequest(
       "No activities match those filters. Widen the radius, budget or categories.",

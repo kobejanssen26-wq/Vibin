@@ -33,47 +33,51 @@ const app = new Hono<Ctx>();
 
 const uid = (c: { get: (k: "userId") => string | null }) => c.get("userId")!;
 
-/** activity rows of the current pool, in deck order, as full DTOs. */
-async function deckWithActivities(db: DB, groupId: string) {
-  const pool = await db
-    .select()
-    .from(groupActivityPool)
-    .where(eq(groupActivityPool.groupId, groupId))
-    .orderBy(asc(groupActivityPool.sort));
-  if (pool.length === 0) return [];
-  const ids = pool.map((p) => p.activityId);
-  const [acts, imgs, settings] = await Promise.all([
-    db.select().from(activities).where(inArray(activities.id, ids)),
-    db.select().from(activityImages).where(inArray(activityImages.activityId, ids)),
-    db.query.groupSettings.findFirst({ where: eq(groupSettings.groupId, groupId) }),
-  ]);
-  const glat = settings?.lat != null ? settings.lat / 1e6 : null;
-  const glng = settings?.lng != null ? settings.lng / 1e6 : null;
-  const byId = new Map(acts.map((a) => [a.id, a]));
-  return pool
-    .map((p) => {
-      const a = byId.get(p.activityId);
-      if (!a) return null;
-      const dist =
-        glat != null && glng != null && a.lat != null && a.lng != null
-          ? haversineKm(glat, glng, a.lat / 1e6, a.lng / 1e6)
-          : null;
-      return {
-        sort: p.sort,
-        activity: toActivityDTO(
-          a,
-          imgs
-            .filter((i) => i.activityId === a.id)
-            .sort((x, y) => x.sort - y.sort)
-            .map((i) => i.url),
-          dist,
-        ),
-      };
-    })
-    .filter(
-      (x): x is { sort: number; activity: ReturnType<typeof toActivityDTO> } =>
-        x != null,
-    );
+/** How many cards the client is ever handed at once — plenty ahead of the
+ * prefetch threshold, and safely under SQLite's ~100 bound-variable limit for
+ * the follow-up image lookup even as the shared pool grows into the hundreds. */
+const QUEUE_HYDRATE_LIMIT = 60;
+
+/** activity id NOT IN (this user's votes for the group) — constant-size subquery */
+const notVotedBy = (db: DB, groupId: string, userId: string) =>
+  notInArray(
+    activities.id,
+    db
+      .select({ id: activityVotes.activityId })
+      .from(activityVotes)
+      .where(
+        and(eq(activityVotes.groupId, groupId), eq(activityVotes.userId, userId)),
+      ),
+  );
+
+/** activity id NOT IN (this group's matches) — constant-size subquery */
+const notMatchedIn = (db: DB, groupId: string) =>
+  notInArray(
+    activities.id,
+    db
+      .select({ id: matches.activityId })
+      .from(matches)
+      .where(eq(matches.groupId, groupId)),
+  );
+
+function cardDTO(
+  a: typeof activities.$inferSelect,
+  imgs: (typeof activityImages.$inferSelect)[],
+  glat: number | null,
+  glng: number | null,
+) {
+  const dist =
+    glat != null && glng != null && a.lat != null && a.lng != null
+      ? haversineKm(glat, glng, a.lat / 1e6, a.lng / 1e6)
+      : null;
+  return toActivityDTO(
+    a,
+    imgs
+      .filter((i) => i.activityId === a.id)
+      .sort((x, y) => x.sort - y.sort)
+      .map((i) => i.url),
+    dist,
+  );
 }
 
 /** The full SwipeStateDTO — shared by GET /swipe and POST /swipe/extend. */
@@ -83,42 +87,84 @@ async function buildSwipeState(
   userId: string,
 ): Promise<SwipeStateDTO> {
   const groupId = group.id;
-  const [deck, myVotes, matchRows, settings] = await Promise.all([
-    deckWithActivities(db, groupId),
-    db
+  const settings = await db.query.groupSettings.findFirst({
+    where: eq(groupSettings.groupId, groupId),
+  });
+  const glat = settings?.lat != null ? settings.lat / 1e6 : null;
+  const glng = settings?.lng != null ? settings.lng / 1e6 : null;
+
+  // The queue = pooled activities this user hasn't voted on and the group hasn't
+  // matched, in deck order. Bounded — the client keeps it topped up by swiping
+  // (voted cards drop out) and prefetching new batches.
+  const queueRows = await db
+    .select({ act: activities, sort: groupActivityPool.sort })
+    .from(groupActivityPool)
+    .innerJoin(activities, eq(activities.id, groupActivityPool.activityId))
+    .where(
+      and(
+        eq(groupActivityPool.groupId, groupId),
+        notVotedBy(db, groupId, userId),
+        notMatchedIn(db, groupId),
+      ),
+    )
+    .orderBy(asc(groupActivityPool.sort))
+    .limit(QUEUE_HYDRATE_LIMIT);
+
+  const queueActs = queueRows.map((r) => r.act);
+  const queueIds = queueActs.map((a) => a.id);
+  const queueImgs = queueIds.length
+    ? await db
+        .select()
+        .from(activityImages)
+        .where(inArray(activityImages.activityId, queueIds))
+    : [];
+
+  const queue: SwipeCardDTO[] = queueActs.map((a, idx) => ({
+    activity: cardDTO(a, queueImgs, glat, glng),
+    yourVote: null,
+    position: idx,
+    deckSize: queueActs.length,
+  }));
+
+  // last card this user voted on (for undo)
+  const lastVotedRow = await db
+    .select({ act: activities })
+    .from(activityVotes)
+    .innerJoin(activities, eq(activities.id, activityVotes.activityId))
+    .where(
+      and(eq(activityVotes.groupId, groupId), eq(activityVotes.userId, userId)),
+    )
+    .orderBy(desc(activityVotes.updatedAt))
+    .limit(1);
+  let lastVoted: SwipeCardDTO | null = null;
+  if (lastVotedRow[0]) {
+    const a = lastVotedRow[0].act;
+    const imgs = await db
       .select()
+      .from(activityImages)
+      .where(eq(activityImages.activityId, a.id));
+    lastVoted = {
+      activity: cardDTO(a, imgs, glat, glng),
+      yourVote: null,
+      position: -1,
+      deckSize: 0,
+    };
+  }
+
+  const [poolCountRow, swipedRow] = await Promise.all([
+    db
+      .select({ n: sql<number>`count(*)` })
+      .from(groupActivityPool)
+      .where(eq(groupActivityPool.groupId, groupId)),
+    db
+      .select({ n: sql<number>`count(*)` })
       .from(activityVotes)
       .where(
         and(eq(activityVotes.groupId, groupId), eq(activityVotes.userId, userId)),
       ),
-    db
-      .select({ activityId: matches.activityId })
-      .from(matches)
-      .where(eq(matches.groupId, groupId)),
-    db.query.groupSettings.findFirst({ where: eq(groupSettings.groupId, groupId) }),
   ]);
-
-  const myVoteByActivity = new Map(myVotes.map((v) => [v.activityId, v.value]));
-  const matchedActivityIds = new Set(matchRows.map((m) => m.activityId));
-
-  const queue: SwipeCardDTO[] = [];
-  let lastVoted: SwipeCardDTO | null = null;
-  deck.forEach((d, idx) => {
-    const card: SwipeCardDTO = {
-      activity: d.activity,
-      yourVote: myVoteByActivity.get(d.activity.id) ?? null,
-      position: idx,
-      deckSize: deck.length,
-    };
-    if (
-      !myVoteByActivity.has(d.activity.id) &&
-      !matchedActivityIds.has(d.activity.id)
-    ) {
-      queue.push(card);
-    } else if (myVoteByActivity.has(d.activity.id)) {
-      lastVoted = card;
-    }
-  });
+  const deckSize = poolCountRow[0]?.n ?? 0;
+  const swipedByYou = swipedRow[0]?.n ?? 0;
 
   // collective progress on the frontmost undecided card
   let currentProgress: SwipeStateDTO["currentProgress"] = null;
@@ -137,13 +183,10 @@ async function buildSwipeState(
     currentProgress = { voted: p.voted, total: p.total };
   }
 
-  // is there another batch to pull? (pool ∪ this user's votes are excluded)
-  let hasMore = false;
-  if (settings) {
-    const poolIds = deck.map((d) => d.activity.id);
-    const exclude = [...new Set([...poolIds, ...myVoteByActivity.keys()])];
-    hasMore = (await countEligibleActivities(db, settings, exclude)) > 0;
-  }
+  // is there another batch to pull? (anything the group hasn't pooled/voted on)
+  const hasMore = settings
+    ? (await countEligibleActivities(db, settings, groupId)) > 0
+    : false;
 
   const latestMatch = await db.query.matches.findFirst({
     where: eq(matches.groupId, groupId),
@@ -153,16 +196,16 @@ async function buildSwipeState(
   return {
     groupId,
     status: group.status,
-    deckSize: deck.length,
+    deckSize,
     queue,
     lastVoted,
     currentProgress,
     newMatch: latestMatch ? await matchDTO(db, latestMatch.id) : null,
     hasMore,
-    swipedByYou: myVotes.length,
+    swipedByYou,
     filters: settingsToDTO(settings),
     canChangeFilters: group.creatorId === userId,
-    finished: deck.length > 0 && queue.length === 0 && !hasMore,
+    finished: deckSize > 0 && queue.length === 0 && !hasMore,
   };
 }
 
@@ -177,29 +220,13 @@ export async function extendPool(
   });
   if (!settings) return { added: 0, hasMore: false };
 
-  const [poolRows, votedRows, maxSortRow] = await Promise.all([
-    db
-      .select({ activityId: groupActivityPool.activityId })
-      .from(groupActivityPool)
-      .where(eq(groupActivityPool.groupId, groupId)),
-    db
-      .selectDistinct({ activityId: activityVotes.activityId })
-      .from(activityVotes)
-      .where(eq(activityVotes.groupId, groupId)),
-    db
-      .select({ m: sql<number>`coalesce(max(${groupActivityPool.sort}), -1)` })
-      .from(groupActivityPool)
-      .where(eq(groupActivityPool.groupId, groupId)),
-  ]);
+  const maxSortRow = await db
+    .select({ m: sql<number>`coalesce(max(${groupActivityPool.sort}), -1)` })
+    .from(groupActivityPool)
+    .where(eq(groupActivityPool.groupId, groupId));
 
-  const exclude = [
-    ...new Set([
-      ...poolRows.map((r) => r.activityId),
-      ...votedRows.map((r) => r.activityId),
-    ]),
-  ];
   const { ids, hasMore } = await buildDeckBatch(db, settings, {
-    exclude,
+    groupId,
     limit: batchLimit,
   });
   if (ids.length === 0) return { added: 0, hasMore: false };
@@ -224,21 +251,21 @@ export async function extendPool(
  * mid-swipe filter change.
  */
 export async function rebuildPoolTail(db: DB, groupId: string): Promise<void> {
-  const voted = await db
-    .selectDistinct({ activityId: activityVotes.activityId })
-    .from(activityVotes)
-    .where(eq(activityVotes.groupId, groupId));
-  const keep = voted.map((v) => v.activityId);
-
+  // Drop every not-yet-voted card (subquery keep-list — no big NOT IN param
+  // list), then pull a fresh batch on the new filters.
   await db
     .delete(groupActivityPool)
     .where(
-      keep.length
-        ? and(
-            eq(groupActivityPool.groupId, groupId),
-            notInArray(groupActivityPool.activityId, keep),
-          )
-        : eq(groupActivityPool.groupId, groupId),
+      and(
+        eq(groupActivityPool.groupId, groupId),
+        notInArray(
+          groupActivityPool.activityId,
+          db
+            .select({ id: activityVotes.activityId })
+            .from(activityVotes)
+            .where(eq(activityVotes.groupId, groupId)),
+        ),
+      ),
     );
 
   await extendPool(db, groupId);

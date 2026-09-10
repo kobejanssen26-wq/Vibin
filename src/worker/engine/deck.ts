@@ -8,7 +8,7 @@
  */
 import { and, eq, gte, inArray, lte, ne, notInArray, sql } from "drizzle-orm";
 import type { DB } from "../db/client";
-import { activities } from "../db/schema";
+import { activities, activityVotes, groupActivityPool } from "../db/schema";
 import { LIMITS } from "@shared/constants";
 import type { Activity, GroupSettings } from "../db/schema";
 
@@ -90,28 +90,50 @@ function geoWhere(settings: GroupSettings) {
 
 export interface DeckBatch {
   ids: string[];
-  /** more eligible activities exist beyond this batch + the exclude set */
+  /** more eligible activities exist beyond what this group has already seen */
   hasMore: boolean;
 }
 
 /**
- * The next slice of the deck. `exclude` is every activity already in the pool
- * or already voted on, so batches never repeat a card. `limit` defaults to
- * LIMITS.deckSize.
+ * Exclude, via constant-size subqueries (never a big `NOT IN (?, ?, …)` — that
+ * blows SQLite's parameter/expression limits once the pool grows), every
+ * activity already in this group's pool or already voted on by anyone in it.
+ */
+function seenByGroup(db: DB, groupId: string) {
+  return [
+    notInArray(
+      activities.id,
+      db
+        .select({ id: groupActivityPool.activityId })
+        .from(groupActivityPool)
+        .where(eq(groupActivityPool.groupId, groupId)),
+    ),
+    notInArray(
+      activities.id,
+      db
+        .select({ id: activityVotes.activityId })
+        .from(activityVotes)
+        .where(eq(activityVotes.groupId, groupId)),
+    ),
+  ];
+}
+
+/**
+ * The next slice of the deck for a group — never repeats a card the group has
+ * already pooled or voted on. `limit` defaults to LIMITS.deckSize.
  */
 export async function buildDeckBatch(
   db: DB,
   settings: GroupSettings,
-  opts: { exclude?: string[]; limit?: number } = {},
+  opts: { groupId?: string; limit?: number } = {},
 ): Promise<DeckBatch> {
   const limit = opts.limit ?? LIMITS.deckSize;
-  const exclude = opts.exclude ?? [];
   const hasRadius = settings.lat != null && settings.lng != null;
 
   const where = [
     ...baseWhere(settings),
     ...geoWhere(settings),
-    ...(exclude.length ? [notInArray(activities.id, exclude)] : []),
+    ...(opts.groupId ? seenByGroup(db, opts.groupId) : []),
   ];
 
   // Pull a generous random sample, then (with a radius) keep only what's truly
@@ -160,24 +182,25 @@ export async function buildDeckBatch(
 export async function buildDeck(
   db: DB,
   settings: GroupSettings,
+  groupId?: string,
 ): Promise<string[]> {
-  return (await buildDeckBatch(db, settings)).ids;
+  return (await buildDeckBatch(db, settings, { groupId })).ids;
 }
 
 /**
- * How many activities match the filters and aren't in `exclude` yet. Counted
- * over the bounding box, so with a radius it's an upper bound — good enough to
- * decide "can the client ask for another batch?".
+ * How many activities match the filters that this group hasn't pooled/voted on
+ * yet. Counted over the bounding box, so with a radius it's an upper bound —
+ * good enough to decide "can the client ask for another batch?".
  */
 export async function countEligibleActivities(
   db: DB,
   settings: GroupSettings,
-  exclude: string[],
+  groupId: string,
 ): Promise<number> {
   const where = [
     ...baseWhere(settings),
     ...geoWhere(settings),
-    ...(exclude.length ? [notInArray(activities.id, exclude)] : []),
+    ...seenByGroup(db, groupId),
   ];
   const rows = await db
     .select({ n: sql<number>`count(*)` })

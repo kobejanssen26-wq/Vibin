@@ -67,17 +67,16 @@ export function Swipe() {
         initialised.current = true;
         return serverQueue.filter((c) => !votedLocally.current.has(c.activity.id));
       }
+      // Poll / prefetch merge: keep the local queue and its order untouched,
+      // only append cards the server has that we don't (a new batch, or another
+      // member extended the pool). A locally-swiped card never comes back.
       const localIds = new Set(prev.map((c) => c.activity.id));
-      const serverIds = new Set(serverQueue.map((c) => c.activity.id));
-      // drop cards the server no longer offers (e.g. a filter rebuild removed
-      // them), keep local order, then append genuinely-new cards from the pool.
-      const kept = prev.filter((c) => serverIds.has(c.activity.id));
       const added = serverQueue.filter(
         (c) =>
           !localIds.has(c.activity.id) &&
           !votedLocally.current.has(c.activity.id),
       );
-      return [...kept, ...added];
+      return added.length ? [...prev, ...added] : prev;
     });
   }, []);
 
@@ -159,8 +158,11 @@ export function Swipe() {
         seenMatchIds.current.add(res.newMatch.id);
         setCelebrate(res.newMatch);
       }
-      // refresh meta (progress, hasMore, deckSize) without touching the queue head
-      void load(false);
+      // meta (member-vote pips, hasMore, deckSize) refreshes on the 5 s poll —
+      // no GET per swipe, so a fast swiper doesn't hammer the API.
+      setMeta((m) =>
+        m ? { ...m, swipedByYou: m.swipedByYou + 1, lastVoted: card } : m,
+      );
     } catch (e) {
       votedLocally.current.delete(card.activity.id);
       setErr(e instanceof ApiRequestError ? e.message : "Vote failed.");
