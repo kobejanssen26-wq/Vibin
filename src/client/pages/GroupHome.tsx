@@ -11,6 +11,7 @@ import {
 } from "../components/ui";
 import { InviteBox } from "../components/InviteBox";
 import { GroupChat } from "../components/GroupChat";
+import { NearbyEvents } from "../components/NearbyEvents";
 import { PageHeader } from "../components/PageHeader";
 import { useConfirm } from "../components/Confirm";
 import { IconChevronRight } from "../components/icons";
@@ -208,6 +209,8 @@ export function GroupHome() {
               </div>
             )}
           </section>
+
+          <NearbyEvents settings={group.settings} />
 
           {group.isCreator && group.status !== "archived" && (
             <button

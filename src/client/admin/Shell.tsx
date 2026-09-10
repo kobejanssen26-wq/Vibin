@@ -8,6 +8,7 @@ const NAV: { to: string; label: string; group: string }[] = [
   { to: "/admin/users", label: "Users", group: "Data" },
   { to: "/admin/groups", label: "Groups", group: "Data" },
   { to: "/admin/activities", label: "Activities", group: "Data" },
+  { to: "/admin/events", label: "Live events", group: "Data" },
   { to: "/admin/providers", label: "Providers", group: "Data" },
   { to: "/admin/analytics", label: "Analytics", group: "Insight" },
   { to: "/admin/funnel", label: "Funnel & retention", group: "Insight" },

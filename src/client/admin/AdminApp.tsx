@@ -10,6 +10,7 @@ import { Groups } from "./pages/Groups";
 import { GroupDetail } from "./pages/GroupDetail";
 import { Activities } from "./pages/Activities";
 import { ActivityDetail } from "./pages/ActivityDetail";
+import { Events } from "./pages/Events";
 import { Providers } from "./pages/Providers";
 import { ProviderDetail } from "./pages/ProviderDetail";
 import { Analytics } from "./pages/Analytics";
@@ -57,6 +58,7 @@ function AdminRoutes() {
         <Route path="/groups/:id" element={<GroupDetail />} />
         <Route path="/activities" element={<Activities />} />
         <Route path="/activities/:id" element={<ActivityDetail />} />
+        <Route path="/events" element={<Events />} />
         <Route path="/providers" element={<Providers />} />
         <Route path="/providers/:id" element={<ProviderDetail />} />
         <Route path="/analytics" element={<Analytics />} />
