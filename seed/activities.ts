@@ -115,12 +115,41 @@ export const ACTIVITY_IMAGES: Record<string, string> = {
   "cinema-palace-brussels": "1595769816263-9b910be24d5f",
 };
 
-/** Resolve a slug to a sized, CDN-optimised Unsplash URL (or null if unmapped). */
-export function activityImageUrl(slug: string): string | null {
-  const id = ACTIVITY_IMAGES[slug];
-  return id
-    ? `https://images.unsplash.com/photo-${id}?w=1200&q=75&auto=format&fit=crop`
-    : null;
+/**
+ * Per-category fallback photo — a free-licence Unsplash photo that represents
+ * the category (an active climbing wall for "sport", a brewery for
+ * "food_drinks", …). Used when an activity has no hand-picked photo of its own,
+ * so a swipe card is never a bare gradient. `creative` and `other` are left
+ * unmapped on purpose — the branded category treatment fits them better than a
+ * generic stock shot. Every id below is a photo already used above and
+ * confirmed on the free licence.
+ */
+export const CATEGORY_IMAGES: Record<string, string> = {
+  sport: "1696105538782-7815474f28e0",
+  adventure: "1578940695359-2dd6aff3eb84",
+  food_drinks: "1779591211635-5e3daafab2a2",
+  nightlife: "1507676385008-e7fb562d11f8",
+  relaxation: "1757940661240-f2e8d2ff93bf",
+  culture: "1782507421864-25e22178f70e",
+  nature: "1441974231531-c6227db76b6e",
+  gaming: "1676651471150-0e3a5f8de05e",
+  entertainment: "1595769816263-9b910be24d5f",
+  learning: "1779643796787-aa14cac77030",
+};
+
+const unsplash = (id: string) =>
+  `https://images.unsplash.com/photo-${id}?w=1200&q=75&auto=format&fit=crop`;
+
+/**
+ * Resolve an activity to a photo URL: its own hand-picked photo first, then the
+ * category fallback, then null (branded category treatment).
+ */
+export function activityImageUrl(
+  slug: string,
+  category?: string,
+): string | null {
+  const id = ACTIVITY_IMAGES[slug] ?? (category ? CATEGORY_IMAGES[category] : undefined);
+  return id ? unsplash(id) : null;
 }
 
 export const ACTIVITY_IMAGE_SOURCE = "Unsplash";

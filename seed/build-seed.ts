@@ -65,7 +65,7 @@ const COLS = [
 for (const a of ACTIVITIES) {
   const id = `act_${a.slug}`;
   const locationLabel = `${a.provider}, ${a.city}`;
-  const imageUrl = activityImageUrl(a.slug);
+  const imageUrl = activityImageUrl(a.slug, a.category);
   // Precise venue coordinates win; otherwise fall back to the city centroid so
   // the group radius filter still has a signal. null only if the city is unknown.
   const cc = CITY_COORDS[a.city];
