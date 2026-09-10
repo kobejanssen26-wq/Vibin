@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="300" viewBox="0 0 900 300">
+  <g transform="translate(16 50) scale(4.166666666666667)">
+  <path d="M7 9h9.4l9.1 21.7L20.9 42 7 9Z" fill="#3155ff"/>
+  <path d="M41 9h-9.4L20.9 35.4 25.6 42 41 9Z" fill="#b8f23d"/>
+  <circle cx="23.2" cy="38.4" r="3.3" fill="#101426"/>
+  </g>
+  <text x="252" y="156" dominant-baseline="central"
+        font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif"
+        font-size="176" font-weight="800" letter-spacing="-5"
+        fill="#101426">VIBIN</text>
+</svg>
