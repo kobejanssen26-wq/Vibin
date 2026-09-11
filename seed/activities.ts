@@ -191,6 +191,8 @@ export const SUBCATEGORY_IMAGES: Record<string, { url: string; attribution: stri
   "Forest walk": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Autumn_scenery_002.JPG/1280px-Autumn_scenery_002.JPG", attribution: "Natubico / CC BY-SA 3.0 — Wikimedia Commons" },
   "Painting workshop": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Paint_Nite.jpg/1280px-Paint_Nite.jpg", attribution: "Mcgrailsean / CC BY-SA 4.0 — Wikimedia Commons" },
   "Perfume workshop": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/Perfume_Organ.jpg/1280px-Perfume_Organ.jpg", attribution: "Mx. Granger / CC0 — Wikimedia Commons" },
+  "Shopping centre": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Galeria_shopping_mall_interior_13.jpg/1280px-Galeria_shopping_mall_interior_13.jpg", attribution: "MBH / CC BY 4.0 — Wikimedia Commons" },
+  "Pottery workshop": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/68/Anne_Shaw_at_the_wheel%2C_Haworth_Pottery%2C_1988.jpg/1280px-Anne_Shaw_at_the_wheel%2C_Haworth_Pottery%2C_1988.jpg", attribution: "S2308rasc / CC BY-SA 3.0 — Wikimedia Commons" },
 };
 
 export interface ResolvedImage {

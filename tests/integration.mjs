@@ -337,9 +337,14 @@ async function run() {
   const sg = (await sw("POST", "/groups", { name: `Infinite ${uniq()}` })).json.group;
   const soon3 = Math.floor(Date.now() / 1000) + 6 * 86400;
   await sw("PUT", `/groups/${sg.id}/settings`, {
-    categories: [],
-    allActivities: true,
-    locationLabel: null, // whole catalogue -> plenty for several batches
+    // "relaxation" is deliberately a small, bounded category (spa & sauna)
+    // so this pool spans a handful of batches and is guaranteed to exhaust
+    // no matter how large the wider catalogue grows — the "multiple batches"
+    // and "ends only when truly done" assertions below need a finite,
+    // multi-batch pool, not "whole catalogue", which now runs to thousands.
+    categories: ["relaxation"],
+    allActivities: false,
+    locationLabel: null,
     lat: null,
     lng: null,
     radiusKm: 25,
@@ -371,7 +376,7 @@ async function run() {
     if (st.hasMore) batches++;
     st = (await sw("POST", `/groups/${sg.id}/swipe/extend`, {})).json;
   }
-  ok("swiping continued well past 40 cards", seenIds.size > 80);
+  ok("swiping continued past the first batch", seenIds.size > 40);
   ok("no card was ever shown twice across batches", dupes === 0);
   ok("multiple batches were pulled automatically", batches >= 2);
   ok(
@@ -437,6 +442,12 @@ async function run() {
   );
 
   // --- ranking: group taste shapes the deck, without hard-hiding anything ---
+  // dateMode "unknown": in a solo group any "like" is instantly unanimous and
+  // matches. A *known* date completes that match straight to "planned", which
+  // /swipe/extend deliberately stops serving (the group has its plan) — fine
+  // for a real group, but it would cut this taste-building loop off after the
+  // very first like. "unknown" keeps a match in "date_matching", where extend
+  // still works, so the loop can keep gathering signal over several batches.
   const baseCfg = {
     allActivities: true,
     categories: [],
@@ -445,9 +456,9 @@ async function run() {
     lng: null,
     radiusKm: 50,
     budgetBand: "any",
-    dateMode: "specific",
-    dateSpecific: soon3,
-    timeBand: "evening",
+    dateMode: "unknown",
+    dateSpecific: null,
+    timeBand: "unknown",
     timeSpecific: null,
   };
   // two solo groups, identical filters; one "likes" sport, the other "likes" culture
@@ -458,11 +469,11 @@ async function run() {
     await cl("PUT", `/groups/${grp.id}/settings`, baseCfg);
     await cl("POST", `/groups/${grp.id}/start`, {});
     let st = (await cl("GET", `/groups/${grp.id}/swipe`)).json;
-    // like up to 6 cards of the target category, pass the rest, for ~2 batches
+    // like up to 10 cards of the target category, pass the rest, for ~3 batches
     let liked = 0;
-    for (let b = 0; b < 3 && (st.queue.length || st.hasMore); b++) {
+    for (let b = 0; b < 4 && (st.queue.length || st.hasMore); b++) {
       for (const c of [...st.queue]) {
-        const want = c.activity.category === likeCategory && liked < 6;
+        const want = c.activity.category === likeCategory && liked < 10;
         await cl("POST", `/groups/${grp.id}/swipe`, {
           activityId: c.activity.id,
           value: want ? "like" : "nope",
@@ -471,9 +482,13 @@ async function run() {
       }
       st = (await cl("POST", `/groups/${grp.id}/swipe/extend`, {})).json;
     }
-    // the batch AFTER the learning phase
-    const fresh = (await cl("POST", `/groups/${grp.id}/swipe/extend`, {})).json;
-    const cats = fresh.queue.map((c) => c.activity.category);
+    // pool 2 fresh batches (after the learning phase) to smooth out the
+    // ranker's deliberate per-batch randomness (exploration + diversity)
+    const cats = [];
+    for (let i = 0; i < 2; i++) {
+      const fresh = (await cl("POST", `/groups/${grp.id}/swipe/extend`, {})).json;
+      cats.push(...fresh.queue.map((c) => c.activity.category));
+    }
     return {
       liked,
       total: cats.length,
