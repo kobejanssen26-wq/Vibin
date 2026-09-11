@@ -36,6 +36,13 @@
       "when": 1789044228885,
       "tag": "0004_lyrical_wilson_fisk",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1789162661383,
+      "tag": "0005_legal_tombstone",
+      "breakpoints": true
     }
   ]
 }

@@ -119,7 +119,10 @@ for (const file of readdirSync(RAW).filter((f) => f.endsWith(".json"))) {
       category: cat.category,
       subcategory: cat.subcategory,
       provider: name.slice(0, 120),
-      providerWebsite: website || osmUrl,
+      // The business's real site only — never the OSM page itself. A missing
+      // website stays null (never shown as a fake "Visit website" link);
+      // sourceUrl (below) is the honest provenance link, admin-only.
+      providerWebsite: website || null,
       city,
       address: addr,
       lat: Math.round(lat * 1e6) / 1e6,

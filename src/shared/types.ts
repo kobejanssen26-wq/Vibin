@@ -135,6 +135,13 @@ export interface ActivityDTO {
   sourceUrl: string | null;
   lastVerifiedAt: number | null;
   status: ActivityStatus;
+  /** what VIBIN can honestly say about outbound clicks — never implies a deal */
+  monetizationType:
+    | "none"
+    | "outbound_tracking"
+    | "affiliate"
+    | "direct_partner"
+    | "booking_partner";
   /** activity info only — NOT a live-availability guarantee */
   availabilityNote: string;
 }

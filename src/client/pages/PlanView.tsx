@@ -64,6 +64,7 @@ export function PlanView() {
   const booking = a.bookingUrl ?? a.ticketUrl;
 
   const share = async () => {
+    track({ name: "activity_shared", groupId: plan.groupId, activityId: a.id });
     const url = `${location.origin}/plans/${plan.id}`;
     if (navigator.share) {
       try {
@@ -156,18 +157,10 @@ export function PlanView() {
       <div className="grid grid-cols-2 gap-2">
         {booking ? (
           <a
-            href={booking}
+            href={`/api/go/activity/${a.id}?kind=${a.ticketUrl ? "ticket" : "booking"}&src=plan_screen&groupId=${encodeURIComponent(plan.groupId)}`}
             target="_blank"
             rel="noreferrer"
             className="btn-primary col-span-2"
-            onClick={() =>
-              track({
-                name: "booking_clicked",
-                groupId: plan.groupId,
-                activityId: a.id,
-                props: { kind: a.ticketUrl ? "ticket" : "booking" },
-              })
-            }
           >
             <IconExternal size={18} />
             {a.ticketUrl ? "Get tickets" : "Book with the provider"}
@@ -179,7 +172,7 @@ export function PlanView() {
         )}
         {a.websiteUrl && (
           <a
-            href={a.websiteUrl}
+            href={`/api/go/activity/${a.id}?kind=website&src=plan_screen&groupId=${encodeURIComponent(plan.groupId)}`}
             target="_blank"
             rel="noreferrer"
             className="btn-outline"

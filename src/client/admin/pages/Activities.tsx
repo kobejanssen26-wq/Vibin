@@ -149,6 +149,12 @@ export function Activities() {
                 </option>
               ))}
             </Select>
+            <a
+              href="/api/admin/cc/activities/export.csv"
+              className="rounded border border-slate-200 px-2.5 py-1.5 text-[13px] text-slate-600 hover:bg-slate-50"
+            >
+              Export CSV
+            </a>
           </div>
         }
         bodyClassName=""

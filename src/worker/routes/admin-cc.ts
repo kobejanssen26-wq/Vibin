@@ -737,7 +737,7 @@ async function activityMetrics(
   args: unknown[],
 ): Promise<Map<string, ActMetric>> {
   const bind = (sql: string) => env.DB.prepare(sql).bind(...(args as never[]));
-  const [votes, matchRows, planRows, viewRows, bookRows, poolRows] =
+  const [votes, matchRows, planRows, viewRows, bookRows, poolRows, webRows, expandRows, shareRows, calRows] =
     await Promise.all([
       bind(
         `SELECT av.activity_id AS id, av.value, COUNT(*) AS n
@@ -771,22 +771,37 @@ async function activityMetrics(
          FROM group_activity_pool gap JOIN activities a ON a.id = gap.activity_id
          ${where} GROUP BY gap.activity_id`,
       ).all<{ id: string; n: number }>(),
+      bind(
+        `SELECT e.activity_id AS id, COUNT(*) AS n
+         FROM analytics_events e JOIN activities a ON a.id = e.activity_id
+         ${where} ${where ? "AND" : "WHERE"} e.name = 'activity_website_clicked'
+         GROUP BY e.activity_id`,
+      ).all<{ id: string; n: number }>(),
+      bind(
+        `SELECT e.activity_id AS id, COUNT(*) AS n
+         FROM analytics_events e JOIN activities a ON a.id = e.activity_id
+         ${where} ${where ? "AND" : "WHERE"} e.name = 'activity_expanded'
+         GROUP BY e.activity_id`,
+      ).all<{ id: string; n: number }>(),
+      bind(
+        `SELECT e.activity_id AS id, COUNT(*) AS n
+         FROM analytics_events e JOIN activities a ON a.id = e.activity_id
+         ${where} ${where ? "AND" : "WHERE"} e.name = 'activity_shared'
+         GROUP BY e.activity_id`,
+      ).all<{ id: string; n: number }>(),
+      bind(
+        `SELECT e.activity_id AS id, COUNT(*) AS n
+         FROM analytics_events e JOIN activities a ON a.id = e.activity_id
+         ${where} ${where ? "AND" : "WHERE"} e.name = 'calendar_action'
+         GROUP BY e.activity_id`,
+      ).all<{ id: string; n: number }>(),
     ]);
 
   const m = new Map<string, ActMetric>();
   const get = (id: string) => {
     let x = m.get(id);
     if (!x) {
-      x = {
-        likes: 0,
-        passes: 0,
-        superlikes: 0,
-        matches: 0,
-        plans: 0,
-        views: 0,
-        bookingClicks: 0,
-        pooled: 0,
-      };
+      x = emptyMetric();
       m.set(id, x);
     }
     return x;
@@ -802,6 +817,10 @@ async function activityMetrics(
   for (const r of viewRows.results) get(r.id).views = r.n;
   for (const r of bookRows.results) get(r.id).bookingClicks = r.n;
   for (const r of poolRows.results) get(r.id).pooled = r.n;
+  for (const r of webRows.results) get(r.id).websiteClicks = r.n;
+  for (const r of expandRows.results) get(r.id).expanded = r.n;
+  for (const r of shareRows.results) get(r.id).shares = r.n;
+  for (const r of calRows.results) get(r.id).calendarAdds = r.n;
   return m;
 }
 
@@ -814,16 +833,42 @@ interface ActMetric {
   views: number;
   bookingClicks: number;
   pooled: number;
+  websiteClicks: number;
+  expanded: number;
+  shares: number;
+  calendarAdds: number;
 }
+
+const emptyMetric = (): ActMetric => ({
+  likes: 0,
+  passes: 0,
+  superlikes: 0,
+  matches: 0,
+  plans: 0,
+  views: 0,
+  bookingClicks: 0,
+  pooled: 0,
+  websiteClicks: 0,
+  expanded: 0,
+  shares: 0,
+  calendarAdds: 0,
+});
 
 function derive(x: ActMetric) {
   const swipes = x.likes + x.passes + x.superlikes;
+  const outboundClicks = x.bookingClicks + x.websiteClicks;
   return {
     ...x,
     swipes,
+    outboundClicks,
     likeRate: swipes > 0 ? (x.likes + x.superlikes) / swipes : null,
     matchRate: x.pooled > 0 ? x.matches / x.pooled : null,
     planConversion: x.matches > 0 ? x.plans / x.matches : null,
+    // view -> click and like -> click conversion (§6). Never a "sale" — a
+    // click only ever means VIBIN sent someone to the destination (§15/§44).
+    viewToClickRate: x.views > 0 ? outboundClicks / x.views : null,
+    likeToClickRate: x.likes + x.superlikes > 0 ? outboundClicks / (x.likes + x.superlikes) : null,
+    matchToClickRate: x.matches > 0 ? outboundClicks / x.matches : null,
   };
 }
 
@@ -907,18 +952,7 @@ app.get("/activities", async (c) => {
 
   const metrics = await activityMetrics(c.env, whereSql, args);
   let rows = baseRows.results.map((r) => {
-    const m = derive(
-      metrics.get(r.id as string) ?? {
-        likes: 0,
-        passes: 0,
-        superlikes: 0,
-        matches: 0,
-        plans: 0,
-        views: 0,
-        bookingClicks: 0,
-        pooled: 0,
-      },
-    );
+    const m = derive(metrics.get(r.id as string) ?? emptyMetric());
     return { ...r, metrics: m };
   });
 
@@ -951,16 +985,7 @@ app.get("/activities/:id", async (c) => {
   if (!a) throw notFound("Activity not found.");
 
   const metrics = derive(
-    (await activityMetrics(c.env, "WHERE a.id = ?1", [id])).get(id) ?? {
-      likes: 0,
-      passes: 0,
-      superlikes: 0,
-      matches: 0,
-      plans: 0,
-      views: 0,
-      bookingClicks: 0,
-      pooled: 0,
-    },
+    (await activityMetrics(c.env, "WHERE a.id = ?1", [id])).get(id) ?? emptyMetric(),
   );
 
   const provider = a.provider_id
@@ -1011,6 +1036,81 @@ function isUrl(v: unknown): boolean {
   return typeof v === "string" && /^https?:\/\//.test(v);
 }
 
+/**
+ * CSV export (§58) — the same per-activity numbers as the list/detail views,
+ * no PII: activities have no individual-user columns, only aggregate counts.
+ */
+app.get("/activities/export.csv", async (c) => {
+  const rows = await c.env.DB.prepare(
+    `SELECT id, title, category_id AS category, city, status, monetization_type AS monetizationType
+     FROM activities ORDER BY title`,
+  ).all<{
+    id: string;
+    title: string;
+    category: string;
+    city: string | null;
+    status: string;
+    monetizationType: string;
+  }>();
+  const metrics = await activityMetrics(c.env, "", []);
+  const cols = [
+    "activity_id",
+    "activity_name",
+    "category",
+    "city",
+    "status",
+    "monetization_type",
+    "impressions",
+    "views",
+    "likes",
+    "passes",
+    "matches",
+    "plans",
+    "website_clicks",
+    "booking_clicks",
+    "outbound_clicks",
+    "calendar_adds",
+    "shares",
+  ];
+  const esc = (v: string | number) => {
+    const s = String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = [cols.join(",")];
+  for (const r of rows.results) {
+    const m = derive(metrics.get(r.id) ?? emptyMetric());
+    lines.push(
+      [
+        r.id,
+        r.title,
+        r.category,
+        r.city ?? "",
+        r.status,
+        r.monetizationType,
+        m.pooled,
+        m.views,
+        m.likes + m.superlikes,
+        m.passes,
+        m.matches,
+        m.plans,
+        m.websiteClicks,
+        m.bookingClicks,
+        m.outboundClicks,
+        m.calendarAdds,
+        m.shares,
+      ]
+        .map(esc)
+        .join(","),
+    );
+  }
+  return new Response(lines.join("\n"), {
+    headers: {
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": `attachment; filename="vibin-activities-${new Date().toISOString().slice(0, 10)}.csv"`,
+    },
+  });
+});
+
 app.get("/rankings/activities", async (c) => {
   const url = new URL(c.req.url);
   const r = parseRange(url.searchParams);
@@ -1047,13 +1147,17 @@ app.get("/rankings/activities", async (c) => {
     mostMatched: rank("matches"),
     highestPlanConversion: rank("planConversion").filter((x) => x.matches >= 1),
     mostBookingClicks: rank("bookingClicks"),
+    mostWebsiteClicks: rank("websiteClicks"),
+    mostOutboundClicks: rank("outboundClicks"),
+    mostExpanded: rank("expanded"),
+    mostShared: rank("shares"),
     mostPassed: rank("passes"),
   });
 });
 
 async function activityMetricsRanged(env: Env, from: number, to: number) {
   const b = (s: string) => env.DB.prepare(s).bind(from, to);
-  const [votes, matchRows, planRows, viewRows, bookRows, poolRows] =
+  const [votes, matchRows, planRows, viewRows, bookRows, poolRows, webRows, expandRows, shareRows, calRows] =
     await Promise.all([
       b(
         `SELECT activity_id AS id, value, COUNT(*) AS n FROM activity_votes
@@ -1080,12 +1184,32 @@ async function activityMetricsRanged(env: Env, from: number, to: number) {
       env.DB.prepare(
         `SELECT activity_id AS id, COUNT(*) AS n FROM group_activity_pool GROUP BY activity_id`,
       ).all<{ id: string; n: number }>(),
+      b(
+        `SELECT activity_id AS id, COUNT(*) AS n FROM analytics_events
+         WHERE name = 'activity_website_clicked' AND created_at >= ?1 AND created_at < ?2
+         AND activity_id IS NOT NULL GROUP BY activity_id`,
+      ).all<{ id: string; n: number }>(),
+      b(
+        `SELECT activity_id AS id, COUNT(*) AS n FROM analytics_events
+         WHERE name = 'activity_expanded' AND created_at >= ?1 AND created_at < ?2
+         AND activity_id IS NOT NULL GROUP BY activity_id`,
+      ).all<{ id: string; n: number }>(),
+      b(
+        `SELECT activity_id AS id, COUNT(*) AS n FROM analytics_events
+         WHERE name = 'activity_shared' AND created_at >= ?1 AND created_at < ?2
+         AND activity_id IS NOT NULL GROUP BY activity_id`,
+      ).all<{ id: string; n: number }>(),
+      b(
+        `SELECT activity_id AS id, COUNT(*) AS n FROM analytics_events
+         WHERE name = 'calendar_action' AND created_at >= ?1 AND created_at < ?2
+         AND activity_id IS NOT NULL GROUP BY activity_id`,
+      ).all<{ id: string; n: number }>(),
     ]);
   const m = new Map<string, ActMetric>();
   const g = (id: string) => {
     let x = m.get(id);
     if (!x) {
-      x = { likes: 0, passes: 0, superlikes: 0, matches: 0, plans: 0, views: 0, bookingClicks: 0, pooled: 0 };
+      x = emptyMetric();
       m.set(id, x);
     }
     return x;
@@ -1101,6 +1225,10 @@ async function activityMetricsRanged(env: Env, from: number, to: number) {
   for (const r of viewRows.results) g(r.id).views = r.n;
   for (const r of bookRows.results) g(r.id).bookingClicks = r.n;
   for (const r of poolRows.results) g(r.id).pooled = r.n;
+  for (const r of webRows.results) g(r.id).websiteClicks = r.n;
+  for (const r of expandRows.results) g(r.id).expanded = r.n;
+  for (const r of shareRows.results) g(r.id).shares = r.n;
+  for (const r of calRows.results) g(r.id).calendarAdds = r.n;
   return m;
 }
 
@@ -1116,7 +1244,7 @@ app.get("/rankings/categories", async (c) => {
   const g = (k: string) => {
     let x = byCat.get(k);
     if (!x) {
-      x = { likes: 0, passes: 0, superlikes: 0, matches: 0, plans: 0, views: 0, bookingClicks: 0, pooled: 0 };
+      x = emptyMetric();
       byCat.set(k, x);
     }
     return x;
@@ -1360,12 +1488,7 @@ app.get("/providers/:id", async (c) => {
   const metrics = await activityMetrics(c.env, "WHERE a.provider_id = ?1", [id]);
   const perActivity = acts.results.map((a) => ({
     ...a,
-    metrics: derive(
-      metrics.get(a.id as string) ?? {
-        likes: 0, passes: 0, superlikes: 0, matches: 0, plans: 0,
-        views: 0, bookingClicks: 0, pooled: 0,
-      },
-    ),
+    metrics: derive(metrics.get(a.id as string) ?? emptyMetric()),
   }));
   const totals = perActivity.reduce(
     (t, a) => {

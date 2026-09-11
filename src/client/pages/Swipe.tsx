@@ -8,6 +8,7 @@ import {
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { api, ApiRequestError } from "../lib/api";
 import { SwipeCard, type SwipeDir } from "../components/SwipeCard";
+import { ActivityExpanded } from "../components/ActivityExpanded";
 import { MatchCelebration } from "../components/MatchCelebration";
 import { EmptyState, ErrorState } from "../components/ui";
 import { SwipeSkeleton } from "../components/SwipeSkeleton";
@@ -41,6 +42,7 @@ export function Swipe() {
   const [loading, setLoading] = useState(true);
   const [celebrate, setCelebrate] = useState<MatchDTO | null>(null);
   const [busy, setBusy] = useState(false);
+  const [expanded, setExpanded] = useState<SwipeCardDTO | null>(null);
 
   const seenMatchIds = useRef<Set<string>>(new Set());
   /** activityIds this client has voted on — never let a merge re-add them. */
@@ -317,6 +319,7 @@ export function Swipe() {
                 key={top.activity.id}
                 activity={top.activity}
                 onSwipe={vote}
+                onExpand={() => setExpanded(top)}
                 z={2}
               />
             )}
@@ -354,6 +357,14 @@ export function Swipe() {
             {meta.hasMore ? "+" : ""} to go · drag the card or tap a button
           </p>
         </>
+      )}
+
+      {expanded && (
+        <ActivityExpanded
+          activity={expanded.activity}
+          groupId={id}
+          onClose={() => setExpanded(null)}
+        />
       )}
 
       {celebrate && (

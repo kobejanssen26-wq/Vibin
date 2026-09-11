@@ -16,6 +16,7 @@ import {
   index,
   integer,
   primaryKey,
+  real,
   sqliteTable,
   text,
   uniqueIndex,
@@ -329,6 +330,38 @@ export const activities = sqliteTable(
     bookingUrl: text("booking_url"),
     ticketUrl: text("ticket_url"),
 
+    // monetization (§4/§46) — what VIBIN can honestly say about this outbound
+    // link. "outbound_tracking" means "we measure the click", nothing more —
+    // it is NOT a claim of commission. Every affiliate/commission field stays
+    // null until a real, contractually-agreed deal exists; never populate
+    // these from a guess.
+    monetizationType: text("monetization_type", {
+      enum: [
+        "none",
+        "outbound_tracking",
+        "affiliate",
+        "direct_partner",
+        "booking_partner",
+      ],
+    })
+      .notNull()
+      .default("none"),
+    affiliateUrl: text("affiliate_url"),
+    affiliateNetwork: text("affiliate_network"),
+    affiliatePartnerId: text("affiliate_partner_id"),
+    commissionType: text("commission_type", {
+      enum: ["none", "percentage", "fixed"],
+    })
+      .notNull()
+      .default("none"),
+    commissionRate: real("commission_rate"), // % (0-100) or fixed-amount units, per commissionType
+    commissionCurrency: text("commission_currency"),
+    commissionStatus: text("commission_status", {
+      enum: ["none", "pending", "active", "paused", "ended"],
+    })
+      .notNull()
+      .default("none"),
+
     // media
     imageUrl: text("image_url"),
     imageSource: text("image_source"), // e.g. "Unsplash", "provider"
@@ -354,6 +387,7 @@ export const activities = sqliteTable(
     activeIdx: index("activities_active_idx").on(t.active),
     statusIdx: index("activities_status_idx").on(t.status),
     cityIdx: index("activities_city_idx").on(t.city),
+    monetizationIdx: index("activities_monetization_idx").on(t.monetizationType),
     extUnq: uniqueIndex("activities_provider_external_unq").on(
       t.providerId,
       t.externalId,

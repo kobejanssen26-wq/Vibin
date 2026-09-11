@@ -51,6 +51,7 @@ export function demoActivity(): ActivityDTO {
     sourceUrl: "https://theparkplayground.com/en-be/our-locations/antwerp",
     lastVerifiedAt: null,
     status: "needs_review",
+    monetizationType: "outbound_tracking",
     availabilityNote: "",
   };
 }

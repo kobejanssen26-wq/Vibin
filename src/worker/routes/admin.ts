@@ -130,6 +130,21 @@ const activityInput = z.object({
     .enum(["verified", "needs_review", "outdated", "inactive"])
     .default("needs_review"),
   active: z.boolean().default(true),
+  // monetization (§4/§17/§46) — edited only when a real deal exists; never
+  // auto-populated with a guess. All optional so a plain content edit doesn't
+  // have to resend them.
+  monetizationType: z
+    .enum(["none", "outbound_tracking", "affiliate", "direct_partner", "booking_partner"])
+    .optional(),
+  affiliateUrl: urlOrNull.optional(),
+  affiliateNetwork: z.string().trim().max(80).nullable().optional(),
+  affiliatePartnerId: z.string().trim().max(80).nullable().optional(),
+  commissionType: z.enum(["none", "percentage", "fixed"]).optional(),
+  commissionRate: z.number().min(0).max(100_000).nullable().optional(),
+  commissionCurrency: z.string().trim().length(3).nullable().optional(),
+  commissionStatus: z
+    .enum(["none", "pending", "active", "paused", "ended"])
+    .optional(),
 });
 
 const scaleLatLng = (v: number | null | undefined) =>

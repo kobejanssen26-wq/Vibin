@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import type { ActivityDTO } from "@shared/types";
 import { CATEGORY_ICON } from "@shared/constants";
-import { IconMapPin } from "./icons";
+import { IconMapPin, IconInfo } from "./icons";
 import { formatDuration } from "../lib/format";
 
 export type SwipeDir = "like" | "nope" | "superlike";
@@ -24,15 +24,23 @@ const CATEGORY_BG: Record<string, string> = {
 const THRESHOLD = 108;
 const VELOCITY = 0.55; // px per ms
 
+/** movement (px) below which a pointer-down/up is a tap, not a drag */
+const TAP_MOVE_MAX = 8;
+/** duration (ms) above which a stationary press stops counting as a tap */
+const TAP_TIME_MAX = 400;
+
 export function SwipeCard({
   activity,
   onSwipe,
+  onExpand,
   interactive = true,
   z = 1,
   offset = 0,
 }: {
   activity: ActivityDTO;
   onSwipe?: (dir: SwipeDir) => void;
+  /** tap (not drag) on the card — opens the expanded detail view */
+  onExpand?: () => void;
   interactive?: boolean;
   z?: number;
   offset?: number;
@@ -82,12 +90,19 @@ export function SwipeCard({
   const onUp = () => {
     if (!start.current) return;
     const { x, y } = drag;
+    const heldFor = performance.now() - start.current.t;
+    const moved = Math.hypot(x, y);
     start.current = null;
     const fast = Math.abs(vx.current) > VELOCITY;
     if (x > THRESHOLD || (fast && vx.current > 0)) fling("like");
     else if (x < -THRESHOLD || (fast && vx.current < 0)) fling("nope");
     else if (y < -THRESHOLD * 1.3) fling("superlike");
-    else setDrag({ x: 0, y: 0, active: false }); // spring back
+    else {
+      setDrag({ x: 0, y: 0, active: false }); // spring back
+      if (onExpand && moved <= TAP_MOVE_MAX && heldFor <= TAP_TIME_MAX) {
+        onExpand();
+      }
+    }
   };
 
   const pos = exit ?? drag;
@@ -166,9 +181,25 @@ export function SwipeCard({
           <span className="chip absolute left-3 top-3 border-white/20 bg-white/90 backdrop-blur">
             {activity.categoryIcon} {activity.categoryLabel}
           </span>
+          {onExpand && (
+            <button
+              type="button"
+              aria-label={`Open more information about ${activity.title}`}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onExpand();
+              }}
+              className="absolute right-3 top-3 z-20 grid h-8 w-8 place-items-center rounded-full bg-navy/45 text-white backdrop-blur-sm"
+            >
+              <IconInfo size={16} />
+            </button>
+          )}
           {showImage && activity.imageAttribution && (
             <span
-              className="pointer-events-none absolute right-2 top-2 max-w-[62%] truncate rounded bg-navy/45 px-1.5 py-0.5 text-[10px] font-medium text-white/80 backdrop-blur-sm"
+              className={`pointer-events-none absolute right-2 max-w-[55%] truncate rounded bg-navy/45 px-1.5 py-0.5 text-[10px] font-medium text-white/80 backdrop-blur-sm ${
+                onExpand ? "top-[46px]" : "top-2"
+              }`}
               title={activity.imageAttribution}
             >
               {activity.imageAttribution}

@@ -137,6 +137,7 @@ export function toActivityDTO(
     sourceUrl: a.sourceUrl,
     lastVerifiedAt: a.lastVerifiedAt,
     status: a.status,
+    monetizationType: a.monetizationType,
     availabilityNote:
       "Activity information is provided for planning. Prices and availability can change — check with the provider before you book.",
   };

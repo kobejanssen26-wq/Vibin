@@ -123,6 +123,16 @@ const COLS = [
   "indoor_outdoor", "accessibility", "opening_hours", "website_url",
   "booking_url", "ticket_url", "image_url", "image_source", "image_attribution",
   "tags", "source", "source_url", "last_verified_at", "status", "active",
+  // monetization (§4/§46) — computed the same as `status` above: a plain,
+  // honest fact from the data itself ("outbound_tracking" when there's a
+  // real link to measure, "none" otherwise), never a guessed deal. Affiliate
+  // URL / network / commission columns are deliberately NOT emitted here —
+  // like `status`, they reset to their safe default ("no deal") on every
+  // reseed, same as an admin's "verified" mark does today; an admin sets a
+  // real deal by hand in the Command Center after the catalogue is seeded,
+  // and re-running the seed (e.g. to add more OSM data) will wipe it, exactly
+  // as it already wipes a hand-verified status. Documented, not new.
+  "monetization_type",
   "created_at", "updated_at",
 ];
 
@@ -200,6 +210,7 @@ function emit(
     n(verifiedAt),
     q("needs_review"),
     "1",
+    q(a.providerWebsite || a.bookingUrl || a.ticketUrl ? "outbound_tracking" : "none"),
     n(now),
     n(now),
   ];

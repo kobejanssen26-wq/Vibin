@@ -29,6 +29,7 @@ import adminCcRoutes from "./routes/admin-cc";
 import adminEventRoutes from "./routes/admin-events";
 import adminVaultRoutes from "./routes/admin-vault";
 import mediaRoutes from "./routes/media";
+import goRoutes from "./routes/go";
 
 type Ctx = { Bindings: Env; Variables: Vars };
 
@@ -126,6 +127,9 @@ api.use("*", async (c, next) => {
 
 api.route("/auth", authRoutes);
 api.route("/media", mediaRoutes);
+// Public outbound-click redirect — no auth required (§3); withSession above
+// already best-effort-populates userId when a session cookie is present.
+api.route("/go", goRoutes);
 
 /* -------------------------- Owner Command Center ------------------------- *
  * Registered BEFORE the app's `requireAuth` catch-all so `/api/admin/auth/*`

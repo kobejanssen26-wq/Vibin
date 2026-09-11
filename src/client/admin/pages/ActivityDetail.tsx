@@ -6,9 +6,12 @@ import {
   Badge,
   Btn,
   ErrorNote,
+  Field,
+  Input,
   Loading,
   Panel,
   PageTitle,
+  Select,
   StatTile,
   fmtDate,
   fmtNum,
@@ -34,15 +37,38 @@ interface Detail {
     matches: number;
     plans: number;
     bookingClicks: number;
+    websiteClicks: number;
+    outboundClicks: number;
+    expanded: number;
+    shares: number;
+    calendarAdds: number;
     pooled: number;
     likeRate: number | null;
     matchRate: number | null;
     planConversion: number | null;
+    viewToClickRate: number | null;
+    likeToClickRate: number | null;
+    matchToClickRate: number | null;
   };
   provider: Record<string, unknown> | null;
   matchedGroups: { id: string; name: string; status: string }[];
   quality: { score: number; checks: { k: string; ok: boolean }[] };
 }
+
+const MONETIZATION_LABEL: Record<string, string> = {
+  none: "None",
+  outbound_tracking: "Outbound tracking only (no deal)",
+  affiliate: "Affiliate",
+  direct_partner: "Direct partner",
+  booking_partner: "Booking partner",
+};
+const MONETIZATION_TONE: Record<string, string> = {
+  none: "slate",
+  outbound_tracking: "blue",
+  affiliate: "green",
+  direct_partner: "green",
+  booking_partner: "green",
+};
 
 export function ActivityDetail() {
   const { id = "" } = useParams();
@@ -241,9 +267,32 @@ export function ActivityDetail() {
               <StatTile label="Match rate" value={fmtPct(data.metrics.matchRate)} hint="of groups that saw it" />
               <StatTile label="Plans" value={fmtNum(data.metrics.plans)} />
               <StatTile label="Plan conversion" value={fmtPct(data.metrics.planConversion)} hint="plans ÷ matches" />
-              <StatTile label="Booking clicks" value={fmtNum(data.metrics.bookingClicks)} />
+              <StatTile label="Expanded" value={fmtNum(data.metrics.expanded)} hint="tapped for more info" />
+              <StatTile label="Shares" value={fmtNum(data.metrics.shares)} />
+              <StatTile label="Calendar adds" value={fmtNum(data.metrics.calendarAdds)} />
             </div>
           </Panel>
+
+          <Panel
+            title="Outbound clicks"
+            subtitle="A click means VIBIN sent someone to the destination — never proof of a booking or sale (§15/§44)"
+          >
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+              <StatTile label="Website clicks" value={fmtNum(data.metrics.websiteClicks)} />
+              <StatTile label="Booking/ticket clicks" value={fmtNum(data.metrics.bookingClicks)} />
+              <StatTile label="Total outbound clicks" value={fmtNum(data.metrics.outboundClicks)} />
+              <StatTile label="View → click" value={fmtPct(data.metrics.viewToClickRate)} />
+              <StatTile label="Like → click" value={fmtPct(data.metrics.likeToClickRate)} />
+              <StatTile label="Match → click" value={fmtPct(data.metrics.matchToClickRate)} />
+            </div>
+            <p className="mt-2 text-[11px] text-slate-400">
+              Confirmed bookings, revenue and commission are only shown once a
+              real affiliate/partner integration reports them back — VIBIN
+              never estimates them from clicks alone.
+            </p>
+          </Panel>
+
+          <MonetizationPanel id={id} activity={a} onSaved={reload} />
 
           {data.matchedGroups.length > 0 && (
             <Panel title="Recently matched by">
@@ -263,6 +312,179 @@ export function ActivityDetail() {
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * Monetization (§4/§17/§46) — what VIBIN can honestly say about this outbound
+ * link, edited only when a real, contractually-agreed deal exists. Nothing
+ * here is ever set automatically from a guess; every field defaults to
+ * "none" and stays that way until an owner enters an actual agreement.
+ */
+function MonetizationPanel({
+  id,
+  activity: a,
+  onSaved,
+}: {
+  id: string;
+  activity: Record<string, unknown>;
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [form, setForm] = useState(() => ({
+    monetizationType: (a.monetization_type as string) || "none",
+    affiliateUrl: (a.affiliate_url as string) || "",
+    affiliateNetwork: (a.affiliate_network as string) || "",
+    affiliatePartnerId: (a.affiliate_partner_id as string) || "",
+    commissionType: (a.commission_type as string) || "none",
+    commissionRate: a.commission_rate != null ? String(a.commission_rate) : "",
+    commissionCurrency: (a.commission_currency as string) || "",
+    commissionStatus: (a.commission_status as string) || "none",
+  }));
+  const set = (k: keyof typeof form, v: string) =>
+    setForm((p) => ({ ...p, [k]: v }));
+
+  const save = async () => {
+    setSaving(true);
+    setErr(null);
+    try {
+      await cc(`/activities/${id}`, {
+        method: "PUT",
+        body: {
+          monetizationType: form.monetizationType,
+          affiliateUrl: form.affiliateUrl.trim() || null,
+          affiliateNetwork: form.affiliateNetwork.trim() || null,
+          affiliatePartnerId: form.affiliatePartnerId.trim() || null,
+          commissionType: form.commissionType,
+          commissionRate: form.commissionRate.trim() ? Number(form.commissionRate) : null,
+          commissionCurrency: form.commissionCurrency.trim() || null,
+          commissionStatus: form.commissionStatus,
+        },
+      });
+      setEditing(false);
+      onSaved();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not save.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const type = (a.monetization_type as string) || "none";
+
+  return (
+    <Panel
+      title="Monetization"
+      right={
+        <Btn variant="ghost" className="!py-1 !text-xs" onClick={() => setEditing((v) => !v)}>
+          {editing ? "Cancel" : "Edit"}
+        </Btn>
+      }
+    >
+      {!editing ? (
+        <dl className="grid gap-x-6 gap-y-2 text-[13px] sm:grid-cols-2">
+          <Row k="Type">
+            <Badge tone={(MONETIZATION_TONE[type] ?? "slate") as never}>
+              {MONETIZATION_LABEL[type] ?? type}
+            </Badge>
+          </Row>
+          <Row k="Commission">
+            {(a.commission_type as string) === "none" || !a.commission_type
+              ? "None"
+              : `${a.commission_rate ?? "—"}${a.commission_type === "percentage" ? "%" : ` ${a.commission_currency ?? ""}`} (${a.commission_status})`}
+          </Row>
+          <Row k="Affiliate URL">
+            <Ext href={a.affiliate_url as string} />
+          </Row>
+          <Row k="Affiliate network">{(a.affiliate_network as string) || "—"}</Row>
+        </dl>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Monetization type">
+            <Select
+              value={form.monetizationType}
+              onChange={(e) => set("monetizationType", e.target.value)}
+            >
+              {Object.entries(MONETIZATION_LABEL).map(([k, label]) => (
+                <option key={k} value={k}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Commission type">
+            <Select
+              value={form.commissionType}
+              onChange={(e) => set("commissionType", e.target.value)}
+            >
+              <option value="none">None</option>
+              <option value="percentage">Percentage</option>
+              <option value="fixed">Fixed amount</option>
+            </Select>
+          </Field>
+          <Field
+            label="Commission rate"
+            hint={form.commissionType === "percentage" ? "e.g. 8 for 8%" : "amount per booking"}
+          >
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.commissionRate}
+              onChange={(e) => set("commissionRate", e.target.value)}
+              disabled={form.commissionType === "none"}
+            />
+          </Field>
+          <Field label="Commission currency">
+            <Input
+              maxLength={3}
+              placeholder="EUR"
+              value={form.commissionCurrency}
+              onChange={(e) => set("commissionCurrency", e.target.value.toUpperCase())}
+              disabled={form.commissionType !== "fixed"}
+            />
+          </Field>
+          <Field label="Commission status">
+            <Select
+              value={form.commissionStatus}
+              onChange={(e) => set("commissionStatus", e.target.value)}
+            >
+              <option value="none">None</option>
+              <option value="pending">Pending</option>
+              <option value="active">Active</option>
+              <option value="paused">Paused</option>
+              <option value="ended">Ended</option>
+            </Select>
+          </Field>
+          <Field label="Affiliate network">
+            <Input
+              value={form.affiliateNetwork}
+              onChange={(e) => set("affiliateNetwork", e.target.value)}
+            />
+          </Field>
+          <Field label="Affiliate partner ID">
+            <Input
+              value={form.affiliatePartnerId}
+              onChange={(e) => set("affiliatePartnerId", e.target.value)}
+            />
+          </Field>
+          <Field label="Affiliate URL" hint="the partner's actual tracking link">
+            <Input
+              value={form.affiliateUrl}
+              onChange={(e) => set("affiliateUrl", e.target.value)}
+            />
+          </Field>
+          <div className="col-span-2 flex items-center gap-3">
+            <Btn loading={saving} onClick={save}>
+              Save
+            </Btn>
+            {err && <span className="text-xs text-rose-600">{err}</span>}
+          </div>
+        </div>
+      )}
+    </Panel>
   );
 }
 

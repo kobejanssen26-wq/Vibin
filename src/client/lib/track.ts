@@ -5,6 +5,8 @@
  */
 type ClientEvent =
   | "activity_viewed"
+  | "activity_expanded"
+  | "activity_shared"
   | "booking_clicked"
   | "calendar_action"
   | "client_error";

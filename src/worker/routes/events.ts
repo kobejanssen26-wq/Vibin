@@ -19,6 +19,8 @@ const uid = (c: { get: (k: "userId") => string | null }) => c.get("userId")!;
 
 const CLIENT_EVENTS = [
   "activity_viewed",
+  "activity_expanded",
+  "activity_shared",
   "booking_clicked",
   "calendar_action",
   "onboarding_completed",

@@ -236,7 +236,8 @@ export interface SeedActivity {
   category: string;
   subcategory?: string;
   provider: string;
-  providerWebsite: string;
+  /** the business's own site — null when none is known (never a fallback URL) */
+  providerWebsite: string | null;
   bookingUrl?: string;
   ticketUrl?: string;
   city: string;

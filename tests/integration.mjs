@@ -482,10 +482,13 @@ async function run() {
       }
       st = (await cl("POST", `/groups/${grp.id}/swipe/extend`, {})).json;
     }
-    // pool 2 fresh batches (after the learning phase) to smooth out the
-    // ranker's deliberate per-batch randomness (exploration + diversity)
+    // pool several fresh batches (after the learning phase) to smooth out the
+    // ranker's deliberate per-batch randomness (exploration + diversity) —
+    // the anti-hard-hiding guarantee itself is proven deterministically at
+    // the algorithm level in src/worker/engine/rank.test.ts; this is a
+    // best-effort smoke check over live, noisier data.
     const cats = [];
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < 5; i++) {
       const fresh = (await cl("POST", `/groups/${grp.id}/swipe/extend`, {})).json;
       cats.push(...fresh.queue.map((c) => c.activity.category));
     }
@@ -506,8 +509,78 @@ async function run() {
   );
   ok(
     "ranking never hard-hides a category — the sport-liking group still sees some culture",
-    sportRun.culture > 0 || cultureRun.total < 8, // (only meaningful with a broad catalogue)
+    sportRun.culture > 0 || cultureRun.total < 5, // (best-effort smoke check — see rank.test.ts for the real guarantee)
   );
+
+  // --- outbound-click tracking (/api/go/activity/:id) ---
+  const gc = client();
+  await signup(gc, "GoClick");
+  const gg = (await gc("POST", "/groups", { name: `Go ${uniq()}` })).json.group;
+  await gc("PUT", `/groups/${gg.id}/settings`, {
+    categories: [],
+    allActivities: true,
+    locationLabel: null,
+    lat: null,
+    lng: null,
+    radiusKm: 50,
+    budgetBand: "any",
+    dateMode: "unknown",
+    dateSpecific: null,
+    timeBand: "unknown",
+    timeSpecific: null,
+  });
+  await gc("POST", `/groups/${gg.id}/start`, {});
+  const gState = (await gc("GET", `/groups/${gg.id}/swipe`)).json;
+  const withWebsite = gState.queue.find((c) => c.activity.websiteUrl)?.activity;
+  const withoutAnyLink = gState.queue.find(
+    (c) => !c.activity.websiteUrl && !c.activity.bookingUrl && !c.activity.ticketUrl,
+  )?.activity;
+
+  if (withWebsite) {
+    const r = await fetch(`${BASE}/api/go/activity/${withWebsite.id}?kind=website&src=swipe_card`, {
+      redirect: "manual",
+    });
+    ok(
+      "go/activity redirects (302) straight to the activity's real website",
+      r.status === 302 && r.headers.get("location") === withWebsite.websiteUrl,
+    );
+    // the exact same request anonymously (no cookies) still redirects — clicks
+    // are measurable without requiring a session (§3)
+    const anon = await fetch(
+      `${BASE}/api/go/activity/${withWebsite.id}?kind=website&src=swipe_card`,
+      { redirect: "manual", headers: { cookie: "" } },
+    );
+    ok("go/activity works for an anonymous (logged-out) click too", anon.status === 302);
+
+    // open-redirect protection: an attacker-supplied `url` query param is
+    // simply ignored — destination always comes from the activity's own
+    // stored URL, never from request input
+    const spoof = await fetch(
+      `${BASE}/api/go/activity/${withWebsite.id}?kind=website&src=swipe_card&url=https://evil.example.com`,
+      { redirect: "manual" },
+    );
+    ok(
+      "an injected ?url= param cannot redirect anywhere else (no open redirect)",
+      spoof.status === 302 &&
+        spoof.headers.get("location") === withWebsite.websiteUrl &&
+        !spoof.headers.get("location")?.includes("evil.example.com"),
+    );
+  } else {
+    console.warn("  (skipped go/activity redirect checks — no card with a websiteUrl in this deck)");
+  }
+
+  if (withoutAnyLink) {
+    const r = await fetch(
+      `${BASE}/api/go/activity/${withoutAnyLink.id}?kind=website&src=swipe_card`,
+      { redirect: "manual" },
+    );
+    ok("go/activity 404s for an activity with no matching outbound link", r.status === 404);
+  }
+
+  const bogus = await fetch(`${BASE}/api/go/activity/does-not-exist?kind=website`, {
+    redirect: "manual",
+  });
+  ok("go/activity 404s for an unknown activity id", bogus.status === 404);
 
   console.log(`\n${passed} passed, ${failed} failed\n`);
   process.exit(failed === 0 ? 0 : 1);
