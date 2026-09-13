@@ -61,6 +61,10 @@ export function verifyEmailBody(url: string): OutboundEmail["text"] {
   return `Welcome to VIBIN!\n\nConfirm your email address to finish setting up your account:\n${url}\n\nThis link expires in 24 hours. If you didn't sign up, ignore this message.`;
 }
 
+export function changeEmailVerifyBody(url: string): OutboundEmail["text"] {
+  return `Confirm this is your new VIBIN email address:\n${url}\n\nThis link expires in 24 hours. If you didn't request this change, contact us — your old email can still be used to reach support.`;
+}
+
 export function resetEmailBody(url: string): OutboundEmail["text"] {
   return `Someone (hopefully you) asked to reset your VIBIN password.\n\nReset it here:\n${url}\n\nThis link expires in 1 hour. If you didn't request this, ignore this message — your password won't change.`;
 }

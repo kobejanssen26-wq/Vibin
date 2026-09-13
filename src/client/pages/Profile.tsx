@@ -202,6 +202,8 @@ export function Profile() {
         </div>
       </section>
 
+      <SecuritySection currentEmail={user.email} />
+
       <section>
         <SectionHead label="Help" />
         <div className="card">
@@ -299,5 +301,142 @@ export function Profile() {
         </Modal>
       )}
     </div>
+  );
+}
+
+function SecuritySection({ currentEmail }: { currentEmail: string }) {
+  const { user, setUser } = useAuth();
+  const [open, setOpen] = useState<"none" | "email" | "password">("none");
+
+  const [emailForm, setEmailForm] = useState({ newEmail: "", password: "" });
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailMsg, setEmailMsg] = useState<string | null>(null);
+  const [emailErr, setEmailErr] = useState<string | null>(null);
+
+  const changeEmail = async (e: FormEvent) => {
+    e.preventDefault();
+    setEmailBusy(true);
+    setEmailErr(null);
+    setEmailMsg(null);
+    try {
+      const r = await api<{ email: string }>("/me/email", {
+        method: "PATCH",
+        body: { newEmail: emailForm.newEmail.trim(), currentPassword: emailForm.password },
+      });
+      if (user) setUser({ ...user, email: r.email, emailVerified: false });
+      setEmailMsg("Email updated. Check your inbox to verify it.");
+      setEmailForm({ newEmail: "", password: "" });
+      setOpen("none");
+    } catch (e) {
+      setEmailErr(e instanceof ApiRequestError ? e.message : "Could not change email.");
+    } finally {
+      setEmailBusy(false);
+    }
+  };
+
+  const [pwForm, setPwForm] = useState({ current: "", next: "" });
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwMsg, setPwMsg] = useState<string | null>(null);
+  const [pwErr, setPwErr] = useState<string | null>(null);
+
+  const changePassword = async (e: FormEvent) => {
+    e.preventDefault();
+    setPwBusy(true);
+    setPwErr(null);
+    setPwMsg(null);
+    try {
+      await api("/me/password", {
+        method: "PATCH",
+        body: { currentPassword: pwForm.current, newPassword: pwForm.next },
+      });
+      setPwMsg("Password changed.");
+      setPwForm({ current: "", next: "" });
+      setOpen("none");
+    } catch (e) {
+      setPwErr(e instanceof ApiRequestError ? e.message : "Could not change password.");
+    } finally {
+      setPwBusy(false);
+    }
+  };
+
+  return (
+    <section>
+      <SectionHead label="Security" />
+      <div className="card divide-y divide-paper-line">
+        <button
+          type="button"
+          className="flex w-full items-center justify-between px-4 py-3.5 text-left text-sm"
+          onClick={() => setOpen(open === "email" ? "none" : "email")}
+        >
+          <div>
+            <p className="font-semibold">Email</p>
+            <p className="text-xs text-navy-400">{currentEmail}</p>
+          </div>
+          <span className="text-xs font-semibold text-brand-600">Change</span>
+        </button>
+        {open === "email" && (
+          <form onSubmit={changeEmail} className="space-y-3 px-4 py-4">
+            <Field
+              label="New email"
+              type="email"
+              required
+              value={emailForm.newEmail}
+              onChange={(e) => setEmailForm({ ...emailForm, newEmail: e.target.value })}
+            />
+            <Field
+              label="Current password"
+              type="password"
+              required
+              value={emailForm.password}
+              onChange={(e) => setEmailForm({ ...emailForm, password: e.target.value })}
+              error={emailErr ?? undefined}
+            />
+            <Button type="submit" loading={emailBusy} className="w-full">
+              Update email
+            </Button>
+          </form>
+        )}
+
+        <button
+          type="button"
+          className="flex w-full items-center justify-between px-4 py-3.5 text-left text-sm"
+          onClick={() => setOpen(open === "password" ? "none" : "password")}
+        >
+          <div>
+            <p className="font-semibold">Password</p>
+            <p className="text-xs text-navy-400">••••••••</p>
+          </div>
+          <span className="text-xs font-semibold text-brand-600">Change</span>
+        </button>
+        {open === "password" && (
+          <form onSubmit={changePassword} className="space-y-3 px-4 py-4">
+            <Field
+              label="Current password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={pwForm.current}
+              onChange={(e) => setPwForm({ ...pwForm, current: e.target.value })}
+            />
+            <Field
+              label="New password"
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={8}
+              value={pwForm.next}
+              onChange={(e) => setPwForm({ ...pwForm, next: e.target.value })}
+              error={pwErr ?? undefined}
+            />
+            <Button type="submit" loading={pwBusy} className="w-full">
+              Update password
+            </Button>
+          </form>
+        )}
+      </div>
+      {(emailMsg || pwMsg) && (
+        <p className="mt-2 text-xs font-medium text-lime-700">{emailMsg || pwMsg}</p>
+      )}
+    </section>
   );
 }

@@ -6,6 +6,7 @@ import { createDb } from "../db/client";
 import {
   activityVotes,
   dateVotes,
+  emailTokens,
   groupMembers,
   groups,
   messages,
@@ -16,14 +17,15 @@ import {
   pushTokens,
   users,
 } from "../db/schema";
-import { parseBody } from "../lib/validate";
+import { emailSchema, parseBody, passwordSchema } from "../lib/validate";
 import { loadMe } from "../lib/me";
 import { planRowToDTO } from "../lib/plan-view";
 import { AppError, badRequest, notFound } from "../lib/errors";
-import { verifyPassword } from "../lib/password";
+import { hashPassword, sha256Hex, verifyPassword } from "../lib/password";
 import { destroyAllSessions } from "../lib/session";
 import { clearSessionCookie } from "../lib/cookies";
 import { newId } from "../lib/id";
+import { changeEmailVerifyBody, sendEmail } from "../lib/email";
 import type { NotificationDTO } from "@shared/types";
 import { LIMITS } from "@shared/constants";
 
@@ -293,6 +295,67 @@ app.post("/delete", async (c) => {
   // Hard delete — FK cascades remove profile, memberships, votes, tokens, etc.
   await db.delete(users).where(eq(users.id, userId));
   return c.json({ ok: true });
+});
+
+/* --------------------------- security settings -------------------------- */
+app.patch("/password", async (c) => {
+  const body = await parseBody(
+    c,
+    z.object({ currentPassword: z.string().min(1).max(200), newPassword: passwordSchema }),
+  );
+  const db = createDb(c.env);
+  const userId = uid(c);
+  const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
+  if (!user) throw notFound();
+  const { ok } = await verifyPassword(body.currentPassword, user.passwordHash);
+  if (!ok) throw badRequest("Current password is incorrect.");
+
+  await db
+    .update(users)
+    .set({ passwordHash: await hashPassword(body.newPassword), updatedAt: Math.floor(Date.now() / 1000) })
+    .where(eq(users.id, userId));
+  return c.json({ ok: true });
+});
+
+app.patch("/email", async (c) => {
+  const body = await parseBody(
+    c,
+    z.object({ newEmail: emailSchema, currentPassword: z.string().min(1).max(200) }),
+  );
+  const db = createDb(c.env);
+  const userId = uid(c);
+  const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
+  if (!user) throw notFound();
+  const { ok } = await verifyPassword(body.currentPassword, user.passwordHash);
+  if (!ok) throw badRequest("Current password is incorrect.");
+
+  const normalized = body.newEmail.toLowerCase();
+  if (normalized === user.emailNormalized) throw badRequest("That's already your email.");
+  const taken = await db.query.users.findFirst({ where: eq(users.emailNormalized, normalized) });
+  if (taken) throw badRequest("That email is already in use.");
+
+  const now = Math.floor(Date.now() / 1000);
+  await db
+    .update(users)
+    .set({ email: body.newEmail, emailNormalized: normalized, emailVerifiedAt: null, updatedAt: now })
+    .where(eq(users.id, userId));
+
+  const token = crypto.randomUUID();
+  await db.insert(emailTokens).values({
+    id: newId(),
+    userId,
+    kind: "verify",
+    tokenHash: await sha256Hex(token),
+    expiresAt: now + 24 * 3600,
+    createdAt: now,
+  });
+  await sendEmail(c.env, {
+    to: body.newEmail,
+    subject: "Confirm your new VIBIN email",
+    text: changeEmailVerifyBody(`${c.env.APP_URL}/verify-email?token=${token}`),
+  });
+
+  return c.json({ ok: true, email: body.newEmail });
 });
 
 export default app;
