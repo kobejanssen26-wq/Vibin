@@ -273,6 +273,9 @@ export const activityCategories = sqliteTable("activity_categories", {
   label: text("label").notNull(),
   icon: text("icon").notNull().default("✨"),
   sort: integer("sort").notNull().default(0),
+  // inactive categories stay valid on existing activities/votes but are
+  // hidden from the swipe-filter chip list for new selections.
+  active: integer("active").notNull().default(1),
 });
 
 export const activities = sqliteTable(
@@ -366,6 +369,11 @@ export const activities = sqliteTable(
     imageUrl: text("image_url"),
     imageSource: text("image_source"), // e.g. "Unsplash", "provider"
     imageAttribution: text("image_attribution"), // e.g. "Photo: Jane Doe / Unsplash"
+    // true when imageUrl is a shared category/subcategory stock fallback
+    // (no venue-specific photo exists) rather than a photo of this exact
+    // place — lets the image-quality audit surface "generic" reuse honestly
+    // instead of admins mistaking it for a data bug.
+    imageIsGeneric: integer("image_is_generic").notNull().default(0),
     tags: text("tags").notNull().default("[]"), // JSON array
 
     // provenance & verification (§14, §27)
@@ -826,9 +834,74 @@ export const reports = sqliteTable(
     }),
     createdAt: integer("created_at").notNull().default(now),
     resolvedAt: integer("resolved_at"),
+    // internal moderator notes — never shown to the reporter or reported user
+    notes: text("notes"),
   },
   (t) => ({
     statusIdx: index("reports_status_idx").on(t.status),
+  }),
+);
+
+/* -------------------------------------------------------------------------- */
+/*  Help / support desk                                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A support conversation. The first message is the user's own question;
+ * an AI reply (if ANTHROPIC_API_KEY is configured — see lib/support-ai.ts)
+ * is appended as its own message, same thread, never a separate system.
+ * `aiResolved` is only ever set true by the AI explicitly saying it's
+ * confident in its answer — anything else stays "open" for a human.
+ */
+export const supportTickets = sqliteTable(
+  "support_tickets",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    subject: text("subject").notNull(),
+    category: text("category", {
+      enum: ["account", "groups", "swiping", "activities", "bug", "other"],
+    })
+      .notNull()
+      .default("other"),
+    priority: text("priority", { enum: ["low", "normal", "high"] })
+      .notNull()
+      .default("normal"),
+    status: text("status", { enum: ["open", "pending", "resolved", "closed"] })
+      .notNull()
+      .default("open"),
+    // true only when the AI answered and explicitly reported high confidence;
+    // false/null means a human should look at this (no key configured, AI was
+    // unsure, or nothing has answered yet).
+    aiResolved: integer("ai_resolved"),
+    assignedTo: text("assigned_to").references(() => users.id, { onDelete: "set null" }),
+    createdAt: integer("created_at").notNull().default(now),
+    updatedAt: integer("updated_at").notNull().default(now),
+  },
+  (t) => ({
+    userIdx: index("support_tickets_user_idx").on(t.userId),
+    statusIdx: index("support_tickets_status_idx").on(t.status),
+  }),
+);
+
+export const supportMessages = sqliteTable(
+  "support_messages",
+  {
+    id: text("id").primaryKey(),
+    ticketId: text("ticket_id")
+      .notNull()
+      .references(() => supportTickets.id, { onDelete: "cascade" }),
+    authorType: text("author_type", { enum: ["user", "ai", "admin", "system"] }).notNull(),
+    authorId: text("author_id").references(() => users.id, { onDelete: "set null" }),
+    body: text("body").notNull(),
+    // admin-only internal note — never sent to or shown to the ticket's user
+    internal: integer("internal").notNull().default(0),
+    createdAt: integer("created_at").notNull().default(now),
+  },
+  (t) => ({
+    ticketIdx: index("support_messages_ticket_idx").on(t.ticketId),
   }),
 );
 

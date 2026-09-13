@@ -106,6 +106,7 @@ app.post("/:id/messages", async (c) => {
     kind: "message",
     title: `${me?.displayName ?? "Someone"} in the group chat`,
     body: body.body.slice(0, 120),
+    data: { messageId: id },
   });
   const [row] = await toDTOs(
     db,

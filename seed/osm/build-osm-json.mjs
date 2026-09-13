@@ -9,7 +9,7 @@
  * curated set's `priceType:"varies"`), no invented descriptions beyond a factual
  * one-liner, everything ships `status:"needs_review"`. Attribution: OSM / ODbL.
  */
-import { readFileSync, writeFileSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { OSM_CATEGORIES } from "./categories.mjs";
@@ -18,6 +18,13 @@ import { resolvePlace, allPlaces } from "../../src/worker/lib/be-places.ts";
 const here = dirname(fileURLToPath(import.meta.url));
 const RAW = join(here, "raw");
 const byKey = Object.fromEntries(OSM_CATEGORIES.map((c) => [c.key, c]));
+
+// Wikidata P18 photos (fetch-wikidata-images.mjs) — a real, curated photo of
+// this exact entity, keyed by QID. Optional: falls back to {} if not fetched.
+const WIKIDATA_IMAGES_PATH = join(RAW, "wikidata-images.json");
+const wikidataImages = existsSync(WIKIDATA_IMAGES_PATH)
+  ? JSON.parse(readFileSync(WIKIDATA_IMAGES_PATH, "utf8"))
+  : {};
 
 const PLACES = allPlaces();
 function nearestCity(lat, lng) {
@@ -94,6 +101,19 @@ for (const file of readdirSync(RAW).filter((f) => f.endsWith(".json"))) {
         f,
       )}?width=1280`;
       imageAttribution = "Wikimedia Commons — via OpenStreetMap";
+    } else if (t.image && /^https?:\/\//i.test(t.image)) {
+      // OSM's plain `image` tag: a direct URL a mapper attached to this exact
+      // element. Real per-venue data, just less common than wikimedia_commons.
+      imageUrl = t.image;
+      imageAttribution = "Photo via OpenStreetMap contributor";
+    } else if (t.wikidata && wikidataImages[t.wikidata]) {
+      // Wikidata P18 — a curated, reviewed photo of this exact entity. Larger
+      // and generally higher-quality source than OSM's own image tags.
+      const f = wikidataImages[t.wikidata].replace(/ /g, "_");
+      imageUrl = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(
+        f,
+      )}?width=1280`;
+      imageAttribution = "Wikimedia Commons — via Wikidata";
     }
 
     const hours =
@@ -139,14 +159,19 @@ for (const file of readdirSync(RAW).filter((f) => f.endsWith(".json"))) {
       imageAttribution,
       osmId,
       _web: website ? 1 : 0,
+      _img: imageUrl ? 1 : 0,
     });
   }
 
-  bucket.sort((a, b) => b._web - a._web);
+  // When a category has more raw elements than its cap, keep the richer
+  // listings first — a real website and/or a real per-venue photo — instead
+  // of discarding them in favour of an arbitrary earlier element with neither.
+  bucket.sort((a, b) => b._web + b._img - (a._web + a._img));
   const take = bucket.slice(0, cat.cap);
   perCat[key] = `${take.length}/${bucket.length}`;
   for (const r of take) {
     delete r._web;
+    delete r._img;
     OUT.push(r);
   }
 }

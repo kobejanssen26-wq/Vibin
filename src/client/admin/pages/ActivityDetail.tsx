@@ -3,6 +3,11 @@ import { Link, useParams } from "react-router-dom";
 import { cc } from "../api";
 import { useResource } from "../lib";
 import {
+  ActivityForm,
+  activityFormToBody,
+  type ActivityFormValues,
+} from "../components/ActivityForm";
+import {
   Badge,
   Btn,
   ErrorNote,
@@ -17,6 +22,64 @@ import {
   fmtNum,
   fmtPct,
 } from "../ui";
+
+function safeJsonArray(s: unknown): string[] {
+  if (typeof s !== "string") return [];
+  try {
+    const v = JSON.parse(s);
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+function safeJsonObject(s: unknown): Record<string, string> {
+  if (typeof s !== "string") return {};
+  try {
+    const v = JSON.parse(s);
+    return v && typeof v === "object" ? v : {};
+  } catch {
+    return {};
+  }
+}
+
+function dbRowToFormValues(a: Record<string, unknown>): ActivityFormValues {
+  const s = (v: unknown) => (v == null ? "" : String(v));
+  return {
+    title: s(a.title),
+    description: s(a.description),
+    categoryId: s(a.category_id),
+    subcategory: s(a.subcategory),
+    provider: s(a.provider),
+    providerWebsite: s(a.provider_website),
+    locationLabel: s(a.location_label),
+    address: s(a.address),
+    city: s(a.city),
+    country: s(a.country) || "BE",
+    lat: a.lat != null ? String((a.lat as number) / 1e6) : "",
+    lng: a.lng != null ? String((a.lng as number) / 1e6) : "",
+    priceType: s(a.price_type) || "per_person",
+    priceCents: a.price_cents != null ? String(a.price_cents) : "",
+    priceBand: s(a.price_band) || "free",
+    durationMin: a.duration_min != null ? String(a.duration_min) : "",
+    minParticipants: a.min_participants != null ? String(a.min_participants) : "",
+    maxParticipants: a.max_participants != null ? String(a.max_participants) : "",
+    minAge: a.min_age != null ? String(a.min_age) : "",
+    indoorOutdoor: s(a.indoor_outdoor),
+    accessibility: s(a.accessibility),
+    hours: safeJsonObject(a.opening_hours),
+    websiteUrl: s(a.website_url),
+    bookingUrl: s(a.booking_url),
+    ticketUrl: s(a.ticket_url),
+    imageUrl: s(a.image_url),
+    imageSource: s(a.image_source),
+    imageAttribution: s(a.image_attribution),
+    tags: safeJsonArray(a.tags).join(", "),
+    source: s(a.source) || "admin",
+    sourceUrl: s(a.source_url),
+    status: s(a.status) || "needs_review",
+    active: a.active !== 0,
+  };
+}
 
 const STATUS_TONE: Record<string, string> = {
   verified: "green",
@@ -97,6 +160,29 @@ export function ActivityDetail() {
   const setStatus = (s: string) =>
     act(s, () => cc(`/activities/${id}`, { method: "PUT", body: { status: s } }));
 
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState<ActivityFormValues | null>(null);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const startEdit = () => {
+    if (a) setEditForm(dbRowToFormValues(a));
+    setSaveErr(null);
+    setEditing(true);
+  };
+  const saveEdit = async () => {
+    if (!editForm) return;
+    setBusy("save");
+    setSaveErr(null);
+    try {
+      await cc(`/activities/${id}`, { method: "PUT", body: activityFormToBody(editForm) });
+      setEditing(false);
+      reload();
+    } catch (e) {
+      setSaveErr(e instanceof Error ? e.message : "Could not save.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
     <>
       <PageTitle
@@ -170,8 +256,19 @@ export function ActivityDetail() {
             </p>
           </Panel>
 
+          {editing && editForm ? (
+            <ActivityForm
+              value={editForm}
+              onChange={setEditForm}
+              onSubmit={saveEdit}
+              onCancel={() => setEditing(false)}
+              submitLabel="Save changes"
+              busy={busy === "save"}
+              error={saveErr}
+            />
+          ) : (
           <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-            <Panel title="Details">
+            <Panel title="Details" right={<Btn variant="ghost" className="!py-1 !text-xs" onClick={startEdit}>Edit</Btn>}>
               <dl className="grid gap-x-6 gap-y-2 text-[13px] sm:grid-cols-2">
                 <Row k="ID">
                   <code className="font-mono text-xs">{a.id as string}</code>
@@ -255,6 +352,7 @@ export function ActivityDetail() {
               </ul>
             </Panel>
           </div>
+          )}
 
           <Panel title="User interest (all time)">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">

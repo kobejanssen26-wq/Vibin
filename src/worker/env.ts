@@ -37,6 +37,26 @@ export interface Env {
    * NOT a login and grants no session on its own.
    */
   OWNER_RECOVERY_SECRET?: string;
+  /**
+   * Image backfill (§27/§28) — server-side only key for the Street View
+   * Static API, used to fill in a real per-venue photo for activities that
+   * currently only have a generic category fallback. Never sent to the
+   * client: /media/streetview/:id fetches with this key and streams the
+   * image bytes back, so the key itself never appears in any URL a browser
+   * sees. Optional — the backfill route and admin action both no-op cleanly
+   * (404 / clear error) when this isn't set.
+   */
+  GOOGLE_MAPS_API_KEY?: string;
+  /**
+   * Help desk (§34-37) — first-line AI answers for support tickets. Optional:
+   * without it, every ticket just goes straight to a human (still fully
+   * functional, see lib/support-ai.ts). Never used for anything except
+   * answering support questions from the fixed product-knowledge prompt.
+   */
+  ANTHROPIC_API_KEY?: string;
+  /** Where a new support ticket's escalation email is sent. Falls back to
+   *  EMAIL_FROM when unset — set this to the real inbox someone reads. */
+  SUPPORT_EMAIL?: string;
 }
 
 /** Hono context variables set by middleware. */

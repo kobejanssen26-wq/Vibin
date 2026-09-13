@@ -43,6 +43,20 @@
       "when": 1789162661383,
       "tag": "0005_legal_tombstone",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789191745431,
+      "tag": "0006_happy_fenris",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1789324051872,
+      "tag": "0007_aspiring_stone_men",
+      "breakpoints": true
     }
   ]
 }

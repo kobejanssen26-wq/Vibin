@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { usePoll } from "../lib/usePoll";
 import { EmptyState, ErrorState, LinkButton, LoadingScreen } from "../components/ui";
 import { PageHeader } from "../components/PageHeader";
+import { JoinGroupBox } from "../components/JoinGroupBox";
 import { IconPlus } from "../components/icons";
 import type { GroupSummaryDTO } from "@shared/types";
 import { formatWhen } from "../lib/format";
@@ -142,12 +143,9 @@ export function Dashboard() {
         </ul>
       )}
 
-      <p className="mt-8 rounded-2xl border border-dashed border-paper-line px-4 py-4 text-center text-sm text-navy-400">
-        Got an invite link? Just open it. They look like{" "}
-        <code className="rounded bg-paper-soft px-1.5 py-0.5 font-semibold text-navy-500">
-          vibin.be/join/ABC123
-        </code>
-      </p>
+      <div className="mt-8">
+        <JoinGroupBox />
+      </div>
     </div>
   );
 }

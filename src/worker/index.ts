@@ -23,10 +23,14 @@ import messageRoutes from "./routes/messages";
 import reportRoutes from "./routes/reports";
 import eventRoutes from "./routes/events";
 import geoRoutes from "./routes/geo";
+import categoryRoutes from "./routes/categories";
 import liveEventRoutes from "./routes/live-events";
+import supportRoutes from "./routes/support";
 import adminRoutes from "./routes/admin";
 import adminCcRoutes from "./routes/admin-cc";
+import adminImportRoutes from "./routes/admin-import";
 import adminEventRoutes from "./routes/admin-events";
+import adminSupportRoutes from "./routes/admin-support";
 import adminVaultRoutes from "./routes/admin-vault";
 import mediaRoutes from "./routes/media";
 import goRoutes from "./routes/go";
@@ -152,7 +156,9 @@ const commandCenter = new Hono<Ctx>();
 commandCenter.use("*", withAdminSession, requireOwner());
 commandCenter.route("/", adminCcRoutes); // dashboards, analytics, browsers, CRM
 commandCenter.route("/", adminRoutes); // catalogue + moderation actions
+commandCenter.route("/", adminImportRoutes); // CSV template/preview/confirm
 commandCenter.route("/", adminEventRoutes); // live events + ingestion sources
+commandCenter.route("/", adminSupportRoutes); // help-desk tickets
 commandCenter.route("/vault", adminVaultRoutes); // encrypted credential vault
 api.route("/admin/cc", commandCenter);
 
@@ -171,6 +177,8 @@ authed.route("/reports", reportRoutes);
 authed.route("/events", eventRoutes);
 authed.route("/live-events", liveEventRoutes);
 authed.route("/geo", geoRoutes);
+authed.route("/categories", categoryRoutes);
+authed.route("/support", supportRoutes);
 api.route("/", authed);
 
 api.onError((err, c) => {

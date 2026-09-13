@@ -2,6 +2,13 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { cc } from "../api";
 import { useDebounced, useResource } from "../lib";
+import { ImportCsv } from "../components/ImportCsv";
+import {
+  ActivityForm,
+  activityFormToBody,
+  EMPTY_ACTIVITY_FORM,
+  type ActivityFormValues,
+} from "../components/ActivityForm";
 import {
   Badge,
   Btn,
@@ -100,6 +107,27 @@ export function Activities() {
     }
   };
 
+  /* -------------------------------- create -------------------------------- */
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createBusy, setCreateBusy] = useState(false);
+  const [createErr, setCreateErr] = useState<string | null>(null);
+  const [form, setForm] = useState<ActivityFormValues>(EMPTY_ACTIVITY_FORM);
+
+  const createActivity = async () => {
+    setCreateBusy(true);
+    setCreateErr(null);
+    try {
+      await cc("/activities", { method: "POST", body: activityFormToBody(form) });
+      setForm(EMPTY_ACTIVITY_FORM);
+      setCreateOpen(false);
+      reload();
+    } catch (e) {
+      setCreateErr(e instanceof Error ? e.message : "Could not create activity.");
+    } finally {
+      setCreateBusy(false);
+    }
+  };
+
   const sortBtn = (key: string, label: string) => (
     <button
       className="inline-flex items-center gap-1"
@@ -118,7 +146,33 @@ export function Activities() {
 
   return (
     <>
-      <PageTitle title="Activities" />
+      <PageTitle
+        title="Activities"
+        right={
+          <Btn variant="primary" onClick={() => setCreateOpen((v) => !v)}>
+            + Activity
+          </Btn>
+        }
+      />
+
+      {createOpen && (
+        <div className="mb-4">
+          <ActivityForm
+            value={form}
+            onChange={setForm}
+            onSubmit={createActivity}
+            onCancel={() => setCreateOpen(false)}
+            submitLabel="Create activity"
+            busy={createBusy}
+            error={createErr}
+          />
+        </div>
+      )}
+
+      <div className="mb-4">
+        <ImportCsv onImported={reload} />
+      </div>
+
       <Panel
         right={
           <div className="flex flex-wrap items-center gap-2">

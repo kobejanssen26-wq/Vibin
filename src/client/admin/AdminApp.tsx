@@ -10,6 +10,8 @@ import { Groups } from "./pages/Groups";
 import { GroupDetail } from "./pages/GroupDetail";
 import { Activities } from "./pages/Activities";
 import { ActivityDetail } from "./pages/ActivityDetail";
+import { DataQuality } from "./pages/DataQuality";
+import { Categories } from "./pages/Categories";
 import { Events } from "./pages/Events";
 import { Providers } from "./pages/Providers";
 import { ProviderDetail } from "./pages/ProviderDetail";
@@ -22,6 +24,10 @@ import { Sessions } from "./pages/Sessions";
 import { Flags } from "./pages/Flags";
 import { Settings } from "./pages/Settings";
 import { Vault } from "./pages/Vault";
+import { Reports } from "./pages/Reports";
+import { ReportDetail } from "./pages/ReportDetail";
+import { Support } from "./pages/Support";
+import { SupportTicket } from "./pages/SupportTicket";
 
 /** Placeholder for sections that land in a later phase. Keeps the nav honest. */
 function Soon({ title }: { title: string }) {
@@ -58,6 +64,8 @@ function AdminRoutes() {
         <Route path="/groups/:id" element={<GroupDetail />} />
         <Route path="/activities" element={<Activities />} />
         <Route path="/activities/:id" element={<ActivityDetail />} />
+        <Route path="/data-quality" element={<DataQuality />} />
+        <Route path="/categories" element={<Categories />} />
         <Route path="/events" element={<Events />} />
         <Route path="/providers" element={<Providers />} />
         <Route path="/providers/:id" element={<ProviderDetail />} />
@@ -69,6 +77,10 @@ function AdminRoutes() {
         <Route path="/audit" element={<AuditLog />} />
         <Route path="/sessions" element={<Sessions />} />
         <Route path="/vault" element={<Vault />} />
+        <Route path="/reports" element={<Reports />} />
+        <Route path="/reports/:id" element={<ReportDetail />} />
+        <Route path="/support" element={<Support />} />
+        <Route path="/support/:id" element={<SupportTicket />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Soon title="Not found" />} />
       </Routes>

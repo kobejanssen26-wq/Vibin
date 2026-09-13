@@ -40,6 +40,7 @@ export function GroupConfig() {
   const [saving, setSaving] = useState(false);
   const [starting, setStarting] = useState(false);
 
+  const [categories, setCategories] = useState(ACTIVITY_CATEGORIES);
   useEffect(() => {
     (async () => {
       try {
@@ -52,6 +53,11 @@ export function GroupConfig() {
         setLoading(false);
       }
     })();
+    // Falls back to the fixed constant (already set as initial state) if this
+    // fails — filters must never break just because this call did.
+    api<{ categories: typeof ACTIVITY_CATEGORIES }>("/categories")
+      .then((r) => r.categories.length && setCategories(r.categories))
+      .catch(() => {});
   }, [id]);
 
   const save = async (): Promise<boolean> => {
@@ -184,7 +190,7 @@ export function GroupConfig() {
         <div
           className={`flex flex-wrap gap-2 ${draft.allActivities ? "pointer-events-none opacity-40" : ""}`}
         >
-          {ACTIVITY_CATEGORIES.map((c) => (
+          {categories.map((c) => (
             <button
               key={c.id}
               type="button"

@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AuthLayout } from "./authLayout";
 import { Button, Field } from "../components/ui";
 import { useAuth } from "../lib/auth";
@@ -9,6 +9,7 @@ import { LIMITS } from "@shared/constants";
 export function Signup() {
   const { signup } = useAuth();
   const nav = useNavigate();
+  const loc = useLocation() as { state?: { from?: string } };
   const [form, setForm] = useState({ displayName: "", email: "", password: "" });
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -19,7 +20,7 @@ export function Signup() {
     setErr(null);
     try {
       await signup(form);
-      nav("/app", { replace: true });
+      nav(loc.state?.from ?? "/app", { replace: true });
     } catch (e) {
       setErr(
         e instanceof ApiRequestError ? e.message : "Could not create account.",
@@ -36,7 +37,7 @@ export function Signup() {
       footer={
         <>
           Already have one?{" "}
-          <Link to="/login" className="font-semibold text-brand-600">
+          <Link to="/login" state={loc.state} className="font-semibold text-brand-600">
             Log in
           </Link>
         </>

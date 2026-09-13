@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { usePoll } from "../lib/usePoll";
 import { api, ApiRequestError } from "../lib/api";
 import {
@@ -22,7 +22,9 @@ export function GroupHome() {
   const { id = "" } = useParams();
   const nav = useNavigate();
   const confirm = useConfirm();
-  const [tab, setTab] = useState<"plan" | "chat">("plan");
+  const [sp] = useSearchParams();
+  const [tab, setTab] = useState<"plan" | "chat">(sp.get("tab") === "chat" ? "chat" : "plan");
+  const highlightMessageId = sp.get("highlight");
   const [actionErr, setActionErr] = useState<string | null>(null);
   const { data, loading, error, refetch } = usePoll<{ group: GroupDTO }>(
     `/groups/${id}`,
@@ -71,7 +73,7 @@ export function GroupHome() {
       </div>
 
       {tab === "chat" ? (
-        <GroupChat groupId={id} />
+        <GroupChat groupId={id} highlightId={highlightMessageId} />
       ) : (
         <>
           {cta && (

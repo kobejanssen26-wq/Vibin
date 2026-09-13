@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { api, ApiRequestError } from "../lib/api";
 import { Avatar, Button, Field, Modal, SectionHead } from "../components/ui";
@@ -199,6 +199,19 @@ export function Profile() {
               />
             </label>
           ))}
+        </div>
+      </section>
+
+      <section>
+        <SectionHead label="Help" />
+        <div className="card">
+          <Link
+            to="/help"
+            className="flex items-center justify-between px-4 py-3.5 text-sm font-semibold text-navy hover:bg-navy/5"
+          >
+            Help &amp; support
+            <span className="text-navy-300">›</span>
+          </Link>
         </div>
       </section>
 

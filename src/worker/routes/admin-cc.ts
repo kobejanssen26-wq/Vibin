@@ -16,9 +16,13 @@ import type { Env, Vars } from "../env";
 import { createDb } from "../db/client";
 import {
   activities,
+  activityCategories,
   activityVotes,
   analyticsEvents,
+  groupInvites,
+  groupMembers,
   groups,
+  groupSettings,
   matches,
   plans,
   reports,
@@ -28,9 +32,15 @@ import { z } from "zod";
 import { parseRange, pctDelta } from "../lib/range";
 import { hasEncryptionKey } from "../lib/crypto-box";
 import { badRequest, forbidden, notFound } from "../lib/errors";
-import { newId } from "../lib/id";
+import { newId, newInviteCode } from "../lib/id";
 import { verifyPassword } from "../lib/password";
-import { parseBody } from "../lib/validate";
+import { groupNameSchema, parseBody } from "../lib/validate";
+import { CSV_BOM, toCsvLine } from "../lib/csv";
+import {
+  ACTIVITY_CSV_COLUMNS,
+  EXPORT_HEADERS,
+  IMPORT_TEMPLATE_HEADERS,
+} from "../lib/activity-csv-columns";
 import { audit } from "../lib/audit";
 import { SETTINGS, getSetting, setSetting } from "../lib/system-settings";
 
@@ -725,6 +735,192 @@ app.get("/groups/:id", async (c) => {
   });
 });
 
+/* ------------------------------ group CRUD ------------------------------ */
+/**
+ * Mirrors the normal-user create flow (groups.ts POST "/"): a group row, the
+ * creator as an active "creator" member, default group_settings (all
+ * activities, so it's swipeable immediately), and one invite code. Additional
+ * memberIds are added as active "member" rows — useful for support/testing,
+ * never required.
+ */
+const groupCreateInput = z.object({
+  name: groupNameSchema,
+  creatorEmail: z.string().trim().email().max(200),
+  memberEmails: z.array(z.string().trim().email().max(200)).max(50).default([]),
+});
+
+app.post("/groups", async (c) => {
+  const body = await parseBody(c, groupCreateInput);
+  const db = createDb(c.env);
+  const creatorEmailNorm = body.creatorEmail.toLowerCase();
+  const creator = await db.query.users.findFirst({
+    where: eq(users.emailNormalized, creatorEmailNorm),
+    columns: { id: true },
+  });
+  if (!creator) throw badRequest(`No user with email "${body.creatorEmail}".`);
+
+  const memberEmailsNorm = [
+    ...new Set(body.memberEmails.map((e) => e.toLowerCase()).filter((e) => e !== creatorEmailNorm)),
+  ];
+  let memberIds: string[] = [];
+  if (memberEmailsNorm.length) {
+    const found = await db.query.users.findMany({
+      where: inArray(users.emailNormalized, memberEmailsNorm),
+      columns: { id: true, emailNormalized: true },
+    });
+    if (found.length !== memberEmailsNorm.length) {
+      const foundEmails = new Set(found.map((f) => f.emailNormalized));
+      const missing = memberEmailsNorm.filter((e) => !foundEmails.has(e));
+      throw badRequest(`No user with email: ${missing.join(", ")}.`);
+    }
+    memberIds = found.map((f) => f.id);
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const groupId = newId();
+  await db.batch([
+    db.insert(groups).values({
+      id: groupId,
+      name: body.name,
+      creatorId: creator.id,
+      status: "configuring",
+      createdAt: now,
+      updatedAt: now,
+    }),
+    db.insert(groupMembers).values({
+      id: newId(),
+      groupId,
+      userId: creator.id,
+      role: "creator",
+      status: "active",
+      joinedAt: now,
+    }),
+    db.insert(groupSettings).values({ groupId, allActivities: 1, updatedAt: now }),
+    db.insert(groupInvites).values({
+      id: newId(),
+      groupId,
+      code: newInviteCode(),
+      createdBy: creator.id,
+      createdAt: now,
+    }),
+    ...memberIds.map((userId) =>
+      db.insert(groupMembers).values({
+        id: newId(),
+        groupId,
+        userId,
+        role: "member",
+        status: "active",
+        joinedAt: now,
+      }),
+    ),
+  ]);
+  await audit(c, {
+    action: "group.created",
+    targetType: "group",
+    targetId: groupId,
+    meta: { name: body.name, creatorEmail: body.creatorEmail, memberCount: memberIds.length },
+  });
+  return c.json({ id: groupId }, 201);
+});
+
+app.put("/groups/:id", async (c) => {
+  const id = c.req.param("id");
+  const body = await parseBody(
+    c,
+    z.object({
+      name: groupNameSchema.optional(),
+      status: z
+        .enum(["configuring", "swiping", "date_matching", "planned", "archived"])
+        .optional(),
+    }),
+  );
+  const db = createDb(c.env);
+  const existing = await db.query.groups.findFirst({ where: eq(groups.id, id) });
+  if (!existing) throw notFound("Group not found.");
+
+  await db
+    .update(groups)
+    .set({
+      ...(body.name !== undefined ? { name: body.name } : {}),
+      ...(body.status !== undefined ? { status: body.status } : {}),
+      updatedAt: Math.floor(Date.now() / 1000),
+    })
+    .where(eq(groups.id, id));
+  await audit(c, {
+    action: "group.updated",
+    targetType: "group",
+    targetId: id,
+    meta: body,
+  });
+  return c.json({ ok: true });
+});
+
+/** Soft-delete only — mirrors the existing user-facing DELETE /groups/:id
+ *  (groups.ts): status -> "archived", nothing cascaded. Members, votes,
+ *  matches and plans stay in place, just hidden behind the archived status. */
+app.delete("/groups/:id", async (c) => {
+  const id = c.req.param("id");
+  const db = createDb(c.env);
+  const existing = await db.query.groups.findFirst({
+    where: eq(groups.id, id),
+    columns: { id: true, status: true, name: true },
+  });
+  if (!existing) throw notFound("Group not found.");
+  await db
+    .update(groups)
+    .set({ status: "archived", updatedAt: Math.floor(Date.now() / 1000) })
+    .where(eq(groups.id, id));
+  await audit(c, {
+    action: "group.archived",
+    targetType: "group",
+    targetId: id,
+    meta: { name: existing.name, previousStatus: existing.status },
+  });
+  return c.json({ ok: true });
+});
+
+app.post("/groups/:id/restore", async (c) => {
+  const id = c.req.param("id");
+  const db = createDb(c.env);
+  const existing = await db.query.groups.findFirst({
+    where: eq(groups.id, id),
+    columns: { id: true, status: true },
+  });
+  if (!existing) throw notFound("Group not found.");
+  if (existing.status !== "archived") throw badRequest("Group isn't archived.");
+  await db
+    .update(groups)
+    .set({ status: "configuring", updatedAt: Math.floor(Date.now() / 1000) })
+    .where(eq(groups.id, id));
+  await audit(c, { action: "group.restored", targetType: "group", targetId: id });
+  return c.json({ ok: true });
+});
+
+app.post("/groups/bulk-archive", async (c) => {
+  const { ids } = await parseBody(
+    c,
+    z.object({ ids: z.array(z.string().min(1).max(40)).min(1).max(200) }),
+  );
+  const db = createDb(c.env);
+  const uniq = [...new Set(ids)];
+  const rows = await db.query.groups.findMany({
+    where: and(inArray(groups.id, uniq), ne(groups.status, "archived")),
+    columns: { id: true },
+  });
+  const now = Math.floor(Date.now() / 1000);
+  for (const r of rows) {
+    await db
+      .update(groups)
+      .set({ status: "archived", updatedAt: now })
+      .where(eq(groups.id, r.id));
+  }
+  await audit(c, {
+    action: "group.bulk_archived",
+    meta: { requested: uniq.length, archived: rows.length },
+  });
+  return c.json({ archived: rows.length, skipped: uniq.length - rows.length });
+});
+
 /* ------------------------------ activities ------------------------------ */
 /**
  * Real per-activity behaviour. Impressions/views/booking-clicks come from
@@ -977,6 +1173,92 @@ function sqlCol(sort: string): string {
       : "updated_at";
 }
 
+/**
+ * CSV export (§8/§58) — the full activity record (same columns the CSV
+ * import template uses, so export -> edit -> re-import round-trips), plus
+ * engagement metrics. A UTF-8 BOM is included so Excel — not just Sheets or a
+ * raw parser — renders Dutch/French accented characters correctly instead of
+ * guessing the system codepage; every cell goes through escapeCsvCell so
+ * commas/quotes/newlines are safe AND a value starting with = + - @ can't be
+ * interpreted as a spreadsheet formula (§33). No credentials or per-user PII
+ * are in this table, so none can leak here.
+ *
+ * MUST be registered before GET /activities/:id — Hono's router falls back to
+ * registration order for overlapping patterns, and "export.csv"/"import"
+ * would otherwise be swallowed by :id and return a fake "Activity not found"
+ * (this was the exact live bug behind the "CSV export doesn't work" report).
+ */
+app.get("/activities/export.csv", async (c) => {
+  const rows = await c.env.DB.prepare(`SELECT * FROM activities ORDER BY title`).all<
+    Record<string, unknown>
+  >();
+  const metrics = await activityMetrics(c.env, "", []);
+
+  const cols = [
+    ...EXPORT_HEADERS,
+    "impressions",
+    "views",
+    "likes",
+    "passes",
+    "matches",
+    "plans",
+    "website_clicks",
+    "booking_clicks",
+    "outbound_clicks",
+    "calendar_adds",
+    "shares",
+  ];
+  const lines = [toCsvLine(cols)];
+  for (const r of rows.results) {
+    const m = derive(metrics.get(r.id as string) ?? emptyMetric());
+    const cells: (string | number | null)[] = [r.id as string];
+    for (const col of ACTIVITY_CSV_COLUMNS) {
+      const raw = r[camelToSnake(col.key)];
+      if (col.key === "tags") {
+        cells.push(col.format(typeof raw === "string" ? safeJsonArray(raw) : []));
+      } else if (col.key === "openingHours") {
+        cells.push(col.format(typeof raw === "string" ? safeJsonObject(raw) : {}));
+      } else {
+        cells.push(col.format(raw));
+      }
+    }
+    cells.push(
+      r.last_verified_at as number | null,
+      r.created_at as number,
+      r.updated_at as number,
+      m.pooled,
+      m.views,
+      m.likes + m.superlikes,
+      m.passes,
+      m.matches,
+      m.plans,
+      m.websiteClicks,
+      m.bookingClicks,
+      m.outboundClicks,
+      m.calendarAdds,
+      m.shares,
+    );
+    lines.push(toCsvLine(cells));
+  }
+  return new Response(CSV_BOM + lines.join("\r\n"), {
+    headers: {
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": `attachment; filename="vibin-activities-${new Date().toISOString().slice(0, 10)}.csv"`,
+    },
+  });
+});
+
+/** Blank template (header row only) so an admin's import always matches the
+ *  live schema/import logic — never a hand-guessed column list (§9). */
+app.get("/activities/import/template.csv", async (c) => {
+  return new Response(CSV_BOM + toCsvLine(IMPORT_TEMPLATE_HEADERS), {
+    headers: {
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": `attachment; filename="vibin-activities-template.csv"`,
+    },
+  });
+});
+
 app.get("/activities/:id", async (c) => {
   const id = c.req.param("id");
   const a = await c.env.DB.prepare(`SELECT * FROM activities WHERE id = ?1`)
@@ -1036,79 +1318,257 @@ function isUrl(v: unknown): boolean {
   return typeof v === "string" && /^https?:\/\//.test(v);
 }
 
+function camelToSnake(s: string): string {
+  return s.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+}
+
+function safeJsonArray(s: string): unknown[] {
+  try {
+    const v = JSON.parse(s);
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+
+function safeJsonObject(s: string): Record<string, unknown> {
+  try {
+    const v = JSON.parse(s);
+    return v && typeof v === "object" && !Array.isArray(v) ? v : {};
+  } catch {
+    return {};
+  }
+}
+
+/* --------------------------- data quality (§29) --------------------------- */
 /**
- * CSV export (§58) — the same per-activity numbers as the list/detail views,
- * no PII: activities have no individual-user columns, only aggregate counts.
+ * Every number below is a plain COUNT(*) against the real catalogue — no
+ * crawling, no guessing. We deliberately do NOT report "broken links" or
+ * "broken images" as a count: verifying a URL is actually reachable requires
+ * live HTTP requests against thousands of external sites, which this page
+ * does not perform, so a "0 broken" figure would be a fabricated one. That
+ * check is a per-activity, admin-triggered action (Activity Detail), not a
+ * background sweep, at this catalogue size.
  */
-app.get("/activities/export.csv", async (c) => {
-  const rows = await c.env.DB.prepare(
-    `SELECT id, title, category_id AS category, city, status, monetization_type AS monetizationType
-     FROM activities ORDER BY title`,
-  ).all<{
-    id: string;
-    title: string;
-    category: string;
-    city: string | null;
-    status: string;
-    monetizationType: string;
-  }>();
-  const metrics = await activityMetrics(c.env, "", []);
-  const cols = [
-    "activity_id",
-    "activity_name",
-    "category",
-    "city",
-    "status",
-    "monetization_type",
-    "impressions",
-    "views",
-    "likes",
-    "passes",
-    "matches",
-    "plans",
-    "website_clicks",
-    "booking_clicks",
-    "outbound_clicks",
-    "calendar_adds",
-    "shares",
-  ];
-  const esc = (v: string | number) => {
-    const s = String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  const lines = [cols.join(",")];
-  for (const r of rows.results) {
-    const m = derive(metrics.get(r.id) ?? emptyMetric());
-    lines.push(
-      [
-        r.id,
-        r.title,
-        r.category,
-        r.city ?? "",
-        r.status,
-        r.monetizationType,
-        m.pooled,
-        m.views,
-        m.likes + m.superlikes,
-        m.passes,
-        m.matches,
-        m.plans,
-        m.websiteClicks,
-        m.bookingClicks,
-        m.outboundClicks,
-        m.calendarAdds,
-        m.shares,
-      ]
-        .map(esc)
-        .join(","),
+app.get("/data-quality", async (c) => {
+  const db = createDb(c.env);
+  const total = await scalar(db.select(COUNT).from(activities).where(eq(activities.active, 1)));
+
+  const withWebsite = await scalar(
+    db
+      .select(COUNT)
+      .from(activities)
+      .where(and(eq(activities.active, 1), sql`(${activities.websiteUrl} is not null or ${activities.providerWebsite} is not null)`)),
+  );
+  const withBookingOrTicket = await scalar(
+    db
+      .select(COUNT)
+      .from(activities)
+      .where(and(eq(activities.active, 1), sql`(${activities.bookingUrl} is not null or ${activities.ticketUrl} is not null)`)),
+  );
+  const withImage = await scalar(
+    db.select(COUNT).from(activities).where(and(eq(activities.active, 1), sql`${activities.imageUrl} is not null`)),
+  );
+  const withSpecificImage = await scalar(
+    db
+      .select(COUNT)
+      .from(activities)
+      .where(and(eq(activities.active, 1), sql`${activities.imageUrl} is not null`, eq(activities.imageIsGeneric, 0))),
+  );
+  const withGenericImage = await scalar(
+    db.select(COUNT).from(activities).where(and(eq(activities.active, 1), eq(activities.imageIsGeneric, 1))),
+  );
+  const missingImage = await scalar(
+    db.select(COUNT).from(activities).where(and(eq(activities.active, 1), sql`${activities.imageUrl} is null`)),
+  );
+  const withCoords = await scalar(
+    db.select(COUNT).from(activities).where(and(eq(activities.active, 1), sql`${activities.lat} is not null and ${activities.lng} is not null`)),
+  );
+  const withAddress = await scalar(
+    db.select(COUNT).from(activities).where(and(eq(activities.active, 1), sql`${activities.address} is not null`)),
+  );
+  const withPrice = await scalar(
+    db
+      .select(COUNT)
+      .from(activities)
+      .where(and(eq(activities.active, 1), sql`(${activities.priceType} = 'free' or ${activities.priceCents} is not null)`)),
+  );
+  const withOpeningHours = await scalar(
+    db.select(COUNT).from(activities).where(and(eq(activities.active, 1), sql`${activities.openingHours} not in ('{}', '')`)),
+  );
+  const withSource = await scalar(
+    db.select(COUNT).from(activities).where(and(eq(activities.active, 1), sql`${activities.sourceUrl} is not null`)),
+  );
+
+  const statusRows = await db
+    .select({ status: activities.status, n: sql<number>`count(*)` })
+    .from(activities)
+    .where(eq(activities.active, 1))
+    .groupBy(activities.status);
+  const byStatus = Object.fromEntries(statusRows.map((r) => [r.status, r.n]));
+
+  const verifiedRecently = await scalar(
+    db
+      .select(COUNT)
+      .from(activities)
+      .where(
+        and(
+          eq(activities.active, 1),
+          eq(activities.status, "verified"),
+          sql`${activities.lastVerifiedAt} > ${Math.floor(Date.now() / 1000) - 180 * 86400}`,
+        ),
+      ),
+  );
+
+  // top reused images — the concrete "same image repeatedly" signal (§27/§28)
+  const reuse = await c.env.DB.prepare(
+    `SELECT image_url AS imageUrl, COUNT(*) AS n
+     FROM activities WHERE active = 1 AND image_url IS NOT NULL
+     GROUP BY image_url HAVING COUNT(*) > 1
+     ORDER BY n DESC LIMIT 15`,
+  ).all<{ imageUrl: string; n: number }>();
+  const distinctImages = await scalar(
+    db.select({ n: sql<number>`count(distinct ${activities.imageUrl})` }).from(activities).where(and(eq(activities.active, 1), sql`${activities.imageUrl} is not null`)),
+  );
+
+  return c.json({
+    total,
+    withWebsite,
+    withBookingOrTicket,
+    withImage,
+    withSpecificImage,
+    withGenericImage,
+    missingImage,
+    distinctImages,
+    withCoords,
+    withAddress,
+    withPrice,
+    withOpeningHours,
+    withSource,
+    verifiedRecently,
+    byStatus: {
+      verified: byStatus.verified ?? 0,
+      needs_review: byStatus.needs_review ?? 0,
+      outdated: byStatus.outdated ?? 0,
+      inactive: byStatus.inactive ?? 0,
+    },
+    mostReusedImages: reuse.results,
+  });
+});
+
+/** Paginated image audit: filter by generic / missing / specific. */
+app.get("/images/quality", async (c) => {
+  const url = new URL(c.req.url);
+  const { page, pageSize, q, offset } = listParams(url, ["title", "updated"], "updated");
+  const filter = url.searchParams.get("filter"); // generic | missing | specific | reused
+
+  const where: string[] = ["active = 1"];
+  const args: unknown[] = [];
+  if (q) {
+    where.push("title LIKE ?" + (args.length + 1));
+    args.push(`%${q}%`);
+  }
+  if (filter === "generic") where.push("image_is_generic = 1");
+  else if (filter === "missing") where.push("image_url IS NULL");
+  else if (filter === "specific") where.push("image_url IS NOT NULL AND image_is_generic = 0");
+  else if (filter === "reused") {
+    where.push(
+      "image_url IN (SELECT image_url FROM activities WHERE active = 1 AND image_url IS NOT NULL GROUP BY image_url HAVING COUNT(*) > 1)",
     );
   }
-  return new Response(lines.join("\n"), {
-    headers: {
-      "content-type": "text/csv; charset=utf-8",
-      "content-disposition": `attachment; filename="vibin-activities-${new Date().toISOString().slice(0, 10)}.csv"`,
-    },
+  const whereSql = `WHERE ${where.join(" AND ")}`;
+
+  const rows = await c.env.DB.prepare(
+    `SELECT id, title, category_id AS category, city, image_url AS imageUrl,
+            image_is_generic AS imageIsGeneric, image_source AS imageSource,
+            status, updated_at AS updatedAt,
+            (SELECT COUNT(*) FROM activities a2 WHERE a2.active = 1 AND a2.image_url = activities.image_url) AS sharedByCount
+     FROM activities
+     ${whereSql}
+     ORDER BY ${q ? "title" : "updated_at"} DESC
+     LIMIT ${pageSize} OFFSET ${offset}`,
+  )
+    .bind(...(args as never[]))
+    .all();
+  const total = await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM activities ${whereSql}`)
+    .bind(...(args as never[]))
+    .first<{ n: number }>();
+
+  return c.json({ rows: rows.results, ...pageMeta(total?.n ?? 0, page, pageSize) });
+});
+
+/**
+ * One-time backfill (§27): for activities that still only have a generic
+ * category fallback, check whether Google Street View has real coverage of
+ * that exact address (a free metadata call — no image is downloaded here)
+ * and, if so, point the activity at the /media/streetview proxy instead.
+ * Self-advancing: call repeatedly, each call only ever selects rows that
+ * still need checking (already-resolved ones stop matching the WHERE
+ * clause), so there's no offset/cursor to track. No-ops with a clear error
+ * if GOOGLE_MAPS_API_KEY isn't configured.
+ */
+app.post("/images/backfill-streetview", async (c) => {
+  if (!c.env.GOOGLE_MAPS_API_KEY) {
+    throw badRequest("GOOGLE_MAPS_API_KEY isn't configured — set it with `wrangler secret put GOOGLE_MAPS_API_KEY` first.");
+  }
+  const { limit } = await parseBody(
+    c,
+    z.object({ limit: z.number().int().min(1).max(200).default(50) }),
+  );
+  const rows = await c.env.DB.prepare(
+    `SELECT id, lat, lng FROM activities
+     WHERE active = 1 AND image_is_generic = 1 AND lat IS NOT NULL AND lng IS NOT NULL
+       AND (image_source IS NULL OR image_source != 'streetview_no_coverage')
+     LIMIT ?1`,
+  )
+    .bind(limit)
+    .all<{ id: string; lat: number; lng: number }>();
+
+  let found = 0;
+  let noCoverage = 0;
+  const now = Math.floor(Date.now() / 1000);
+  for (const r of rows.results) {
+    const lat = r.lat / 1e6;
+    const lng = r.lng / 1e6;
+    // ZERO_RESULTS is the only status that genuinely means "no imagery here"
+    // — anything else (REQUEST_DENIED for a bad/misconfigured key,
+    // OVER_QUERY_LIMIT, a network error, …) must NOT be recorded as "no
+    // coverage", or a bad key would permanently mis-mark the whole catalogue
+    // on the very first run. Those abort the batch instead, leaving
+    // unresolved rows to retry on the next call.
+    const meta = await fetch(
+      `https://maps.googleapis.com/maps/api/streetview/metadata?location=${lat},${lng}&key=${c.env.GOOGLE_MAPS_API_KEY}`,
+    );
+    const json = await meta.json<{ status: string; error_message?: string }>();
+    if (json.status !== "OK" && json.status !== "ZERO_RESULTS") {
+      throw badRequest(
+        `Street View API error (${json.status}): ${json.error_message ?? "check the key/billing"}. Stopped after ${found + noCoverage} rows — nothing already resolved was lost.`,
+      );
+    }
+    const hasCoverage = json.status === "OK";
+    if (hasCoverage) {
+      await c.env.DB.prepare(
+        `UPDATE activities SET image_url = ?1, image_source = 'Google Street View',
+           image_attribution = '© Google Street View', image_is_generic = 0, updated_at = ?2
+         WHERE id = ?3`,
+      )
+        .bind(`/api/media/streetview/${r.id}`, now, r.id)
+        .run();
+      found++;
+    } else {
+      await c.env.DB.prepare(
+        `UPDATE activities SET image_source = 'streetview_no_coverage', updated_at = ?1 WHERE id = ?2`,
+      )
+        .bind(now, r.id)
+        .run();
+      noCoverage++;
+    }
+  }
+  await audit(c, {
+    action: "images.streetview_backfill",
+    meta: { checked: rows.results.length, found, noCoverage },
   });
+  return c.json({ checked: rows.results.length, found, noCoverage, done: rows.results.length < limit });
 });
 
 app.get("/rankings/activities", async (c) => {

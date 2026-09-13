@@ -34,7 +34,11 @@ export function Login() {
       footer={
         <>
           New here?{" "}
-          <Link to="/signup" className="font-semibold text-brand-600">
+          <Link
+            to="/signup"
+            state={loc.state}
+            className="font-semibold text-brand-600"
+          >
             Create an account
           </Link>
         </>

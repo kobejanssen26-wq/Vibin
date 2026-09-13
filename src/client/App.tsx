@@ -20,6 +20,8 @@ import { Swipe } from "./pages/Swipe";
 import { DateMatch } from "./pages/DateMatch";
 import { PlanView } from "./pages/PlanView";
 import { Profile } from "./pages/Profile";
+import { Help } from "./pages/Help";
+import { HelpTicket } from "./pages/HelpTicket";
 import { Legal } from "./pages/Legal";
 
 // The Owner Command Center is a large, separate tree that normal users never
@@ -116,6 +118,8 @@ export function App({ onReady }: { onReady?: () => void }) {
       <Route path="/groups/:id/plan" element={<Protected><PlanView /></Protected>} />
       <Route path="/plans/:planId" element={<Protected><PlanView /></Protected>} />
       <Route path="/settings" element={<Protected><Profile /></Protected>} />
+      <Route path="/help" element={<Protected><Help /></Protected>} />
+      <Route path="/help/:id" element={<Protected><HelpTicket /></Protected>} />
 
       {/* Owner Command Center — its own auth (admin session + MFA), never the
           normal-user gate. Server-side authorization is enforced independently

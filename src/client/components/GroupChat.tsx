@@ -7,7 +7,13 @@ import { relativeTime } from "../lib/format";
 import type { MessageDTO } from "@shared/types";
 import { LIMITS } from "@shared/constants";
 
-export function GroupChat({ groupId }: { groupId: string }) {
+export function GroupChat({
+  groupId,
+  highlightId,
+}: {
+  groupId: string;
+  highlightId?: string | null;
+}) {
   const { data, refetch } = usePoll<{ messages: MessageDTO[] }>(
     `/groups/${groupId}/messages`,
     4000,
@@ -15,10 +21,21 @@ export function GroupChat({ groupId }: { groupId: string }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const [highlighted, setHighlighted] = useState(highlightId ?? null);
+  const scrolledToHighlight = useRef(false);
 
   useEffect(() => {
+    if (!data?.messages.length) return;
+    if (highlightId && !scrolledToHighlight.current) {
+      const el = document.getElementById(`msg-${highlightId}`);
+      if (!el) return; // not loaded yet — try again once more messages arrive
+      scrolledToHighlight.current = true;
+      el.scrollIntoView({ block: "center" });
+      const t = setTimeout(() => setHighlighted(null), 2500);
+      return () => clearTimeout(t);
+    }
     endRef.current?.scrollIntoView({ block: "end" });
-  }, [data?.messages.length]);
+  }, [data?.messages.length, highlightId]);
 
   const send = async (e: FormEvent) => {
     e.preventDefault();
@@ -60,7 +77,10 @@ export function GroupChat({ groupId }: { groupId: string }) {
             ) : (
               <div
                 key={m.id}
-                className={`flex gap-2 ${m.isYou ? "flex-row-reverse" : ""}`}
+                id={`msg-${m.id}`}
+                className={`flex gap-2 rounded-xl transition-colors duration-500 ${m.isYou ? "flex-row-reverse" : ""} ${
+                  highlighted === m.id ? "bg-brand-500/10" : ""
+                }`}
               >
                 {!m.isYou && (
                   <Avatar

@@ -199,14 +199,17 @@ export interface ResolvedImage {
   url: string;
   source: string;
   attribution: string;
+  /** false for a photo of this exact venue/activity; true for a shared
+   *  category/subcategory stock fallback (see activityImageUrl doc). */
+  generic: boolean;
 }
 
 /**
  * Resolve an activity to a photo, best match first:
- *   1. a real photo of that exact venue           (Wikimedia, credited)
- *   2. its hand-picked Unsplash photo             (depicts the activity)
- *   3. a real photo of that activity type         (Wikimedia, credited)
- *   4. the per-category Unsplash fallback         (depicts the category)
+ *   1. a real photo of that exact venue           (Wikimedia, credited)   -> specific
+ *   2. its hand-picked Unsplash photo             (depicts the activity) -> specific
+ *   3. a real photo of that activity type         (Wikimedia, credited)  -> generic
+ *   4. the per-category Unsplash fallback         (depicts the category) -> generic
  *   5. null -> branded category treatment on the card
  */
 export function activityImageUrl(
@@ -215,16 +218,16 @@ export function activityImageUrl(
   subcategory?: string,
 ): ResolvedImage | null {
   const venue = VENUE_IMAGES[slug];
-  if (venue) return { url: venue.url, source: WIKIMEDIA_SOURCE, attribution: venue.attribution };
+  if (venue) return { url: venue.url, source: WIKIMEDIA_SOURCE, attribution: venue.attribution, generic: false };
 
   const own = ACTIVITY_IMAGES[slug];
-  if (own) return { url: unsplash(own), source: ACTIVITY_IMAGE_SOURCE, attribution: ACTIVITY_IMAGE_ATTRIBUTION };
+  if (own) return { url: unsplash(own), source: ACTIVITY_IMAGE_SOURCE, attribution: ACTIVITY_IMAGE_ATTRIBUTION, generic: false };
 
   const sub = subcategory ? SUBCATEGORY_IMAGES[subcategory] : undefined;
-  if (sub) return { url: sub.url, source: WIKIMEDIA_SOURCE, attribution: sub.attribution };
+  if (sub) return { url: sub.url, source: WIKIMEDIA_SOURCE, attribution: sub.attribution, generic: true };
 
   const cat = category ? CATEGORY_IMAGES[category] : undefined;
-  if (cat) return { url: unsplash(cat), source: ACTIVITY_IMAGE_SOURCE, attribution: ACTIVITY_IMAGE_ATTRIBUTION };
+  if (cat) return { url: unsplash(cat), source: ACTIVITY_IMAGE_SOURCE, attribution: ACTIVITY_IMAGE_ATTRIBUTION, generic: true };
 
   return null;
 }

@@ -6,6 +6,7 @@ import { IconBell, IconLogout } from "./icons";
 import { useAuth } from "../lib/auth";
 import { usePoll } from "../lib/usePoll";
 import { relativeTime } from "../lib/format";
+import { notificationHref } from "../lib/notificationRoute";
 import type { NotificationDTO } from "@shared/types";
 import { api } from "../lib/api";
 
@@ -35,10 +36,19 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [panel]);
 
-  const openBell = async () => {
+  const openBell = () => {
     setPanel(panel === "bell" ? "none" : "bell");
-    if (panel !== "bell" && data?.unread) {
-      await api("/me/notifications/read", { method: "POST", body: {} }).catch(
+  };
+
+  // Marks just this one notification read (not the whole list) and, when we
+  // know exactly what it's about, takes the user straight there instead of
+  // a generic page.
+  const onNotificationClick = async (n: NotificationDTO) => {
+    setPanel("none");
+    const href = notificationHref(n);
+    if (href) nav(href);
+    if (!n.read) {
+      await api("/me/notifications/read", { method: "POST", body: { ids: [n.id] } }).catch(
         () => {},
       );
       void refetch();
@@ -96,17 +106,28 @@ export function AppShell({ children }: { children: ReactNode }) {
             {data?.notifications.length ? (
               <ul className="-mx-2 max-h-72 space-y-1 overflow-auto">
                 {data.notifications.slice(0, 15).map((n) => (
-                  <li
-                    key={n.id}
-                    className="rounded-xl px-2 py-2 text-sm hover:bg-navy/5"
-                  >
-                    <p className="font-semibold text-navy">{n.title}</p>
-                    {n.body && (
-                      <p className="text-navy-400">{n.body}</p>
-                    )}
-                    <p className="mt-0.5 text-[11px] text-navy-300">
-                      {relativeTime(n.createdAt)}
-                    </p>
+                  <li key={n.id}>
+                    <button
+                      type="button"
+                      onClick={() => onNotificationClick(n)}
+                      className={`relative w-full rounded-xl px-2 py-2 text-left text-sm transition hover:bg-navy/5 ${
+                        n.read ? "" : "bg-brand-500/5"
+                      }`}
+                    >
+                      {!n.read && (
+                        <span
+                          className="absolute left-0.5 top-4 h-1.5 w-1.5 rounded-full bg-brand-500"
+                          aria-hidden="true"
+                        />
+                      )}
+                      <p className={`pl-2.5 font-semibold text-navy ${n.read ? "" : "pr-1"}`}>
+                        {n.title}
+                      </p>
+                      {n.body && <p className="pl-2.5 text-navy-400">{n.body}</p>}
+                      <p className="mt-0.5 pl-2.5 text-[11px] text-navy-300">
+                        {relativeTime(n.createdAt)}
+                      </p>
+                    </button>
                   </li>
                 ))}
               </ul>

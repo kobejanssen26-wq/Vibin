@@ -106,11 +106,15 @@ const lines: string[] = [
   "",
 ];
 
+// Upsert (not INSERT OR REPLACE): keeps label/icon/sort in sync with the code
+// constant on every reseed, but never touches `active` — an admin's
+// activate/deactivate choice in the Command Center must survive a reseed.
 CATEGORIES.forEach((c, i) => {
   lines.push(
-    `INSERT OR REPLACE INTO activity_categories (id, label, icon, sort) VALUES (${q(
+    `INSERT INTO activity_categories (id, label, icon, sort) VALUES (${q(
       c.id,
-    )}, ${q(c.label)}, ${q(c.icon)}, ${i});`,
+    )}, ${q(c.label)}, ${q(c.icon)}, ${i}) ` +
+      `ON CONFLICT(id) DO UPDATE SET label=excluded.label, icon=excluded.icon, sort=excluded.sort;`,
   );
 });
 lines.push("");
@@ -123,6 +127,7 @@ const COLS = [
   "indoor_outdoor", "accessibility", "opening_hours", "website_url",
   "booking_url", "ticket_url", "image_url", "image_source", "image_attribution",
   "tags", "source", "source_url", "last_verified_at", "status", "active",
+  "image_is_generic",
   // monetization (§4/§46) — computed the same as `status` above: a plain,
   // honest fact from the data itself ("outbound_tracking" when there's a
   // real link to measure, "none" otherwise), never a guessed deal. Affiliate
@@ -158,16 +163,23 @@ function emit(
   }
 
   // image: a real venue photo from the source wins; else the shared resolver
-  // (venue slug → hand Unsplash → subcategory → category).
+  // (venue slug → hand Unsplash → subcategory → category). `imageIsGeneric`
+  // tracks whether the final photo is specific to this venue/activity (a
+  // per-node OSM photo, a curated venue shot, or a hand-picked activity
+  // photo) or a shared category/subcategory stock fallback used across many
+  // unrelated activities — the honest signal the image-quality audit (§28)
+  // surfaces instead of silently letting reuse look like a bug.
   let imgUrl = opts.imageUrl ?? null;
   let imgSource = opts.imageUrl ? "Wikimedia Commons" : null;
   let imgAttr = opts.imageAttribution ?? null;
+  let imgIsGeneric = false;
   if (!imgUrl) {
     const r = activityImageUrl(a.slug, a.category, a.subcategory);
     if (r) {
       imgUrl = r.url;
       imgSource = r.source;
       imgAttr = r.attribution;
+      imgIsGeneric = r.generic;
     }
   }
 
@@ -210,6 +222,7 @@ function emit(
     n(verifiedAt),
     q("needs_review"),
     "1",
+    imgIsGeneric ? "1" : "0",
     q(a.providerWebsite || a.bookingUrl || a.ticketUrl ? "outbound_tracking" : "none"),
     n(now),
     n(now),
