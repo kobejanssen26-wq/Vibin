@@ -26,6 +26,7 @@ import {
   matches,
   plans,
   reports,
+  supportTickets,
   users,
 } from "../db/schema";
 import { z } from "zod";
@@ -193,6 +194,9 @@ app.get("/overview", async (c) => {
   const openReports = await scalar(
     db.select(COUNT).from(reports).where(eq(reports.status, "open")),
   );
+  const openTickets = await scalar(
+    db.select(COUNT).from(supportTickets).where(eq(supportTickets.status, "open")),
+  );
 
   /* system — only report "operational" for things actually checked now */
   const system: { name: string; status: string; detail: string }[] = [];
@@ -248,6 +252,13 @@ app.get("/overview", async (c) => {
     attention.push({
       level: "info",
       text: `${openReports} open user report${openReports === 1 ? "" : "s"}.`,
+      href: "/admin/reports?status=open",
+    });
+  if (openTickets > 0)
+    attention.push({
+      level: "warn",
+      text: `${openTickets} support ticket${openTickets === 1 ? "" : "s"} waiting for a reply.`,
+      href: "/admin/support?status=open",
     });
 
   return c.json({
