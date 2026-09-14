@@ -165,6 +165,10 @@ export const VENUE_IMAGES: Record<string, { url: string; attribution: string }> 
 
 export const SUBCATEGORY_IMAGES: Record<string, { url: string; attribution: string }> = {
   "Squash": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/TrinqueteSportivoEscobar%281%29.jpg/1280px-TrinqueteSportivoEscobar%281%29.jpg", attribution: "fede.dirocco / CC BY-SA 3.0 — Wikimedia Commons" },
+  "Tennis": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Empty_clay_tennis_court_in_Melbourne_Australia_looking_down_the_middle.jpg/1280px-Empty_clay_tennis_court_in_Melbourne_Australia_looking_down_the_middle.jpg", attribution: "KeepActive Australia / CC BY-SA 4.0 — Wikimedia Commons" },
+  "Golf": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/92/Blessings16th.JPG/1280px-Blessings16th.JPG", attribution: "Hogwoller / CC0 — Wikimedia Commons" },
+  "Padel": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Club_Kingswood_Padel.jpg/1280px-Club_Kingswood_Padel.jpg", attribution: "OCHAPPS / CC BY-SA 4.0 — Wikimedia Commons" },
+  "Swimming pool": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/Basingstoke_Sports_Centre_Pool.jpg/1280px-Basingstoke_Sports_Centre_Pool.jpg", attribution: "Basingstoke Sports Trust / CC BY 3.0 — Wikimedia Commons" },
   "Mini-golf": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Ferny_Crofts_Mini_Golf.jpg/1280px-Ferny_Crofts_Mini_Golf.jpg", attribution: "Rafmarham / CC BY-SA 4.0 — Wikimedia Commons" },
   "Diving": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/DACOR_Photo_%286%29.jpg/1280px-DACOR_Photo_%286%29.jpg", attribution: "Unknown authorUnknown author / Public domain — Wikimedia Commons" },
   "Rafting": { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Dinghies_rafting_So%C4%8Da.jpg/1280px-Dinghies_rafting_So%C4%8Da.jpg", attribution: "malenki / CC BY-SA 3.0 — Wikimedia Commons" },
