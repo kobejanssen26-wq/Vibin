@@ -142,6 +142,7 @@ app.post("/activities/import/preview", async (c) => {
         data,
         candidateId: match.id,
         candidateTitle: match.title,
+        reason,
       });
       if (duplicates.length < PREVIEW_LIST_CAP) {
         duplicates.push({ row, title: data.title, reason, existingId: match.id, existingTitle: match.title });
