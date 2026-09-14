@@ -2,10 +2,19 @@ import { useState } from "react";
 import { api, ApiRequestError } from "../lib/api";
 import { Button, Modal } from "./ui";
 
-const REPORT_REASONS = [
+const CONTENT_REASONS = [
   { id: "incorrect_info", label: "Details are wrong" },
   { id: "inappropriate", label: "Inappropriate or unsafe" },
   { id: "spam", label: "Spam or not real" },
+  { id: "other", label: "Something else" },
+] as const;
+
+/** Behavior reports (a person, or something someone said) skip the
+ *  content-accuracy reason and lead with harassment instead. */
+const BEHAVIOR_REASONS = [
+  { id: "harassment", label: "Harassment or bullying" },
+  { id: "inappropriate", label: "Inappropriate behavior" },
+  { id: "spam", label: "Spam" },
   { id: "other", label: "Something else" },
 ] as const;
 
@@ -22,9 +31,12 @@ export function ReportButton({
   label: string;
   modalTitle: string;
 }) {
+  const reasons = targetType === "member" || targetType === "message"
+    ? BEHAVIOR_REASONS
+    : CONTENT_REASONS;
   const [open, setOpen] = useState(false);
   const [sent, setSent] = useState(false);
-  const [reason, setReason] = useState<string>("incorrect_info");
+  const [reason, setReason] = useState<string>(reasons[0].id);
   const [detail, setDetail] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -68,7 +80,7 @@ export function ReportButton({
             <legend className="mb-1 text-sm font-semibold text-navy-700">
               What's the issue?
             </legend>
-            {REPORT_REASONS.map((r) => (
+            {reasons.map((r) => (
               <label
                 key={r.id}
                 className="flex cursor-pointer items-center gap-3 rounded-xl border border-paper-line px-3 py-2.5 text-sm transition-colors has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50"

@@ -514,6 +514,10 @@ export const events = sqliteTable(
     endsAt: integer("ends_at"),
     allDay: integer("all_day").notNull().default(0),
     timezone: text("timezone").notNull().default("Europe/Brussels"),
+    /** How many days before startsAt this event becomes discoverable — a
+     *  major festival might want 90, a small local market only 7. Null uses
+     *  the platform default (see DEFAULT_VISIBILITY_WINDOW_DAYS). */
+    visibilityWindowDays: integer("visibility_window_days"),
 
     status: text("status", {
       enum: [
@@ -823,7 +827,7 @@ export const reports = sqliteTable(
     }).notNull(),
     targetId: text("target_id").notNull(),
     reason: text("reason", {
-      enum: ["inappropriate", "spam", "incorrect_info", "other"],
+      enum: ["inappropriate", "harassment", "spam", "incorrect_info", "other"],
     }).notNull(),
     detail: text("detail").notNull().default(""),
     status: text("status", { enum: ["open", "reviewing", "resolved", "dismissed"] })

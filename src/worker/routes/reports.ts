@@ -19,7 +19,7 @@ app.post("/", async (c) => {
     z.object({
       targetType: z.enum(["activity", "group", "member", "message"]),
       targetId: z.string().min(1).max(64),
-      reason: z.enum(["inappropriate", "spam", "incorrect_info", "other"]),
+      reason: z.enum(["inappropriate", "harassment", "spam", "incorrect_info", "other"]),
       detail: z.string().trim().max(1000).default(""),
     }),
   );

@@ -125,14 +125,24 @@ export function GroupHome() {
                       {m.status !== "active" && ` · ${m.status}`}
                     </p>
                   </div>
-                  {group.isCreator && !m.isYou && (
-                    <MemberActions
-                      groupId={id}
-                      memberId={m.id}
-                      memberName={m.displayName}
-                      status={m.status}
-                      onDone={refetch}
-                    />
+                  {!m.isYou && (
+                    <div className="flex shrink-0 items-center gap-2">
+                      <ReportButton
+                        targetType="member"
+                        targetId={m.id}
+                        label="Report"
+                        modalTitle={`Report ${m.displayName}`}
+                      />
+                      {group.isCreator && (
+                        <MemberActions
+                          groupId={id}
+                          memberId={m.id}
+                          memberName={m.displayName}
+                          status={m.status}
+                          onDone={refetch}
+                        />
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
