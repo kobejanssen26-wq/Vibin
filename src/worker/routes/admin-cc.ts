@@ -10,7 +10,7 @@
  * "Not enough data yet" — nothing is invented.
  */
 import { Hono } from "hono";
-import { and, gte, lt, sql, eq, ne, inArray } from "drizzle-orm";
+import { and, desc, gte, lt, sql, eq, ne, inArray } from "drizzle-orm";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import type { Env, Vars } from "../env";
 import { createDb } from "../db/client";
@@ -19,6 +19,7 @@ import {
   activityCategories,
   activityVotes,
   analyticsEvents,
+  auditLog,
   groupInvites,
   groupMembers,
   groups,
@@ -507,6 +508,31 @@ app.get("/users/:id", async (c) => {
     .bind(id)
     .first<{ n: number }>();
 
+  const modRows = await db
+    .select({
+      action: auditLog.action,
+      meta: auditLog.meta,
+      createdAt: auditLog.createdAt,
+      actorEmail: users.email,
+    })
+    .from(auditLog)
+    .leftJoin(users, eq(users.id, auditLog.actorId))
+    .where(
+      and(
+        eq(auditLog.targetType, "user"),
+        eq(auditLog.targetId, id),
+        inArray(auditLog.action, ["user.suspended", "user.reactivated"]),
+      ),
+    )
+    .orderBy(desc(auditLog.createdAt))
+    .limit(20);
+  const moderationHistory = modRows.map((r) => ({
+    action: r.action,
+    reason: (JSON.parse(r.meta) as { reason?: string }).reason ?? null,
+    actorEmail: r.actorEmail,
+    createdAt: r.createdAt,
+  }));
+
   return c.json({
     user: { ...u, ...(profile ?? {}) },
     groups: groupRows.results,
@@ -520,6 +546,7 @@ app.get("/users/:id", async (c) => {
     createdGroups: createdGroups?.n ?? 0,
     recentSwipes: recentSwipes.results,
     timeline: timeline.results,
+    moderationHistory,
   });
 });
 
@@ -527,10 +554,16 @@ app.get("/users/:id", async (c) => {
 
 app.post("/users/:id/status", async (c) => {
   const id = c.req.param("id");
-  const { status } = await parseBody(
+  const { status, reason } = await parseBody(
     c,
-    z.object({ status: z.enum(["active", "suspended"]) }),
+    z.object({
+      status: z.enum(["active", "suspended"]),
+      reason: z.string().trim().max(500).optional(),
+    }),
   );
+  if (status === "suspended" && !reason) {
+    throw badRequest("A reason is required to suspend an account.");
+  }
   const db = createDb(c.env);
   const target = await db.query.users.findFirst({
     where: eq(users.id, id),
@@ -547,6 +580,7 @@ app.post("/users/:id/status", async (c) => {
     action: status === "suspended" ? "user.suspended" : "user.reactivated",
     targetType: "user",
     targetId: id,
+    meta: reason ? { reason } : {},
   });
   return c.json({ ok: true });
 });

@@ -58,6 +58,12 @@ interface Detail {
     groupId: string | null;
     createdAt: number;
   }[];
+  moderationHistory: {
+    action: string;
+    reason: string | null;
+    actorEmail: string | null;
+    createdAt: number;
+  }[];
 }
 
 const voteTone = (v: string) =>
@@ -180,6 +186,39 @@ export function UserDetail() {
             </Table>
           </Panel>
 
+          {data.moderationHistory.length > 0 && (
+            <Panel title="Moderation history" bodyClassName="">
+              <Table>
+                <thead>
+                  <tr>
+                    <Th>Action</Th>
+                    <Th>Reason</Th>
+                    <Th>By</Th>
+                    <Th>When</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.moderationHistory.map((m, i) => (
+                    <Tr key={i}>
+                      <Td>
+                        <Badge tone={m.action === "user.suspended" ? "amber" : "green"}>
+                          {m.action === "user.suspended" ? "banned" : "reactivated"}
+                        </Badge>
+                      </Td>
+                      <Td className="max-w-xs">{m.reason || "—"}</Td>
+                      <Td className="text-xs text-slate-500">
+                        {m.actorEmail || "—"}
+                      </Td>
+                      <Td className="text-xs text-slate-500">
+                        {fmtDate(m.createdAt)}
+                      </Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </Table>
+            </Panel>
+          )}
+
           <div className="grid gap-4 lg:grid-cols-2">
             <Panel title="Recent swipes" bodyClassName="">
               <Table>
@@ -277,12 +316,19 @@ function UserActions({
   const [err, setErr] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [pw, setPw] = useState("");
+  const [statusAction, setStatusAction] = useState<"active" | "suspended" | null>(null);
+  const [reason, setReason] = useState("");
 
-  const setStatus = async (next: "active" | "suspended") => {
+  const setStatus = async (next: "active" | "suspended", statusReason: string) => {
     setBusy("status");
     setErr(null);
     try {
-      await cc(`/users/${id}/status`, { method: "POST", body: { status: next } });
+      await cc(`/users/${id}/status`, {
+        method: "POST",
+        body: { status: next, reason: statusReason.trim() || undefined },
+      });
+      setStatusAction(null);
+      setReason("");
       onChanged();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed");
@@ -309,27 +355,94 @@ function UserActions({
         {status === "suspended" ? (
           <Btn
             variant="neutral"
-            loading={busy === "status"}
-            onClick={() => setStatus("active")}
+            onClick={() => {
+              setStatusAction("active");
+              setReason("");
+              setErr(null);
+            }}
           >
-            Reactivate account
+            Reactivate account…
           </Btn>
         ) : (
           <Btn
             variant="neutral"
-            loading={busy === "status"}
             onClick={() => {
-              if (confirm(`Suspend ${email}? They will be unable to sign in.`))
-                void setStatus("suspended");
+              setStatusAction("suspended");
+              setReason("");
+              setErr(null);
             }}
           >
-            Suspend account
+            Ban account…
           </Btn>
         )}
         <Btn variant="danger" onClick={() => setConfirming((v) => !v)}>
           Delete account…
         </Btn>
       </div>
+
+      {statusAction && (
+        <div
+          className={`mt-3 rounded-md border p-3 ${
+            statusAction === "suspended"
+              ? "border-rose-200 bg-rose-50"
+              : "border-slate-200 bg-slate-50"
+          }`}
+        >
+          <p className="text-[13px] text-slate-700">
+            {statusAction === "suspended" ? (
+              <>
+                Ban <strong>{email}</strong>. They will be unable to sign in until
+                reactivated.
+              </>
+            ) : (
+              <>
+                Reactivate <strong>{email}</strong>. They will be able to sign in
+                again.
+              </>
+            )}
+          </p>
+          <div className="mt-2 max-w-sm">
+            <Field
+              label={
+                statusAction === "suspended"
+                  ? "Reason (required, visible in the audit log)"
+                  : "Reason (optional, visible in the audit log)"
+              }
+            >
+              <Input
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder={
+                  statusAction === "suspended"
+                    ? "e.g. harassment reported in group chat"
+                    : "e.g. appeal accepted"
+                }
+                className="w-full"
+              />
+            </Field>
+          </div>
+          <div className="mt-2 flex gap-2">
+            <Btn
+              variant="ghost"
+              onClick={() => {
+                setStatusAction(null);
+                setReason("");
+                setErr(null);
+              }}
+            >
+              Cancel
+            </Btn>
+            <Btn
+              variant={statusAction === "suspended" ? "danger" : "primary"}
+              loading={busy === "status"}
+              disabled={statusAction === "suspended" && !reason.trim()}
+              onClick={() => void setStatus(statusAction, reason)}
+            >
+              {statusAction === "suspended" ? "Ban account" : "Reactivate account"}
+            </Btn>
+          </div>
+        </div>
+      )}
 
       {confirming && (
         <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-3">
