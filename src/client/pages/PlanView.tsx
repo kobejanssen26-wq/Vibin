@@ -6,9 +6,9 @@ import {
   Button,
   ErrorState,
   LoadingScreen,
-  Modal,
 } from "../components/ui";
 import { PageHeader } from "../components/PageHeader";
+import { ReportButton } from "../components/ReportButton";
 import {
   IconCalendar,
   IconChat,
@@ -218,7 +218,14 @@ export function PlanView() {
         )}
       </p>
 
-      <ReportLink targetType="activity" targetId={a.id} />
+      <div className="text-center">
+        <ReportButton
+          targetType="activity"
+          targetId={a.id}
+          label="Report a problem with this activity"
+          modalTitle="Report this activity"
+        />
+      </div>
     </div>
   );
 }
@@ -229,102 +236,5 @@ function Row({ icon, text }: { icon: ReactNode; text: string }) {
       <span className="shrink-0 text-navy-400">{icon}</span>
       <span>{text}</span>
     </p>
-  );
-}
-
-const REPORT_REASONS = [
-  { id: "incorrect_info", label: "Details are wrong (price, address, hours…)" },
-  { id: "inappropriate", label: "Inappropriate or unsafe" },
-  { id: "spam", label: "Spam or not a real activity" },
-  { id: "other", label: "Something else" },
-] as const;
-
-function ReportLink({
-  targetType,
-  targetId,
-}: {
-  targetType: string;
-  targetId: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [reason, setReason] = useState<string>("incorrect_info");
-  const [detail, setDetail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  if (sent) {
-    return (
-      <p className="text-center text-xs text-navy-400">
-        Thanks — our team will take a look.
-      </p>
-    );
-  }
-
-  const submit = async () => {
-    setBusy(true);
-    setErr(null);
-    try {
-      await api("/reports", {
-        method: "POST",
-        body: { targetType, targetId, reason, detail: detail.trim() },
-      });
-      setSent(true);
-      setOpen(false);
-    } catch (e) {
-      setErr(
-        e instanceof ApiRequestError ? e.message : "Could not send the report.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <>
-      <button
-        className="w-full text-center text-xs font-medium text-navy-400 underline underline-offset-2 hover:text-navy"
-        onClick={() => setOpen(true)}
-      >
-        Report a problem with this activity
-      </button>
-      {open && (
-        <Modal title="Report this activity" onClose={() => setOpen(false)}>
-          <fieldset className="space-y-2">
-            <legend className="mb-1 text-sm font-semibold text-navy-700">
-              What's the issue?
-            </legend>
-            {REPORT_REASONS.map((r) => (
-              <label
-                key={r.id}
-                className="flex cursor-pointer items-center gap-3 rounded-xl border border-paper-line px-3 py-2.5 text-sm has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50"
-              >
-                <input
-                  type="radio"
-                  name="reason"
-                  className="h-4 w-4 accent-brand-500"
-                  checked={reason === r.id}
-                  onChange={() => setReason(r.id)}
-                />
-                {r.label}
-              </label>
-            ))}
-          </fieldset>
-          <textarea
-            className="field mt-3 min-h-[80px] resize-none"
-            placeholder="Add any detail that helps (optional)"
-            maxLength={1000}
-            value={detail}
-            onChange={(e) => setDetail(e.target.value)}
-          />
-          {err && (
-            <p className="mt-2 text-sm font-medium text-danger-600">{err}</p>
-          )}
-          <Button className="mt-3 w-full" loading={busy} onClick={submit}>
-            Send report
-          </Button>
-        </Modal>
-      )}
-    </>
   );
 }

@@ -4,6 +4,7 @@ import { usePoll } from "../lib/usePoll";
 import { api, ApiRequestError } from "../lib/api";
 import { Button, EmptyState, ErrorState, Field, LoadingScreen } from "../components/ui";
 import { PageHeader } from "../components/PageHeader";
+import { IconChevronRight } from "../components/icons";
 
 interface TicketRow {
   id: string;
@@ -84,10 +85,14 @@ export function Help() {
         <div className="card divide-y divide-paper-line">
           {FAQ.map((f) => (
             <details key={f.q} className="group px-4 py-3">
-              <summary className="cursor-pointer list-none text-sm font-semibold text-navy marker:hidden">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-navy marker:hidden">
                 {f.q}
+                <IconChevronRight
+                  size={16}
+                  className="shrink-0 text-navy-300 transition-transform duration-200 group-open:rotate-90"
+                />
               </summary>
-              <p className="mt-1.5 text-sm text-navy-400">{f.a}</p>
+              <p className="mt-1.5 animate-float-up text-sm text-navy-400">{f.a}</p>
             </details>
           ))}
         </div>

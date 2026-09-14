@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAdminAuth } from "./auth";
+import { LogoMark } from "../components/Logo";
+import { GlobalSearch } from "./components/GlobalSearch";
 import { Btn } from "./ui";
 
 const NAV: { to: string; label: string; group: string }[] = [
@@ -28,6 +30,7 @@ const NAV: { to: string; label: string; group: string }[] = [
 export function Shell({ children }: { children: ReactNode }) {
   const { user, logout } = useAdminAuth();
   const nav = useNavigate();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
 
   const groups = [...new Set(NAV.map((n) => n.group))];
@@ -42,9 +45,7 @@ export function Shell({ children }: { children: ReactNode }) {
           }`}
         >
           <div className="mb-4 flex items-center gap-2 px-1">
-            <span className="grid h-6 w-6 place-items-center rounded bg-white/10 text-[11px] font-black text-white">
-              V
-            </span>
+            <LogoMark className="h-6 w-6 shrink-0" onDark />
             <span className="text-xs font-semibold text-white">
               Command Center
             </span>
@@ -63,9 +64,9 @@ export function Shell({ children }: { children: ReactNode }) {
                   end={n.to === "/admin"}
                   onClick={() => setOpen(false)}
                   className={({ isActive }) =>
-                    `block rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors ${
+                    `relative block rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors duration-150 ${
                       isActive
-                        ? "bg-white/10 text-white"
+                        ? "bg-white/10 text-white before:absolute before:-left-3 before:top-1/2 before:h-4 before:w-[3px] before:-translate-y-1/2 before:rounded-full before:bg-lime-400"
                         : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
                     }`
                   }
@@ -80,7 +81,7 @@ export function Shell({ children }: { children: ReactNode }) {
         {open && (
           <button
             aria-label="Close menu"
-            className="fixed inset-0 z-20 bg-black/30 lg:hidden"
+            className="fixed inset-0 z-20 animate-fade-in bg-black/30 lg:hidden"
             onClick={() => setOpen(false)}
           />
         )}
@@ -90,16 +91,17 @@ export function Shell({ children }: { children: ReactNode }) {
           <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2">
             <div className="flex items-center gap-2">
               <button
-                className="rounded p-1 text-slate-500 hover:bg-slate-100 lg:hidden"
+                className="rounded p-1 text-slate-500 transition-colors hover:bg-slate-100 active:scale-95 lg:hidden"
                 onClick={() => setOpen(true)}
                 aria-label="Open menu"
               >
                 ☰
               </button>
-              <span className="text-xs text-slate-500">
+              <span className="hidden text-xs text-slate-500 sm:inline">
                 {import.meta.env.DEV ? "development" : "production"}
               </span>
             </div>
+            <GlobalSearch />
             <div className="flex items-center gap-3">
               <span className="text-xs text-slate-500">{user?.email}</span>
               <Btn
@@ -114,7 +116,11 @@ export function Shell({ children }: { children: ReactNode }) {
               </Btn>
             </div>
           </header>
-          <main className="flex-1 p-4 sm:p-6">{children}</main>
+          <main className="flex-1 p-4 sm:p-6">
+            <div key={location.pathname} className="animate-float-up">
+              {children}
+            </div>
+          </main>
         </div>
       </div>
     </div>

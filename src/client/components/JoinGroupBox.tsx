@@ -60,7 +60,9 @@ export function JoinGroupBox() {
           Join group
         </Button>
       </form>
-      {err && <p className="mt-2 text-xs font-medium text-danger-600">{err}</p>}
+      {err && (
+        <p className="mt-2 animate-float-up text-xs font-medium text-danger-600">{err}</p>
+      )}
     </div>
   );
 }

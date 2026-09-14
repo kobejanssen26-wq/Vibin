@@ -115,7 +115,9 @@ export function StatTile({
   );
   const cls =
     "block rounded-lg border border-slate-200 bg-white p-3 text-left" +
-    (clickable ? " transition-colors hover:border-slate-300" : "");
+    (clickable
+      ? " transition-[transform,box-shadow,border-color] duration-150 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-[0_8px_20px_-12px_rgba(49,85,255,0.35)] active:translate-y-0"
+      : "");
   if (href)
     return (
       <a href={href} className={cls}>
@@ -134,7 +136,7 @@ export function StatTile({
 /* ------------------------------- controls ---------------------------- */
 
 const btnBase =
-  "inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500";
+  "inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-semibold transition-[background-color,color,border-color,transform] duration-150 active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1";
 const btnVariants = {
   primary: "bg-brand-500 text-white hover:bg-brand-600",
   neutral: "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
@@ -299,7 +301,7 @@ export function Tr({
 }) {
   return (
     <tr
-      className={onClick ? "cursor-pointer hover:bg-slate-50" : undefined}
+      className={`transition-colors duration-100 hover:bg-slate-50 ${onClick ? "cursor-pointer" : ""}`}
       onClick={onClick}
     >
       {children}

@@ -108,6 +108,10 @@ export default {
           "linear-gradient(160deg, #101426 0%, #1c2a6b 55%, #3155ff 100%)",
       },
       keyframes: {
+        "fade-in": {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
         "pop-in": {
           "0%": { transform: "scale(0.86)", opacity: "0" },
           "60%": { transform: "scale(1.03)", opacity: "1" },
@@ -144,6 +148,7 @@ export default {
         },
       },
       animation: {
+        "fade-in": "fade-in 0.15s ease-out both",
         "pop-in": "pop-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) both",
         "float-up": "float-up 0.32s ease-out both",
         "slide-up": "slide-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both",

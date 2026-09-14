@@ -11,6 +11,7 @@ import {
 } from "../components/ui";
 import { InviteBox } from "../components/InviteBox";
 import { GroupChat } from "../components/GroupChat";
+import { ReportButton } from "../components/ReportButton";
 import { NearbyEvents } from "../components/NearbyEvents";
 import { PageHeader } from "../components/PageHeader";
 import { useConfirm } from "../components/Confirm";
@@ -263,6 +264,14 @@ export function GroupHome() {
               Leave group
             </button>
           )}
+          <div className="text-center">
+            <ReportButton
+              targetType="group"
+              targetId={id}
+              label="Report a problem with this group"
+              modalTitle="Report this group"
+            />
+          </div>
         </>
       )}
     </div>

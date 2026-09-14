@@ -302,6 +302,56 @@ app.get("/overview", async (c) => {
   });
 });
 
+/* ------------------------------ global search ------------------------------ */
+/** One box, five tables — capped small per category so it stays instant even
+ *  at this catalogue's size. Exact-id matches first, then a LIKE scan. */
+app.get("/search", async (c) => {
+  const q = (new URL(c.req.url).searchParams.get("q") || "").trim().slice(0, 120);
+  if (q.length < 2) return c.json({ users: [], groups: [], activities: [], reports: [], tickets: [] });
+  const like = `%${q}%`;
+
+  const [users_, groups_, activities_, reports_, tickets_] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT u.id, u.email, p.display_name AS displayName
+       FROM users u LEFT JOIN profiles p ON p.user_id = u.id
+       WHERE u.id = ?2 OR u.email_normalized LIKE ?1 OR p.display_name LIKE ?1
+       LIMIT 5`,
+    )
+      .bind(like, q)
+      .all<{ id: string; email: string; displayName: string | null }>(),
+    c.env.DB.prepare(
+      `SELECT id, name, status FROM groups WHERE id = ?2 OR name LIKE ?1 LIMIT 5`,
+    )
+      .bind(like, q)
+      .all<{ id: string; name: string; status: string }>(),
+    c.env.DB.prepare(
+      `SELECT id, title, city, status FROM activities WHERE id = ?2 OR title LIKE ?1 LIMIT 5`,
+    )
+      .bind(like, q)
+      .all<{ id: string; title: string; city: string | null; status: string }>(),
+    c.env.DB.prepare(
+      `SELECT id, target_type AS targetType, target_id AS targetId, reason, status FROM reports WHERE id = ?2 OR target_id = ?2 OR reason LIKE ?1 LIMIT 5`,
+    )
+      .bind(like, q)
+      .all<{ id: string; targetType: string; targetId: string; reason: string; status: string }>(),
+    c.env.DB.prepare(
+      `SELECT t.id, t.subject, t.status, u.email AS userEmail
+       FROM support_tickets t JOIN users u ON u.id = t.user_id
+       WHERE t.id = ?2 OR t.subject LIKE ?1 OR u.email_normalized LIKE ?1 LIMIT 5`,
+    )
+      .bind(like, q)
+      .all<{ id: string; subject: string; status: string; userEmail: string }>(),
+  ]);
+
+  return c.json({
+    users: users_.results,
+    groups: groups_.results,
+    activities: activities_.results,
+    reports: reports_.results,
+    tickets: tickets_.results,
+  });
+});
+
 /* --------------------------------- users --------------------------------- */
 
 const USER_SORT: Record<string, string> = {
