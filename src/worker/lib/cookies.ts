@@ -1,11 +1,8 @@
 import type { Context } from "hono";
 import { setCookie, deleteCookie } from "hono/cookie";
-import {
-  CSRF_COOKIE,
-  SESSION_COOKIE,
-  SESSION_TTL_SECONDS,
-} from "@shared/constants";
+import { CSRF_COOKIE, SESSION_COOKIE } from "@shared/constants";
 import type { Env, Vars } from "../env";
+import { sessionInactivitySeconds } from "./session-config";
 
 type Ctx = Context<{ Bindings: Env; Variables: Vars }>;
 
@@ -19,7 +16,7 @@ export function setSessionCookie(c: Ctx, sessionId: string) {
     secure: secure(c.env),
     sameSite: "Lax",
     path: "/",
-    maxAge: SESSION_TTL_SECONDS,
+    maxAge: sessionInactivitySeconds(c.env),
   });
 }
 
@@ -40,7 +37,7 @@ export function setCsrfCookie(c: Ctx, token: string) {
     secure: secure(c.env),
     sameSite: "Lax",
     path: "/",
-    maxAge: SESSION_TTL_SECONDS,
+    maxAge: sessionInactivitySeconds(c.env),
   });
 }
 

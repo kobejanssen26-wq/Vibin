@@ -314,6 +314,9 @@ app.patch("/password", async (c) => {
     .update(users)
     .set({ passwordHash: await hashPassword(body.newPassword), updatedAt: Math.floor(Date.now() / 1000) })
     .where(eq(users.id, userId));
+  // A changed password should sign the account out everywhere else — keep
+  // only the session making this request alive.
+  await destroyAllSessions(c.env, userId, c.get("sessionId") ?? undefined);
   return c.json({ ok: true });
 });
 
@@ -355,6 +358,8 @@ app.patch("/email", async (c) => {
     text: changeEmailVerifyBody(`${c.env.APP_URL}/verify-email?token=${token}`),
   });
 
+  // Same reasoning as password change: sign out other devices, not this one.
+  await destroyAllSessions(c.env, userId, c.get("sessionId") ?? undefined);
   return c.json({ ok: true, email: body.newEmail });
 });
 

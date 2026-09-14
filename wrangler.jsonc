@@ -24,7 +24,10 @@
     // Canonical origin. Once vibin.be is attached as a Custom Domain in the
     // Cloudflare dashboard this is the live URL; until then the site is also
     // reachable at the *.workers.dev URL printed by `wrangler deploy`.
-    "APP_URL": "https://vibin.be"
+    "APP_URL": "https://vibin.be",
+    // Sliding session window: a user who opens the app within this many days
+    // of their last visit stays logged in; past it, they must sign in again.
+    "SESSION_INACTIVITY_DAYS": "14"
   },
   "d1_databases": [
     {

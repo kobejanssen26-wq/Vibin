@@ -6,7 +6,8 @@ import {
 } from "@shared/constants";
 import type { Env, Vars } from "../env";
 import { forbidden, unauthorized } from "../lib/errors";
-import { getSession } from "../lib/session";
+import { getSession, touchSession, SESSION_TOUCH_THRESHOLD_SECONDS } from "../lib/session";
+import { setCsrfCookie, setSessionCookie } from "../lib/cookies";
 
 type Ctx = { Bindings: Env; Variables: Vars };
 
@@ -56,6 +57,22 @@ export const withSession: MiddlewareHandler<Ctx> = async (c, next) => {
         const header = c.req.header(CSRF_HEADER);
         if (!header || header !== session.csrf) {
           throw forbidden("Invalid or missing CSRF token. Refresh and retry.");
+        }
+      }
+
+      // Sliding expiration: a user active within the inactivity window stays
+      // logged in indefinitely — only real inactivity signs them out. Throttled
+      // so an active session gets one extra KV write (and, for cookie sessions,
+      // one Set-Cookie) per day rather than on every request.
+      const now = Math.floor(Date.now() / 1000);
+      if (now - session.lastSeenAt > SESSION_TOUCH_THRESHOLD_SECONDS) {
+        await touchSession(c.env, sid, session);
+        if (cookieSid) {
+          // Bearer (mobile) sessions have no cookie to refresh — the KV TTL
+          // extension above is all they need; the client just keeps using
+          // the same token.
+          setSessionCookie(c, sid);
+          setCsrfCookie(c, session.csrf);
         }
       }
     }

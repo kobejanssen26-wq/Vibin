@@ -13,6 +13,13 @@ export interface Env {
   /** Optional deploy marker (git sha / CI build number) shown in the Command
    *  Center version panel. Falls back to "dev" when unset. */
   BUILD_ID?: string;
+  /**
+   * How many days of inactivity before a user session expires (sliding
+   * window — every authenticated request within the window extends it).
+   * Parse with a fallback: `Number(env.SESSION_INACTIVITY_DAYS) || 14`.
+   * Optional — defaults to 14 when unset.
+   */
+  SESSION_INACTIVITY_DAYS?: string;
 
   // --- secrets (wrangler secret put / .dev.vars) ---
   /** Reserved for signed tokens (not yet used — sessions are opaque + KV-backed). */

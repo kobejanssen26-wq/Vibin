@@ -111,7 +111,9 @@ export const GROUP_STATUSES = [
 export type GroupStatus = (typeof GROUP_STATUSES)[number];
 
 export const INVITE_CODE_LENGTH = 6;
-export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
+// Session lifetime is a configurable, sliding inactivity window, not a fixed
+// constant — see worker/lib/session-config.ts (SESSION_INACTIVITY_DAYS env
+// var, default 14 days from last activity).
 export const SESSION_COOKIE = "vibin_session";
 export const CSRF_COOKIE = "vibin_csrf";
 export const CSRF_HEADER = "x-vibin-csrf";
