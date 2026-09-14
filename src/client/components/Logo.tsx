@@ -1,6 +1,6 @@
 /**
- * VIBIN mark: an abstract "V" built from two converging blades — the left blade
- * VIBIN Blue, the right blade VIBIN Lime — meeting at a point, like two paths
+ * VIBIN mark: an abstract "V" built from two converging ribbons — the left
+ * VIBIN Blue, the right VIBIN Lime — meeting at a point, like two paths
  * agreeing on one direction. Stays legible at favicon size.
  */
 export function LogoMark({
@@ -12,18 +12,12 @@ export function LogoMark({
 }) {
   return (
     <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
-      {/* left blade — VIBIN Blue */}
-      <path
-        d="M7 9h9.4l9.1 21.7L20.9 42 7 9Z"
-        fill="#3155ff"
-      />
-      {/* right blade — VIBIN Lime */}
-      <path
-        d="M41 9h-9.4L20.9 35.4 25.6 42 41 9Z"
-        fill="#b8f23d"
-      />
+      {/* left ribbon — VIBIN Blue */}
+      <line x1="10" y1="8" x2="24" y2="40" stroke="#3155ff" strokeWidth="9" strokeLinecap="round" />
+      {/* right ribbon — VIBIN Lime */}
+      <line x1="38" y1="8" x2="24" y2="40" stroke="#b8f23d" strokeWidth="9" strokeLinecap="round" />
       {/* convergence dot */}
-      <circle cx="23.2" cy="38.4" r="3.3" fill={onDark ? "#f7f8fc" : "#101426"} />
+      <circle cx="24" cy="40" r="4.2" fill={onDark ? "#f7f8fc" : "#101426"} />
     </svg>
   );
 }

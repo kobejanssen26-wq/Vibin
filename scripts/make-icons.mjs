@@ -25,18 +25,18 @@ const WHITE = "#f7f8fc";
 const mark = (box = 48, bg = NAVY, radius = box * 0.25) => `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="${box}" height="${box}">
   <rect width="48" height="48" rx="${(radius / box) * 48}" fill="${bg}"/>
-  <path d="M9 11h8.6l8.4 20L21.6 41 9 11Z" fill="${BLUE}"/>
-  <path d="M39 11h-8.6L21.6 35.3 25.9 41 39 11Z" fill="${LIME}"/>
-  <circle cx="23.7" cy="37.6" r="3" fill="${WHITE}"/>
+  <line x1="10" y1="8" x2="24" y2="40" stroke="${BLUE}" stroke-width="9" stroke-linecap="round"/>
+  <line x1="38" y1="8" x2="24" y2="40" stroke="${LIME}" stroke-width="9" stroke-linecap="round"/>
+  <circle cx="24" cy="40" r="4.2" fill="${WHITE}"/>
 </svg>`;
 
 const maskable = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="512" height="512">
   <rect width="100" height="100" fill="${NAVY}"/>
   <g transform="translate(28 28) scale(0.9)">
-    <path d="M9 11h8.6l8.4 20L21.6 41 9 11Z" fill="${BLUE}"/>
-    <path d="M39 11h-8.6L21.6 35.3 25.9 41 39 11Z" fill="${LIME}"/>
-    <circle cx="23.7" cy="37.6" r="3" fill="${WHITE}"/>
+    <line x1="10" y1="8" x2="24" y2="40" stroke="${BLUE}" stroke-width="9" stroke-linecap="round"/>
+    <line x1="38" y1="8" x2="24" y2="40" stroke="${LIME}" stroke-width="9" stroke-linecap="round"/>
+    <circle cx="24" cy="40" r="4.2" fill="${WHITE}"/>
   </g>
 </svg>`;
 
@@ -46,9 +46,9 @@ const og = `
   <circle cx="120" cy="90" r="420" fill="${BLUE}" opacity="0.16"/>
   <circle cx="1120" cy="620" r="360" fill="${LIME}" opacity="0.14"/>
   <g transform="translate(96 210) scale(3.1)">
-    <path d="M9 11h8.6l8.4 20L21.6 41 9 11Z" fill="${BLUE}"/>
-    <path d="M39 11h-8.6L21.6 35.3 25.9 41 39 11Z" fill="${LIME}"/>
-    <circle cx="23.7" cy="37.6" r="3" fill="${WHITE}"/>
+    <line x1="10" y1="8" x2="24" y2="40" stroke="${BLUE}" stroke-width="9" stroke-linecap="round"/>
+    <line x1="38" y1="8" x2="24" y2="40" stroke="${LIME}" stroke-width="9" stroke-linecap="round"/>
+    <circle cx="24" cy="40" r="4.2" fill="${WHITE}"/>
   </g>
   <text x="270" y="300" font-family="Plus Jakarta Sans, Arial, sans-serif" font-size="120" font-weight="800" fill="${WHITE}" letter-spacing="-3">VIBIN</text>
   <text x="272" y="372" font-family="Plus Jakarta Sans, Arial, sans-serif" font-size="42" font-weight="600" fill="${LIME}">Find your vibe. Make a plan.</text>

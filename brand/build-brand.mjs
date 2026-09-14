@@ -20,9 +20,9 @@ const C = {
 
 /** the mark, drawn in a 0 0 48 48 space (matches Logo.tsx) */
 const MARK = (dot) => `
-  <path d="M7 9h9.4l9.1 21.7L20.9 42 7 9Z" fill="${C.blue}"/>
-  <path d="M41 9h-9.4L20.9 35.4 25.6 42 41 9Z" fill="${C.lime}"/>
-  <circle cx="23.2" cy="38.4" r="3.3" fill="${dot}"/>`;
+  <line x1="10" y1="8" x2="24" y2="40" stroke="${C.blue}" stroke-width="9" stroke-linecap="round"/>
+  <line x1="38" y1="8" x2="24" y2="40" stroke="${C.lime}" stroke-width="9" stroke-linecap="round"/>
+  <circle cx="24" cy="40" r="4.2" fill="${dot}"/>`;
 
 /** mark centred on a `size` canvas with `pad` fraction of breathing room */
 function markCanvas(size, { pad = 0.11, dot = C.navy, bg = null, radius = 0 } = {}) {
