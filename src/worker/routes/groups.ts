@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Env, Vars } from "../env";
 import { createDb } from "../db/client";
@@ -242,6 +242,9 @@ app.put("/:id/settings", async (c) => {
       timeBand: body.timeBand as never,
       timeSpecific: body.timeSpecific,
       updatedAt: now,
+      // Atomic increment — marks the boundary undo/lastVoted use to tell this
+      // filter session's votes from an earlier one (see activityVotes.filterGeneration).
+      filterGeneration: sql`${groupSettings.filterGeneration} + 1`,
     })
     .where(eq(groupSettings.groupId, groupId));
   await db.update(groups).set({ updatedAt: now }).where(eq(groups.id, groupId));

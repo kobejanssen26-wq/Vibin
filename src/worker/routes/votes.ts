@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, asc, desc, eq, gte, inArray, notInArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, notInArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Env, Vars } from "../env";
 import { createDb } from "../db/client";
@@ -130,7 +130,10 @@ async function buildSwipeState(
 
   // last card this user voted on (for undo) — scoped to the current filter
   // session: a vote cast before the most recent filter change belongs to a
-  // deck that's no longer showing, so it's not eligible to undo into.
+  // deck that's no longer showing, so it's not eligible to undo into. Matched
+  // by filterGeneration (an exact integer), not a timestamp — a vote and a
+  // filter change can land in the same unix second (seen live in testing),
+  // which let a >= timestamp comparison wrongly treat a stale vote as current.
   const lastVotedRow = await db
     .select({ act: activities })
     .from(activityVotes)
@@ -139,7 +142,7 @@ async function buildSwipeState(
       and(
         eq(activityVotes.groupId, groupId),
         eq(activityVotes.userId, userId),
-        gte(activityVotes.updatedAt, settings?.updatedAt ?? 0),
+        eq(activityVotes.filterGeneration, settings?.filterGeneration ?? 0),
       ),
     )
     .orderBy(desc(activityVotes.updatedAt))
@@ -358,6 +361,12 @@ app.post("/:id/swipe", async (c) => {
     ),
   });
 
+  const settings = await db.query.groupSettings.findFirst({
+    where: eq(groupSettings.groupId, groupId),
+    columns: { filterGeneration: true },
+  });
+  const filterGeneration = settings?.filterGeneration ?? 0;
+
   const now = Math.floor(Date.now() / 1000);
   await db
     .insert(activityVotes)
@@ -367,6 +376,7 @@ app.post("/:id/swipe", async (c) => {
       activityId: body.activityId,
       userId: uid(c),
       value: body.value,
+      filterGeneration,
       createdAt: now,
       updatedAt: now,
     })
@@ -376,7 +386,7 @@ app.post("/:id/swipe", async (c) => {
         activityVotes.activityId,
         activityVotes.userId,
       ],
-      set: { value: body.value, updatedAt: now },
+      set: { value: body.value, updatedAt: now, filterGeneration },
     });
 
   track(
@@ -426,7 +436,8 @@ app.post("/:id/swipe/undo", async (c) => {
 
   // Scoped to the current filter session (see buildSwipeState's lastVoted) —
   // a filter change rebuilds the deck, so a vote from before it isn't part of
-  // what's on screen now and shouldn't be reachable by Back.
+  // what's on screen now and shouldn't be reachable by Back. Matched by
+  // filterGeneration, not a timestamp — see the comment on lastVotedRow above.
   const settings = await db.query.groupSettings.findFirst({
     where: eq(groupSettings.groupId, groupId),
   });
@@ -437,7 +448,7 @@ app.post("/:id/swipe/undo", async (c) => {
       and(
         eq(activityVotes.groupId, groupId),
         eq(activityVotes.userId, uid(c)),
-        gte(activityVotes.updatedAt, settings?.updatedAt ?? 0),
+        eq(activityVotes.filterGeneration, settings?.filterGeneration ?? 0),
       ),
     )
     .orderBy(desc(activityVotes.updatedAt))

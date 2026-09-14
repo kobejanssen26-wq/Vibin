@@ -173,6 +173,11 @@ export const groupSettings = sqliteTable("group_settings", {
     .notNull()
     .default("unknown"),
   timeSpecific: text("time_specific"), // "HH:MM"
+  /** Bumped on every settings save. Votes are stamped with the generation
+   *  active when cast (see activityVotes.filterGeneration) so undo/lastVoted
+   *  can tell "this filter session" from "an earlier one" with an exact
+   *  integer match instead of a same-second-prone timestamp comparison. */
+  filterGeneration: integer("filter_generation").notNull().default(0),
   updatedAt: integer("updated_at").notNull().default(now),
 });
 
@@ -623,6 +628,13 @@ export const activityVotes = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     value: text("value", { enum: ["like", "nope", "superlike"] }).notNull(),
+    /** groupSettings.filterGeneration at the moment this vote was cast — the
+     *  undo/lastVoted boundary compares this instead of a timestamp, since a
+     *  vote and a filter change can land in the same unix second (seen live:
+     *  both timestamps identical), which made a >= timestamp comparison
+     *  occasionally let undo reach into the previous filter session. An
+     *  integer generation number can't tie like that. */
+    filterGeneration: integer("filter_generation").notNull().default(0),
     createdAt: integer("created_at").notNull().default(now),
     updatedAt: integer("updated_at").notNull().default(now),
   },

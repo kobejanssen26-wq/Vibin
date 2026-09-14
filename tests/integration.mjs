@@ -441,6 +441,32 @@ async function run() {
     !fs.queue.some((c) => c.activity.category === "sport"),
   );
 
+  // --- regression: a vote and a filter change landing in the same unix
+  // second must not leave that vote reachable by undo (filterGeneration is
+  // an exact integer match, not a >= timestamp comparison that can tie) ---
+  const raceVote = fs.queue[0]?.activity?.id;
+  if (raceVote) {
+    await fc("POST", `/groups/${fg.id}/swipe`, { activityId: raceVote, value: "nope" });
+    await fc("PUT", `/groups/${fg.id}/settings`, {
+      categories: ["culture"],
+      allActivities: false,
+      locationLabel: null,
+      lat: null,
+      lng: null,
+      radiusKm: 25,
+      budgetBand: "any",
+      dateMode: "specific",
+      dateSpecific: soon3,
+      timeBand: "evening",
+      timeSpecific: null,
+    });
+    const raceState = (await fc("GET", `/groups/${fg.id}/swipe`)).json;
+    ok(
+      "a vote cast the same instant as a filter change is not undo-reachable after",
+      raceState.lastVoted === null,
+    );
+  }
+
   // --- ranking: group taste shapes the deck, without hard-hiding anything ---
   // dateMode "unknown": in a solo group any "like" is instantly unanimous and
   // matches. A *known* date completes that match straight to "planned", which
