@@ -3,6 +3,7 @@ import { usePoll } from "../lib/usePoll";
 import { EmptyState, ErrorState, LinkButton, LoadingScreen } from "../components/ui";
 import { PageHeader } from "../components/PageHeader";
 import { JoinGroupBox } from "../components/JoinGroupBox";
+import { Reveal } from "../components/Reveal";
 import { IconPlus } from "../components/icons";
 import type { GroupSummaryDTO } from "@shared/types";
 import { formatWhen } from "../lib/format";
@@ -74,14 +75,14 @@ export function Dashboard() {
         />
       ) : (
         <ul className="space-y-3">
-          {groups.map((g) => {
+          {groups.map((g, i) => {
             const s = STATUS[g.status] ?? STATUS.configuring!;
             const pct =
               g.progress && g.progress.total > 1
                 ? Math.round((g.progress.voted / g.progress.total) * 100)
                 : null;
             return (
-              <li key={g.id}>
+              <Reveal as="li" key={g.id} delay={Math.min(i, 6) * 60}>
                 <Link
                   to={`/groups/${g.id}`}
                   className="card relative block overflow-hidden p-4 pl-5 transition-[transform,border-color] duration-150 hover:-translate-y-0.5 hover:border-brand-300"
@@ -137,7 +138,7 @@ export function Dashboard() {
                     </p>
                   )}
                 </Link>
-              </li>
+              </Reveal>
             );
           })}
         </ul>

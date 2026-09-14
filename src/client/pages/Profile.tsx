@@ -4,6 +4,7 @@ import { useAuth } from "../lib/auth";
 import { api, ApiRequestError } from "../lib/api";
 import { Avatar, Button, Field, Modal, SectionHead } from "../components/ui";
 import { PageHeader } from "../components/PageHeader";
+import { Reveal } from "../components/Reveal";
 import type { Me } from "@shared/types";
 
 export function Profile() {
@@ -112,7 +113,7 @@ export function Profile() {
         title="Profile & settings"
       />
 
-      <div className="card flex items-center gap-4 p-4">
+      <Reveal className="card flex items-center gap-4 p-4">
         <Avatar name={user.displayName} url={user.avatarUrl} size={60} />
         <div className="min-w-0 flex-1">
           <p className="truncate font-bold">{user.displayName}</p>
@@ -129,9 +130,9 @@ export function Profile() {
             }
           />
         </label>
-      </div>
+      </Reveal>
 
-      <section>
+      <Reveal as="section" delay={60}>
         <SectionHead label="Your profile" />
         <form onSubmit={save} className="card space-y-4 p-4">
           <Field
@@ -168,9 +169,9 @@ export function Profile() {
             Save changes
           </Button>
         </form>
-      </section>
+      </Reveal>
 
-      <section>
+      <Reveal as="section" delay={120}>
         <SectionHead label="Notifications" />
         <div className="card divide-y divide-paper-line">
           {(
@@ -200,24 +201,26 @@ export function Profile() {
             </label>
           ))}
         </div>
-      </section>
+      </Reveal>
 
-      <SecuritySection currentEmail={user.email} />
+      <Reveal delay={180}>
+        <SecuritySection currentEmail={user.email} />
+      </Reveal>
 
-      <section>
+      <Reveal as="section" delay={240}>
         <SectionHead label="Help" />
         <div className="card">
           <Link
             to="/help"
-            className="flex items-center justify-between px-4 py-3.5 text-sm font-semibold text-navy hover:bg-navy/5"
+            className="flex items-center justify-between px-4 py-3.5 text-sm font-semibold text-navy transition-colors hover:bg-navy/5"
           >
             Help &amp; support
             <span className="text-navy-300">›</span>
           </Link>
         </div>
-      </section>
+      </Reveal>
 
-      <section>
+      <Reveal as="section" delay={300}>
         <SectionHead label="Your data" />
         <div className="card divide-y divide-paper-line">
           <div className="flex items-center justify-between px-4 py-3.5">
@@ -253,7 +256,7 @@ export function Profile() {
             </button>
           </div>
         </div>
-      </section>
+      </Reveal>
 
       {delOpen && (
         <Modal title="Delete your account" onClose={() => setDelOpen(false)}>

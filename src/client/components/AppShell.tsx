@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Wordmark } from "./Logo";
 import { Avatar } from "./ui";
 import { IconBell, IconLogout } from "./icons";
@@ -13,6 +13,7 @@ import { api } from "../lib/api";
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const nav = useNavigate();
+  const location = useLocation();
   const [panel, setPanel] = useState<"none" | "bell" | "menu">("none");
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -158,7 +159,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
       </header>
 
-      <main className="flex-1 px-4 pb-24 pt-4">{children}</main>
+      <main className="flex-1 px-4 pb-24 pt-4">
+        <div key={location.pathname} className="animate-float-up">
+          {children}
+        </div>
+      </main>
     </div>
   );
 }

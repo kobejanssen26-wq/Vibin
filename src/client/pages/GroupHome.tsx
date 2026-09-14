@@ -12,6 +12,7 @@ import {
 import { InviteBox } from "../components/InviteBox";
 import { GroupChat } from "../components/GroupChat";
 import { ReportButton } from "../components/ReportButton";
+import { Reveal } from "../components/Reveal";
 import { NearbyEvents } from "../components/NearbyEvents";
 import { PageHeader } from "../components/PageHeader";
 import { useConfirm } from "../components/Confirm";
@@ -78,7 +79,7 @@ export function GroupHome() {
       ) : (
         <>
           {cta && (
-            <div className="relative overflow-hidden rounded-3xl bg-vibin-match p-5 text-white">
+            <Reveal className="relative overflow-hidden rounded-3xl bg-vibin-match p-5 text-white">
               <div className="dot-grid pointer-events-none absolute inset-0 text-white/60 opacity-[0.06]" />
               <p className="relative eyebrow text-lime-400">Next step</p>
               <p className="relative mt-1 text-lg font-extrabold">{cta.title}</p>
@@ -89,7 +90,7 @@ export function GroupHome() {
               >
                 {cta.label}
               </button>
-            </div>
+            </Reveal>
           )}
 
           {group.isCreator && group.status === "configuring" && (
@@ -105,7 +106,7 @@ export function GroupHome() {
           <InviteBox code={group.inviteCode} url={group.inviteUrl} />
 
           {/* members */}
-          <section>
+          <Reveal as="section" delay={60}>
             <SectionHead
               label="Crew"
               count={`${group.members.length}`}
@@ -136,11 +137,11 @@ export function GroupHome() {
                 </div>
               ))}
             </div>
-          </section>
+          </Reveal>
 
           {/* upcoming plans */}
           {plans.data && plans.data.plans.length > 0 && (
-            <section>
+            <Reveal as="section" delay={120}>
               <SectionHead label="Upcoming" count={`${plans.data.plans.length}`} />
               <div className="hairline">
                 {plans.data.plans.map((p) => (
@@ -164,11 +165,11 @@ export function GroupHome() {
                   </Link>
                 ))}
               </div>
-            </section>
+            </Reveal>
           )}
 
           {/* matches */}
-          <section>
+          <Reveal as="section" delay={180}>
             <SectionHead
               label="Matches"
               count={matches.data ? `${matches.data.matches.length}` : undefined}
@@ -211,9 +212,11 @@ export function GroupHome() {
                 </p>
               </div>
             )}
-          </section>
+          </Reveal>
 
-          <NearbyEvents settings={group.settings} />
+          <Reveal delay={220}>
+            <NearbyEvents settings={group.settings} />
+          </Reveal>
 
           {group.isCreator && group.status !== "archived" && (
             <button
