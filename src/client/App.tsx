@@ -23,6 +23,7 @@ import { Profile } from "./pages/Profile";
 import { Help } from "./pages/Help";
 import { HelpTicket } from "./pages/HelpTicket";
 import { Legal } from "./pages/Legal";
+import { Contact } from "./pages/Contact";
 
 // The Owner Command Center is a large, separate tree that normal users never
 // load — split it into its own chunk.
@@ -107,6 +108,7 @@ export function App({ onReady }: { onReady?: () => void }) {
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/privacy" element={<Legal tab="privacy" />} />
       <Route path="/terms" element={<Legal tab="terms" />} />
+      <Route path="/contact" element={<Contact />} />
 
       <Route path="/app" element={<Protected><Dashboard /></Protected>} />
       <Route path="/groups/new" element={<Protected><CreateGroup /></Protected>} />

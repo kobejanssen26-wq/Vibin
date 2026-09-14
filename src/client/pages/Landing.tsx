@@ -279,6 +279,7 @@ export function Landing() {
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 text-sm text-navy-400 md:flex-row">
           <Wordmark />
           <div className="flex gap-5">
+            <Link to="/contact" className="hover:text-navy">Contact</Link>
             <Link to="/privacy" className="hover:text-navy">Privacy</Link>
             <Link to="/terms" className="hover:text-navy">Terms</Link>
             <Link to="/login" className="hover:text-navy">Log in</Link>

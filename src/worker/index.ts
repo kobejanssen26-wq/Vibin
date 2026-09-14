@@ -34,6 +34,7 @@ import adminSupportRoutes from "./routes/admin-support";
 import adminVaultRoutes from "./routes/admin-vault";
 import mediaRoutes from "./routes/media";
 import goRoutes from "./routes/go";
+import contactRoutes from "./routes/contact";
 
 type Ctx = { Bindings: Env; Variables: Vars };
 
@@ -134,6 +135,8 @@ api.route("/media", mediaRoutes);
 // Public outbound-click redirect — no auth required (§3); withSession above
 // already best-effort-populates userId when a session cookie is present.
 api.route("/go", goRoutes);
+// Public contact form — reachable without an account.
+api.route("/contact", contactRoutes);
 
 /* -------------------------- Owner Command Center ------------------------- *
  * Registered BEFORE the app's `requireAuth` catch-all so `/api/admin/auth/*`
