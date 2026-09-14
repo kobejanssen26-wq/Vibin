@@ -75,6 +75,10 @@ export function GlobalSearch() {
         }}
         onFocus={() => setOpen(true)}
         placeholder="Search users, groups, activities…"
+        aria-label="Search users, groups, activities, reports, and support tickets"
+        role="combobox"
+        aria-expanded={open && hasQuery}
+        aria-haspopup="listbox"
         className="w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[13px] text-slate-900 placeholder:text-slate-400 transition-shadow focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
       />
       {open && hasQuery && (
