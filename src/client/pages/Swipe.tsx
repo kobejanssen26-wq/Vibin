@@ -287,7 +287,7 @@ export function Swipe() {
                 View the plan
               </Link>
             ) : meta.canChangeFilters ? (
-              <Link to={`/groups/${id}/config`} className="btn-primary">
+              <Link to={`/groups/${id}/configure`} className="btn-primary">
                 Change filters
               </Link>
             ) : (
@@ -428,7 +428,7 @@ function FilterBar({
   return (
     <div className="mb-3">
       {canChange ? (
-        <Link to={`/groups/${groupId}/config`} aria-label="Change filters">
+        <Link to={`/groups/${groupId}/configure`} aria-label="Change filters">
           {inner}
         </Link>
       ) : (

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, asc, desc, eq, inArray, notInArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, notInArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Env, Vars } from "../env";
 import { createDb } from "../db/client";
@@ -128,13 +128,19 @@ async function buildSwipeState(
     deckSize: queueActs.length,
   }));
 
-  // last card this user voted on (for undo)
+  // last card this user voted on (for undo) — scoped to the current filter
+  // session: a vote cast before the most recent filter change belongs to a
+  // deck that's no longer showing, so it's not eligible to undo into.
   const lastVotedRow = await db
     .select({ act: activities })
     .from(activityVotes)
     .innerJoin(activities, eq(activities.id, activityVotes.activityId))
     .where(
-      and(eq(activityVotes.groupId, groupId), eq(activityVotes.userId, userId)),
+      and(
+        eq(activityVotes.groupId, groupId),
+        eq(activityVotes.userId, userId),
+        gte(activityVotes.updatedAt, settings?.updatedAt ?? 0),
+      ),
     )
     .orderBy(desc(activityVotes.updatedAt))
     .limit(1);
@@ -418,11 +424,21 @@ app.post("/:id/swipe/undo", async (c) => {
   const groupId = c.req.param("id");
   await requireActiveMember(db, groupId, uid(c));
 
+  // Scoped to the current filter session (see buildSwipeState's lastVoted) —
+  // a filter change rebuilds the deck, so a vote from before it isn't part of
+  // what's on screen now and shouldn't be reachable by Back.
+  const settings = await db.query.groupSettings.findFirst({
+    where: eq(groupSettings.groupId, groupId),
+  });
   const last = await db
     .select()
     .from(activityVotes)
     .where(
-      and(eq(activityVotes.groupId, groupId), eq(activityVotes.userId, uid(c))),
+      and(
+        eq(activityVotes.groupId, groupId),
+        eq(activityVotes.userId, uid(c)),
+        gte(activityVotes.updatedAt, settings?.updatedAt ?? 0),
+      ),
     )
     .orderBy(desc(activityVotes.updatedAt))
     .limit(1);
