@@ -25,6 +25,7 @@ const CLIENT_EVENTS = [
   "calendar_action",
   "onboarding_completed",
   "client_error",
+  "activity_maps_fallback_clicked",
 ] as const;
 
 const eventSchema = z.object({

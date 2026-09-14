@@ -9,7 +9,8 @@ type ClientEvent =
   | "activity_shared"
   | "booking_clicked"
   | "calendar_action"
-  | "client_error";
+  | "client_error"
+  | "activity_maps_fallback_clicked";
 
 interface Payload {
   name: ClientEvent;

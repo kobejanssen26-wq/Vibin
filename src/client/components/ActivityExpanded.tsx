@@ -67,6 +67,15 @@ export function ActivityExpanded({
   const secondaryWebsite =
     primary?.kind !== "website" && a.websiteUrl ? true : false;
 
+  // No website/booking/ticket link on file at all — fall back to a Google
+  // Maps search on this activity's own real coordinates (or name + location
+  // as text) so there's still a real way to find and contact the place,
+  // rather than a dead end. Never a fabricated business-specific URL.
+  const mapsQuery = a.lat != null && a.lng != null
+    ? `${a.lat},${a.lng}`
+    : [a.provider ?? a.title, a.address ?? a.locationLabel].filter(Boolean).join(", ");
+  const mapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`;
+
   const share = async () => {
     track({ name: "activity_shared", groupId, activityId: a.id });
     const shareData = { title: a.title, text: a.description.slice(0, 140) };
@@ -205,9 +214,22 @@ export function ActivityExpanded({
               {primary.label}
             </a>
           ) : (
-            <div className="flex-1 rounded-2xl bg-paper-soft px-4 py-2.5 text-center text-sm text-navy-400">
-              No online link — contact the venue directly
-            </div>
+            <a
+              href={mapsHref}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-primary flex-1"
+              onClick={() =>
+                track({
+                  name: "activity_maps_fallback_clicked",
+                  groupId,
+                  activityId: a.id,
+                })
+              }
+            >
+              <IconMapPin size={16} />
+              Find on Google Maps
+            </a>
           )}
           {secondaryWebsite && (
             <a

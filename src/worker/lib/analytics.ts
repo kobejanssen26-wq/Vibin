@@ -35,7 +35,8 @@ export type EventName =
   | "booking_clicked"
   | "calendar_action"
   | "client_error"
-  | "server_error";
+  | "server_error"
+  | "activity_maps_fallback_clicked";
 
 export interface TrackOpts {
   userId?: string | null;
