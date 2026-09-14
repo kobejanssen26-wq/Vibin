@@ -9,6 +9,7 @@ import { requireActiveMember, requireGroupMember } from "../lib/access";
 import { newId } from "../lib/id";
 import { rateLimit } from "../lib/ratelimit";
 import { notifyGroup } from "../lib/notify";
+import { censor } from "../lib/profanity";
 import { toPublicUser } from "../lib/dto";
 import { LIMITS } from "@shared/constants";
 import type { MessageDTO } from "@shared/types";
@@ -87,6 +88,7 @@ app.post("/:id/messages", async (c) => {
       body: z.string().trim().min(LIMITS.message.min).max(LIMITS.message.max),
     }),
   );
+  const { clean, flagged } = censor(body.body);
   const now = Math.floor(Date.now() / 1000);
   const id = newId();
   await db.insert(messages).values({
@@ -94,8 +96,8 @@ app.post("/:id/messages", async (c) => {
     groupId,
     userId: uid(c),
     kind: "text",
-    body: body.body,
-    meta: "{}",
+    body: clean,
+    meta: flagged ? JSON.stringify({ filtered: true }) : "{}",
     createdAt: now,
   });
   const me = await db.query.profiles.findFirst({
@@ -105,7 +107,7 @@ app.post("/:id/messages", async (c) => {
   await notifyGroup(db, groupId, uid(c), {
     kind: "message",
     title: `${me?.displayName ?? "Someone"} in the group chat`,
-    body: body.body.slice(0, 120),
+    body: clean.slice(0, 120),
     data: { messageId: id },
   });
   const [row] = await toDTOs(
@@ -116,8 +118,8 @@ app.post("/:id/messages", async (c) => {
         groupId,
         userId: uid(c),
         kind: "text",
-        body: body.body,
-        meta: "{}",
+        body: clean,
+        meta: flagged ? JSON.stringify({ filtered: true }) : "{}",
         createdAt: now,
       },
     ],
