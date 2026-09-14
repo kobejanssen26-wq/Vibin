@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Wordmark } from "./Logo";
 import { Avatar } from "./ui";
-import { IconBell, IconLogout } from "./icons";
+import { IconBell, IconHelp, IconLogout } from "./icons";
 import { useAuth } from "../lib/auth";
 import { usePoll } from "../lib/usePoll";
 import { relativeTime } from "../lib/format";
@@ -71,6 +71,13 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Wordmark />
           </NavLink>
           <div className="flex items-center gap-1">
+            <NavLink
+              to="/help"
+              aria-label="Help & support"
+              className="grid h-10 w-10 place-items-center rounded-full text-navy-500 transition hover:bg-navy/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            >
+              <IconHelp />
+            </NavLink>
             <button
               type="button"
               onClick={openBell}

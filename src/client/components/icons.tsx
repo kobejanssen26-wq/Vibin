@@ -35,6 +35,13 @@ export const IconBell = (p: P) => (
     <path d="M10 20a2 2 0 0 0 4 0" />
   </Svg>
 );
+export const IconHelp = (p: P) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.5 9.5a2.5 2.5 0 0 1 4.9.8c0 1.7-2.4 2-2.4 3.7" />
+    <path d="M12 17.5v.1" />
+  </Svg>
+);
 export const IconArrowLeft = (p: P) => (
   <Svg {...p}>
     <path d="M15 5l-7 7 7 7" />
