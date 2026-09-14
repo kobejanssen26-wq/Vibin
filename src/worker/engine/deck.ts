@@ -13,8 +13,14 @@ import { LIMITS } from "@shared/constants";
 import type { Activity, GroupSettings } from "../db/schema";
 import { rankActivities, type RankContext } from "./rank";
 
-/** Share of each batch reserved for pure-random discovery (anti-filter-bubble). */
-const EXPLORE_FRACTION = 0.15;
+/**
+ * Personalization is a suggestion, not a decision: only this many leading
+ * cards of a batch come from the ranker (highest-scored first); everything
+ * else is a fair diverse shuffle of the remaining candidates. This keeps a
+ * user's own taste history from dominating a whole new group's deck — it
+ * nudges what shows up first, nothing more.
+ */
+const RANK_SUGGESTION_SLOTS = 3;
 
 /** Straight-line distance in km between two WGS84 points. */
 export function haversineKm(
@@ -168,17 +174,13 @@ export async function buildDeckBatch(
 
   let ids: string[];
   if (opts.rank) {
-    const exploreN = Math.min(
-      rows.length,
-      Math.max(1, Math.round(limit * EXPLORE_FRACTION)),
-    );
-    const rankN = limit - exploreN;
-    const ranked = rankActivities(rows, opts.rank, rankN).map((r) => r.id);
-    const taken = new Set(ranked);
-    const explore = shuffle(rows.filter((a) => !taken.has(a.id)))
-      .slice(0, exploreN)
+    const suggestN = Math.min(rows.length, RANK_SUGGESTION_SLOTS);
+    const suggested = rankActivities(rows, opts.rank, suggestN).map((r) => r.id);
+    const taken = new Set(suggested);
+    const rest = shuffle(rows.filter((a) => !taken.has(a.id)))
+      .slice(0, limit - suggestN)
       .map((a) => a.id);
-    ids = [...ranked, ...explore];
+    ids = [...suggested, ...rest];
   } else {
     ids = shuffle(rows)
       .slice(0, limit)
