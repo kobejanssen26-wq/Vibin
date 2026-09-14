@@ -44,12 +44,17 @@ export function Shell({ children }: { children: ReactNode }) {
             open ? "translate-x-0" : "-translate-x-full"
           }`}
         >
-          <div className="mb-4 flex items-center gap-2 px-1">
+          <NavLink
+            to="/admin"
+            end
+            aria-label="Command Center home"
+            className="mb-4 flex items-center gap-2 rounded px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+          >
             <LogoMark className="h-6 w-6 shrink-0" onDark />
             <span className="text-xs font-semibold text-white">
               Command Center
             </span>
-          </div>
+          </NavLink>
           {groups.map((g) => (
             <div key={g} className="mb-3">
               {g && (
