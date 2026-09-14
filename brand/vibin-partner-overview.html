@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VIBIN — Partner Overview</title>
+<style>
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: #101426;
+    background: #e9ebf3;
+  }
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    background: #f7f8fc;
+    padding: 16mm 16mm 14mm;
+    position: relative;
+    page-break-after: always;
+  }
+  .page:last-child { page-break-after: auto; }
+  @media print {
+    body { background: none; }
+    .page { box-shadow: none; margin: 0; width: auto; min-height: 0; }
+  }
+  @media screen {
+    .page { box-shadow: 0 8px 40px rgba(16,20,38,.12); margin: 10mm auto; border-radius: 6px; }
+  }
+
+  .brand-row { display: flex; align-items: center; gap: 10px; }
+  .brand-row svg { width: 30px; height: 30px; }
+  .brand-row .name { font-size: 19px; font-weight: 800; letter-spacing: -.02em; }
+  .tag { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #6f7690; margin-top: 3px; }
+
+  h1 { font-size: 34px; font-weight: 800; letter-spacing: -.03em; line-height: 1.05; margin: 22px 0 8px; }
+  h1 .accent { background: linear-gradient(90deg,#3155ff,#5b6bff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lede { font-size: 14.5px; color: #4b5170; max-width: 145mm; line-height: 1.55; margin: 0 0 22px; }
+
+  .flow { display: flex; align-items: center; gap: 8px; margin: 6px 0 26px; flex-wrap: wrap; }
+  .flow .step {
+    background: #101426; color: #fff; font-weight: 700; font-size: 12.5px;
+    padding: 8px 14px; border-radius: 999px; white-space: nowrap;
+  }
+  .flow .step.lime { background: #b8f23d; color: #101426; }
+  .flow .arrow { color: #9aa0b8; font-weight: 700; }
+
+  h2 { font-size: 17px; font-weight: 800; letter-spacing: -.01em; margin: 0 0 4px; }
+  .section { margin-bottom: 20px; }
+  .section .sub { font-size: 12.5px; color: #6f7690; margin: 0 0 12px; }
+
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .card {
+    background: #fff; border: 1px solid #e3e6f0; border-radius: 10px;
+    padding: 13px 15px;
+  }
+  .card .k { font-weight: 700; font-size: 13px; margin: 0 0 4px; display: flex; align-items: center; gap: 7px; }
+  .card .k .dot { width: 7px; height: 7px; border-radius: 999px; background: #3155ff; flex: none; }
+  .card p { font-size: 12px; color: #565c78; margin: 0; line-height: 1.5; }
+
+  .foot {
+    position: absolute; left: 16mm; right: 16mm; bottom: 10mm;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 10px; color: #9aa0b8; border-top: 1px solid #e3e6f0; padding-top: 8px;
+  }
+
+  .models { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .model {
+    background: #fff; border: 1px solid #e3e6f0; border-radius: 12px; padding: 15px;
+  }
+  .model .num { font-size: 11px; font-weight: 800; color: #3155ff; letter-spacing: .08em; }
+  .model h3 { font-size: 14.5px; font-weight: 800; margin: 4px 0 6px; }
+  .model p { font-size: 12px; color: #565c78; line-height: 1.5; margin: 0; }
+  .model.open { grid-column: 1 / -1; background: linear-gradient(135deg,#101426,#1c2a6b); color: #fff; }
+  .model.open .num { color: #b8f23d; }
+  .model.open p { color: #c7cbe0; }
+
+  .banner {
+    background: #101426; color: #fff; border-radius: 12px; padding: 14px 16px; margin: 4px 0 20px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .banner .pill { background: #b8f23d; color: #101426; font-weight: 800; font-size: 11px; padding: 5px 10px; border-radius: 999px; white-space: nowrap; }
+  .banner p { margin: 0; font-size: 12.5px; color: #dde0f0; }
+
+  ol.steps { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+  ol.steps li {
+    counter-increment: s;
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 10px 0; border-bottom: 1px solid #e3e6f0;
+    font-size: 12.5px; color: #35395a;
+  }
+  ol.steps li:last-child { border-bottom: none; }
+  ol.steps li::before {
+    content: counter(s);
+    flex: none; width: 22px; height: 22px; border-radius: 999px;
+    background: #eef1fb; color: #3155ff; font-weight: 800; font-size: 11px;
+    display: grid; place-items: center;
+  }
+
+  .checklist { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; margin: 0; padding: 0; list-style: none; }
+  .checklist li { font-size: 12.5px; color: #35395a; padding: 5px 0 5px 20px; position: relative; }
+  .checklist li::before { content: "✓"; position: absolute; left: 0; color: #3155ff; font-weight: 800; }
+
+  .cta {
+    margin-top: 26px; background: linear-gradient(135deg,#101426 0%,#1c2a6b 55%,#3155ff 100%);
+    border-radius: 16px; padding: 26px 28px; color: #fff; text-align: center;
+  }
+  .cta h2 { color: #fff; font-size: 22px; margin-bottom: 6px; }
+  .cta p { color: #c7cbe0; font-size: 12.5px; margin: 0 0 14px; }
+  .cta .link {
+    display: inline-block; background: #b8f23d; color: #101426; font-weight: 800;
+    font-size: 13px; padding: 10px 20px; border-radius: 999px; text-decoration: none;
+  }
+  .cta .sub2 { margin-top: 10px; font-size: 11px; color: #9aa0c0; }
+
+  .disclaimer { font-size: 10.5px; color: #9aa0b8; line-height: 1.5; margin-top: 14px; }
+</style>
+</head>
+<body>
+
+<!-- ============ PAGE 1 ============ -->
+<section class="page">
+  <div class="brand-row">
+    <svg viewBox="0 0 48 48"><line x1="10" y1="8" x2="24" y2="40" stroke="#3155ff" stroke-width="9" stroke-linecap="round"/><line x1="38" y1="8" x2="24" y2="40" stroke="#b8f23d" stroke-width="9" stroke-linecap="round"/><circle cx="24" cy="40" r="4.2" fill="#101426"/></svg>
+    <span class="name">VIBIN</span>
+  </div>
+  <div class="tag">Partner overview</div>
+
+  <h1>Where groups decide<br><span class="accent">what to do — together.</span></h1>
+  <p class="lede">
+    VIBIN is a platform where groups discover activities, decide together, and turn that
+    decision into a real plan. No more scattered group chats and "so what are we doing" —
+    everyone swipes, and a plan only forms when the whole group is genuinely in.
+  </p>
+
+  <div class="flow">
+    <span class="step">Swipe</span><span class="arrow">→</span>
+    <span class="step lime">Match</span><span class="arrow">→</span>
+    <span class="step">Plan</span><span class="arrow">→</span>
+    <span class="step lime">Book</span>
+  </div>
+
+  <div class="section">
+    <h2>Why businesses are looking at VIBIN</h2>
+    <p class="sub">A new way for real groups to find and choose a real place — not a search result, a group decision.</p>
+    <div class="cards">
+      <div class="card">
+        <div class="k"><span class="dot"></span>Reach groups, not just browsers</div>
+        <p>Every VIBIN session starts with a group actively trying to agree on something to do — high intent, not idle scrolling.</p>
+      </div>
+      <div class="card">
+        <div class="k"><span class="dot"></span>Local discovery</div>
+        <p>Activities surface by category, location and budget, so nearby groups see your venue when it genuinely fits what they're looking for.</p>
+      </div>
+      <div class="card">
+        <div class="k"><span class="dot"></span>Measurable outbound clicks</div>
+        <p>Every click through to your website, booking page or ticket link is tracked — you can see real interest, not guesswork.</p>
+      </div>
+      <div class="card">
+        <div class="k"><span class="dot"></span>Social exposure, no extra work</div>
+        <p>Your venue appears where the decision is already being made, alongside the activities and events people actually swipe on.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>What we won't promise</h2>
+    <p class="sub" style="margin-bottom:0">
+      We won't promise guaranteed bookings or invented numbers — VIBIN reports real, measured clicks
+      and, where an affiliate or booking partnership is in place, real tracked conversions. Nothing more.
+    </p>
+  </div>
+
+  <div class="foot">
+    <span>VIBIN — Find your vibe. Make a plan.</span>
+    <span>Page 1 / 3</span>
+  </div>
+</section>
+
+<!-- ============ PAGE 2 ============ -->
+<section class="page">
+  <div class="brand-row">
+    <svg viewBox="0 0 48 48"><line x1="10" y1="8" x2="24" y2="40" stroke="#3155ff" stroke-width="9" stroke-linecap="round"/><line x1="38" y1="8" x2="24" y2="40" stroke="#b8f23d" stroke-width="9" stroke-linecap="round"/><circle cx="24" cy="40" r="4.2" fill="#101426"/></svg>
+    <span class="name">VIBIN</span>
+  </div>
+  <div class="tag">Partnership models</div>
+
+  <h2 style="font-size:24px;margin-top:18px;">How we can work together</h2>
+  <p class="lede" style="margin-bottom:18px;">
+    We keep this flexible on purpose — the right model depends on your business, not the other way around.
+  </p>
+
+  <div class="banner">
+    <span class="pill">No required fixed costs</span>
+    <p>Joining VIBIN's catalogue doesn't require a mandatory monthly fee. Commercial terms — if any — are agreed per partner, based on the model below that fits you.</p>
+  </div>
+
+  <div class="models">
+    <div class="model">
+      <div class="num">01</div>
+      <h3>Affiliate / commission</h3>
+      <p>You pay only on results — a commission on bookings that actually came from VIBIN, tracked end-to-end. Rate agreed directly with you; we don't apply one blanket percentage to every partner.</p>
+    </div>
+    <div class="model">
+      <div class="num">02</div>
+      <h3>Referral / tracking</h3>
+      <p>We send you tracked, attributed traffic and report on it — clicks, and conversions where your systems can confirm them. A lighter-weight starting point before any commercial terms are discussed.</p>
+    </div>
+    <div class="model">
+      <div class="num">03</div>
+      <h3>Custom partnership</h3>
+      <p>Featured placement, seasonal promotion, or something specific to your business — we shape the details together rather than fitting you into a fixed package.</p>
+    </div>
+    <div class="model open">
+      <div class="num">04 — OPEN</div>
+      <h3>Propose your own model</h3>
+      <p>Already have a partnership structure that works for you elsewhere? Bring it. We'd rather adapt to a model that fits your business than force one that doesn't.</p>
+    </div>
+  </div>
+
+  <div class="section" style="margin-top:22px;">
+    <h2>Getting started</h2>
+    <p class="sub">What we need from you to get your activity live and accurate.</p>
+    <ol class="steps">
+      <li>Tell us a bit about the business — name, activity type, and your official website.</li>
+      <li>Share accurate activity details: description, pricing, opening hours, and the right booking or ticket link.</li>
+      <li>Send a few real photos of the actual experience — interior, activity in progress, not just the storefront.</li>
+      <li>Name a contact person for questions and future updates.</li>
+      <li>Tell us which partnership model (above) you'd like to explore — or propose your own.</li>
+    </ol>
+  </div>
+
+  <div class="foot">
+    <span>VIBIN — Find your vibe. Make a plan.</span>
+    <span>Page 2 / 3</span>
+  </div>
+</section>
+
+<!-- ============ PAGE 3 ============ -->
+<section class="page">
+  <div class="brand-row">
+    <svg viewBox="0 0 48 48"><line x1="10" y1="8" x2="24" y2="40" stroke="#3155ff" stroke-width="9" stroke-linecap="round"/><line x1="38" y1="8" x2="24" y2="40" stroke="#b8f23d" stroke-width="9" stroke-linecap="round"/><circle cx="24" cy="40" r="4.2" fill="#101426"/></svg>
+    <span class="name">VIBIN</span>
+  </div>
+  <div class="tag">What we'll ask for</div>
+
+  <h2 style="font-size:24px;margin-top:18px;">Onboarding checklist</h2>
+  <p class="lede" style="margin-bottom:16px;">
+    Nothing here is a hard requirement to start the conversation — it's simply what makes your
+    listing as accurate and useful as possible once you're in.
+  </p>
+
+  <ul class="checklist">
+    <li>Business / activity name</li>
+    <li>Official website</li>
+    <li>Correct activity description</li>
+    <li>Real photos of the experience</li>
+    <li>Accurate pricing</li>
+    <li>Opening hours</li>
+    <li>Booking or ticket link</li>
+    <li>A contact person</li>
+    <li>Preferred partnership model</li>
+    <li>Address / coordinates</li>
+  </ul>
+
+  <div class="section" style="margin-top:24px;">
+    <h2>A quick word on accuracy</h2>
+    <p class="sub" style="margin-bottom:0">
+      VIBIN never invents activity details, prices or availability. If something about your listing
+      needs correcting, that's exactly what we want to hear from you — accuracy matters more to us
+      than a bigger catalogue.
+    </p>
+  </div>
+
+  <div class="cta">
+    <h2>Interested in becoming a VIBIN partner?</h2>
+    <p>Tell us about your business and we'll take it from there.</p>
+    <a class="link" href="https://vibin.be/contact">vibin.be/contact</a>
+    <p class="sub2">Select "Business / partner inquiry" on the contact form</p>
+  </div>
+
+  <p class="disclaimer">
+    This document describes VIBIN's current partnership approach and is provided for discussion
+    purposes. Exact commercial terms, if any, are confirmed directly with each partner before
+    anything is agreed. VIBIN — Belgium.
+  </p>
+
+  <div class="foot">
+    <span>VIBIN — Find your vibe. Make a plan.</span>
+    <span>Page 3 / 3</span>
+  </div>
+</section>
+
+</body>
+</html>
