@@ -1,0 +1,1 @@
+ALTER TABLE `events` ADD `visibility_window_days` integer;

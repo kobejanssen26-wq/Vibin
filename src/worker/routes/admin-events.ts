@@ -92,6 +92,9 @@ const eventInput = z.object({
   startsAt: z.number().int().positive(),
   endsAt: z.number().int().positive().nullable().default(null),
   allDay: z.boolean().default(false),
+  /** Days before startsAt this event becomes discoverable. Null = platform
+   *  default (see DEFAULT_VISIBILITY_WINDOW_DAYS in routes/live-events.ts). */
+  visibilityWindowDays: z.number().int().min(1).max(365).nullable().default(null),
   status: STATUS.default("upcoming"),
   priceType: z.enum(["free", "paid", "varies", "unknown"]).default("unknown"),
   priceMinCents: z.number().int().min(0).max(10_000_00).nullable().default(null),
@@ -138,6 +141,7 @@ app.post("/events", async (c) => {
     startsAt: body.startsAt,
     endsAt: body.endsAt,
     allDay: body.allDay ? 1 : 0,
+    visibilityWindowDays: body.visibilityWindowDays,
     status: body.status as never,
     priceType: body.priceType,
     priceMinCents: body.priceMinCents,

@@ -29,12 +29,14 @@ interface EventRow {
   kind: string;
   status: string;
   verificationStatus: string;
+  categoryId: string | null;
   city: string | null;
   venueName: string | null;
   startsAt: number;
   source: string;
   url: string | null;
   priceType: string;
+  visibilityWindowDays: number | null;
 }
 interface SourceRow {
   id: string;
@@ -261,6 +263,7 @@ function EventsPanel() {
   const [status, setStatus] = useState("");
   const [verification, setVerification] = useState("");
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const query = `q=${encodeURIComponent(q)}&kind=${kind}&status=${status}&verification=${verification}`;
   const { data, loading, error, reload } = useResource<{ events: EventRow[] }>(
@@ -400,6 +403,13 @@ function EventsPanel() {
                     )}
                     <Btn
                       variant="ghost"
+                      className="!py-0.5 !text-xs"
+                      onClick={() => setEditingId(editingId === e.id ? null : e.id)}
+                    >
+                      {editingId === e.id ? "Close" : "Edit"}
+                    </Btn>
+                    <Btn
+                      variant="ghost"
                       className="!py-0.5 !text-xs !text-red-600"
                       loading={busy === e.id}
                       onClick={() => act(e.id, "", "DELETE")}
@@ -410,10 +420,164 @@ function EventsPanel() {
                 </Td>
               </Tr>
             ))}
+            {editingId && (() => {
+              const row = data.events.find((r) => r.id === editingId);
+              return row ? (
+                <tr>
+                  <td colSpan={7} className="bg-slate-50 p-0">
+                    <EditEventForm
+                      event={row}
+                      onDone={() => {
+                        setEditingId(null);
+                        reload();
+                      }}
+                    />
+                  </td>
+                </tr>
+              ) : null;
+            })()}
           </tbody>
         </Table>
       )}
     </Panel>
+  );
+}
+
+function toLocalInput(unixSeconds: number): string {
+  const d = new Date(unixSeconds * 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function EditEventForm({
+  event,
+  onDone,
+}: {
+  event: EventRow;
+  onDone: () => void;
+}) {
+  const [f, setF] = useState({
+    title: event.title,
+    kind: event.kind,
+    categoryId: event.categoryId ?? "",
+    city: event.city ?? "",
+    venueName: event.venueName ?? "",
+    startsAt: toLocalInput(event.startsAt),
+    url: event.url ?? "",
+    priceType: event.priceType,
+    visibilityWindowDays: event.visibilityWindowDays != null ? String(event.visibilityWindowDays) : "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const set = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
+
+  const submit = async () => {
+    setErr(null);
+    const startsAt = Math.floor(new Date(f.startsAt).getTime() / 1000);
+    if (!f.title.trim() || !Number.isFinite(startsAt)) {
+      setErr("Title and a valid start date/time are required.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await cc(`/events/${event.id}`, {
+        method: "PATCH",
+        body: {
+          title: f.title.trim(),
+          kind: f.kind,
+          categoryId: f.categoryId || null,
+          city: f.city.trim() || null,
+          venueName: f.venueName.trim() || null,
+          startsAt,
+          url: f.url.trim() || null,
+          priceType: f.priceType,
+          visibilityWindowDays: f.visibilityWindowDays
+            ? Number(f.visibilityWindowDays)
+            : null,
+        },
+      });
+      onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not save.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-2 gap-3 border-t border-slate-200 p-3">
+      <Field label="Title">
+        <Input value={f.title} onChange={(e) => set("title", e.target.value)} />
+      </Field>
+      <Field label="Starts at">
+        <Input
+          type="datetime-local"
+          value={f.startsAt}
+          onChange={(e) => set("startsAt", e.target.value)}
+        />
+      </Field>
+      <Field label="Kind">
+        <Select value={f.kind} onChange={(e) => set("kind", e.target.value)}>
+          {EVENT_KIND_META.map((k) => (
+            <option key={k.id} value={k.id}>
+              {k.label}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Category (optional)">
+        <Select
+          value={f.categoryId}
+          onChange={(e) => set("categoryId", e.target.value)}
+        >
+          <option value="">—</option>
+          {ACTIVITY_CATEGORIES.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.label}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="City">
+        <Input value={f.city} onChange={(e) => set("city", e.target.value)} />
+      </Field>
+      <Field label="Venue">
+        <Input
+          value={f.venueName}
+          onChange={(e) => set("venueName", e.target.value)}
+        />
+      </Field>
+      <Field label="Event URL">
+        <Input value={f.url} onChange={(e) => set("url", e.target.value)} />
+      </Field>
+      <Field label="Price">
+        <Select
+          value={f.priceType}
+          onChange={(e) => set("priceType", e.target.value)}
+        >
+          <option value="unknown">unknown</option>
+          <option value="free">free</option>
+          <option value="paid">paid</option>
+          <option value="varies">varies</option>
+        </Select>
+      </Field>
+      <Field label="Visible from (days before) — blank = default 60">
+        <Input
+          type="number"
+          min={1}
+          max={365}
+          value={f.visibilityWindowDays}
+          onChange={(e) => set("visibilityWindowDays", e.target.value)}
+          placeholder="60"
+        />
+      </Field>
+      <div className="col-span-2 flex items-center gap-3">
+        <Btn loading={saving} onClick={submit}>
+          Save changes
+        </Btn>
+        {err && <span className="text-xs text-red-600">{err}</span>}
+      </div>
+    </div>
   );
 }
 
@@ -427,6 +591,7 @@ function AddEventForm({ onDone }: { onDone: () => void }) {
     startsAt: "",
     url: "",
     priceType: "unknown",
+    visibilityWindowDays: "",
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -452,6 +617,9 @@ function AddEventForm({ onDone }: { onDone: () => void }) {
           startsAt,
           url: f.url.trim() || null,
           priceType: f.priceType,
+          visibilityWindowDays: f.visibilityWindowDays
+            ? Number(f.visibilityWindowDays)
+            : null,
           verificationStatus: "verified",
         },
       });
@@ -519,6 +687,16 @@ function AddEventForm({ onDone }: { onDone: () => void }) {
           <option value="paid">paid</option>
           <option value="varies">varies</option>
         </Select>
+      </Field>
+      <Field label="Visible from (days before) — blank = default 60">
+        <Input
+          type="number"
+          min={1}
+          max={365}
+          value={f.visibilityWindowDays}
+          onChange={(e) => set("visibilityWindowDays", e.target.value)}
+          placeholder="60"
+        />
       </Field>
       <div className="col-span-2 flex items-center gap-3">
         <Btn loading={saving} onClick={submit}>

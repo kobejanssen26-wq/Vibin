@@ -7,7 +7,7 @@
  * the activity deck, so "within X km of Hoogstraten" means real distance.
  */
 import { Hono } from "hono";
-import { and, asc, between, eq, gte, inArray, lte, ne } from "drizzle-orm";
+import { and, asc, between, eq, gte, inArray, lte, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Env, Vars } from "../env";
 import { createDb } from "../db/client";
@@ -20,6 +20,11 @@ import { EVENT_KINDS } from "@shared/constants";
 
 type Ctx = { Bindings: Env; Variables: Vars };
 const app = new Hono<Ctx>();
+
+/** Default discovery window (days before startsAt) for an event that hasn't
+ *  been given its own — a major festival might want longer, a small local
+ *  event shorter (see events.visibilityWindowDays, admin-settable per event). */
+const DEFAULT_VISIBILITY_WINDOW_DAYS = 60;
 
 const nearbySchema = z.object({
   lat: z.coerce.number().min(-90).max(90).optional(),
@@ -37,13 +42,17 @@ app.get("/nearby", async (c) => {
   const db = createDb(c.env);
   const now = Math.floor(Date.now() / 1000);
   const from = q.from ?? now - 3600;
-  const to = q.to ?? now + 60 * 86_400;
+  // `to` is just an outer sanity cap (or an explicit client override) — the
+  // real "is this event visible yet" decision is the per-event window below,
+  // so the default has to be generous enough not to clip a long-window event.
+  const to = q.to ?? now + 365 * 86_400;
 
   const where = [
     eq(events.active, 1),
     ne(events.verificationStatus, "archived"),
     inArray(events.status, ["upcoming", "live"]),
     between(events.startsAt, from, to),
+    sql`${events.startsAt} <= ${now} + COALESCE(${events.visibilityWindowDays}, ${DEFAULT_VISIBILITY_WINDOW_DAYS}) * 86400`,
     ...(q.kind ? [eq(events.kind, q.kind as (typeof EVENT_KINDS)[number])] : []),
   ];
 

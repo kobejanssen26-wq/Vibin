@@ -57,6 +57,13 @@
       "when": 1789324051872,
       "tag": "0007_aspiring_stone_men",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1789403190901,
+      "tag": "0008_pale_stick",
+      "breakpoints": true
     }
   ]
 }
