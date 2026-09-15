@@ -276,6 +276,49 @@ async function run() {
   });
   ok("removed member cannot vote", eveVote.status === 403);
 
+  // --- leaving/being removed clears that group's notifications ---
+  const g5 = (await kobe("POST", "/groups", { name: `Crew ${uniq()}` })).json.group;
+  const code5 = (await kobe("GET", `/groups/${g5.id}`)).json.group.inviteCode;
+  const frank = client();
+  const frankUser = await signup(frank, "Frank");
+  await frank("POST", `/invites/${code5}/join`, {});
+  await kobe("POST", `/groups/${g5.id}/messages`, { body: "hi frank, before you leave" });
+  const frankNotifsBefore = (await frank("GET", "/me/notifications")).json.notifications;
+  ok(
+    "member has a notification for the group before leaving",
+    frankNotifsBefore.some((n) => n.data.groupId === g5.id),
+  );
+  await frank("POST", `/groups/${g5.id}/leave`, {});
+  const frankNotifsAfter = (await frank("GET", "/me/notifications")).json.notifications;
+  ok(
+    "leaving a group clears that group's existing notifications",
+    !frankNotifsAfter.some((n) => n.data.groupId === g5.id),
+  );
+  await kobe("POST", `/groups/${g5.id}/messages`, { body: "message after frank left" });
+  const frankNotifsAfterNewMsg = (await frank("GET", "/me/notifications")).json.notifications;
+  ok(
+    "no new notification is created for a group you've already left",
+    !frankNotifsAfterNewMsg.some((n) => n.data.groupId === g5.id),
+  );
+
+  const g6 = (await kobe("POST", "/groups", { name: `Crew ${uniq()}` })).json.group;
+  const code6 = (await kobe("GET", `/groups/${g6.id}`)).json.group.inviteCode;
+  const grace = client();
+  const graceUser = await signup(grace, "Grace");
+  await grace("POST", `/invites/${code6}/join`, {});
+  await kobe("POST", `/groups/${g6.id}/messages`, { body: "hi grace, before you're removed" });
+  const graceNotifsBefore = (await grace("GET", "/me/notifications")).json.notifications;
+  ok(
+    "member has a notification for the group before being removed",
+    graceNotifsBefore.some((n) => n.data.groupId === g6.id),
+  );
+  await kobe("PATCH", `/groups/${g6.id}/members/${graceUser.id}`, { status: "removed" });
+  const graceNotifsAfter = (await grace("GET", "/me/notifications")).json.notifications;
+  ok(
+    "being removed from a group clears that group's existing notifications",
+    !graceNotifsAfter.some((n) => n.data.groupId === g6.id),
+  );
+
   // --- invalid invite code ---
   const bad = await kobe("GET", `/invites/ZZZZZZ`);
   ok("unknown invite code is rejected", bad.status === 404 || bad.status === 400);

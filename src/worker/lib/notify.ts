@@ -1,4 +1,4 @@
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import type { DB } from "../db/client";
 import { groupMembers, messages, notifications } from "../db/schema";
 import { newId } from "./id";
@@ -48,6 +48,28 @@ export async function notifyGroup(
     .map((r) => r.userId)
     .filter((id) => id !== exceptUserId);
   await notifyUsers(db, targets, { ...n, data: { groupId, ...n.data } });
+}
+
+/**
+ * Wipe a former member's existing notifications for one group — called when
+ * they leave or get removed, so nothing about a group they can no longer
+ * open lingers in their notification list. notifyGroup already excludes
+ * left/removed members from *future* notifications; this handles the ones
+ * already sent before they left.
+ */
+export async function clearGroupNotifications(
+  db: DB,
+  userId: string,
+  groupId: string,
+): Promise<void> {
+  await db
+    .delete(notifications)
+    .where(
+      and(
+        eq(notifications.userId, userId),
+        sql`json_extract(${notifications.data}, '$.groupId') = ${groupId}`,
+      ),
+    );
 }
 
 /** Post a system message into the group chat (match / date / plan events). */

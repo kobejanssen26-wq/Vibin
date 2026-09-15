@@ -22,7 +22,7 @@ import { buildGroupDTO, matchCountFor, settingsToDTO } from "../lib/group-view";
 import { chunk, rowsPerInsert } from "../lib/chunk";
 import { rateLimit } from "../lib/ratelimit";
 import { track } from "../lib/analytics";
-import { systemMessage, notifyGroup } from "../lib/notify";
+import { systemMessage, notifyGroup, clearGroupNotifications } from "../lib/notify";
 import { buildDeck } from "../engine/deck";
 import { rebuildPoolTail, contextForGroup } from "./votes";
 import { activityVoteProgress } from "../engine/match";
@@ -348,6 +348,9 @@ app.patch("/:id/members/:memberId", async (c) => {
     .where(
       and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, memberId)),
     );
+  if (body.status === "removed") {
+    await clearGroupNotifications(db, memberId, groupId);
+  }
   await db
     .update(groups)
     .set({ updatedAt: Math.floor(Date.now() / 1000) })
@@ -373,6 +376,7 @@ app.post("/:id/leave", async (c) => {
     .where(
       and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, uid(c))),
     );
+  await clearGroupNotifications(db, uid(c), groupId);
   await systemMessage(db, groupId, `Someone left the group.`);
   return c.json({ ok: true });
 });
