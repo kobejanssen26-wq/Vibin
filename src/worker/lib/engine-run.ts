@@ -29,6 +29,7 @@ import {
   groupHasKnownDate,
 } from "../engine/match";
 import { generateDateOptions, resolveKnownStart } from "./dates";
+import { isKnownClosed } from "./opening-hours";
 import { newId } from "./id";
 import { notifyGroup, systemMessage } from "./notify";
 import { trackNow } from "./analytics";
@@ -113,14 +114,25 @@ export async function runActivityMatch(
     { type: "activity_match", matchId: match.id, activityId },
   );
 
-  if (settings && groupHasKnownDate(settings.dateMode)) {
-    // §10 — the group already knows when. Skip date voting, complete the plan.
-    const startsAt = resolveKnownStart(
-      settings.dateMode,
-      settings.dateSpecific,
-      settings.timeBand,
-      settings.timeSpecific,
-    );
+  const knownStart =
+    settings && groupHasKnownDate(settings.dateMode)
+      ? resolveKnownStart(
+          settings.dateMode,
+          settings.dateSpecific,
+          settings.timeBand,
+          settings.timeSpecific,
+        )
+      : null;
+  // Never silently lock in a plan for a time the venue is confirmed closed —
+  // fall through to the date-voting phase instead so the group picks a real
+  // time, exactly as if the date had been unknown to begin with.
+  const knownStartClosed =
+    knownStart != null && isKnownClosed(activity?.openingHours, knownStart);
+
+  if (knownStart != null && !knownStartClosed) {
+    // §10 — the group already knows when, and the venue is open (or hours
+    // aren't known either way). Skip date voting, complete the plan.
+    const startsAt = knownStart;
     await db.batch([
       db
         .update(matches)
@@ -160,8 +172,9 @@ export async function runActivityMatch(
       data: { matchId: match.id },
     });
   } else {
-    // Start the second matching phase — date/time voting.
-    const options = generateDateOptions();
+    // Start the second matching phase — date/time voting. Opening-hours-aware
+    // when the activity's real hours are known (see generateDateOptions).
+    const options = generateDateOptions(now, activity?.openingHours);
     await db.batch([
       db
         .update(groups)
@@ -188,7 +201,9 @@ export async function runActivityMatch(
     await systemMessage(
       db,
       groupId,
-      `📅 Now let's find a date for ${activity?.title ?? "it"} — vote on the options.`,
+      knownStartClosed
+        ? `📅 ${activity?.title ?? "It"} is closed at your usual time — pick a real time below.`
+        : `📅 Now let's find a date for ${activity?.title ?? "it"} — vote on the options.`,
       { type: "date_voting_started", matchId: match.id },
     );
     await notifyGroup(db, groupId, actingUserId, {

@@ -185,6 +185,66 @@ async function run() {
   const g2plan = (await d("GET", `/groups/${g2.id}/plans`)).json.plans;
   ok("date-matched plan exists with the chosen start time", g2plan[0]?.startsAt > 0);
 
+  // --- smart time availability: never auto-complete a plan for a time the
+  // venue is confirmed closed, even on a "known date" group; the auto-
+  // generated date options must all be genuinely open ---
+  const oh = client();
+  await signup(oh, "OpeningHours");
+  const g4 = (await oh("POST", "/groups", { name: `Hours ${uniq()}` })).json.group;
+  await oh("PUT", `/groups/${g4.id}/settings`, {
+    categories: ["sport"],
+    allActivities: false,
+    locationLabel: "Leuven",
+    lat: null,
+    lng: null,
+    radiusKm: 25,
+    budgetBand: "any",
+    // "tonight" + "morning" resolves to ~10:00 today — before Bowling
+    // Leuven's real hours (Mo-Sa 13:00-01:00; Su 13:00-00:00) on any day.
+    dateMode: "tonight",
+    dateSpecific: null,
+    timeBand: "morning",
+    timeSpecific: null,
+  });
+  await oh("POST", `/groups/${g4.id}/start`, {});
+  let bowlingId = null;
+  let s4 = (await oh("GET", `/groups/${g4.id}/swipe`)).json;
+  for (let b = 0; b < 6 && !bowlingId; b++) {
+    for (const c of s4.queue) {
+      if (c.activity.title === "Bowling Leuven") {
+        bowlingId = c.activity.id;
+        break;
+      }
+      await oh("POST", `/groups/${g4.id}/swipe`, { activityId: c.activity.id, value: "nope" });
+    }
+    if (!bowlingId) s4 = (await oh("POST", `/groups/${g4.id}/swipe/extend`, {})).json;
+  }
+  if (bowlingId) {
+    const bowlingMatch = await oh("POST", `/groups/${g4.id}/swipe`, {
+      activityId: bowlingId,
+      value: "like",
+    });
+    ok(
+      "a known-date match on a venue closed at that time does NOT auto-complete",
+      bowlingMatch.json.newMatch?.needsDateMatch === true,
+    );
+    const dm4 = (await oh("GET", `/groups/${g4.id}/date-match`)).json;
+    const hours = bowlingMatch.json.newMatch.activity.openingHours;
+    const allOpen = dm4.options.every((o) => {
+      const day = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Europe/Brussels",
+        weekday: "short",
+      }).format(new Date(o.startsAt * 1000));
+      return !!hours[day]; // some hours exist that day — good enough for a smoke check
+    });
+    ok(
+      "auto-generated date options for a closed-at-usual-time match are all on days the venue is actually open",
+      dm4.options.length > 0 && allOpen,
+    );
+  } else {
+    console.log("  (skipped opening-hours smart-time test — Bowling Leuven not in this batch)");
+  }
+
   // --- removed member cannot vote ---
   const g3 = (await kobe("POST", "/groups", { name: `Crew ${uniq()}` })).json.group;
   await kobe("PUT", `/groups/${g3.id}/settings`, {

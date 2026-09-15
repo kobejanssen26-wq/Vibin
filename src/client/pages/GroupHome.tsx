@@ -17,6 +17,7 @@ import { NearbyEvents } from "../components/NearbyEvents";
 import { PageHeader } from "../components/PageHeader";
 import { useConfirm } from "../components/Confirm";
 import { IconChevronRight } from "../components/icons";
+import { ActivityExpanded } from "../components/ActivityExpanded";
 import { formatWhen } from "../lib/format";
 import type { GroupDTO, MatchDTO, PlanDTO } from "@shared/types";
 
@@ -28,6 +29,7 @@ export function GroupHome() {
   const [tab, setTab] = useState<"plan" | "chat">(sp.get("tab") === "chat" ? "chat" : "plan");
   const highlightMessageId = sp.get("highlight");
   const [actionErr, setActionErr] = useState<string | null>(null);
+  const [expandedMatch, setExpandedMatch] = useState<MatchDTO | null>(null);
   const { data, loading, error, refetch } = usePoll<{ group: GroupDTO }>(
     `/groups/${id}`,
     6000,
@@ -187,7 +189,12 @@ export function GroupHome() {
             {matches.data?.matches.length ? (
               <div className="hairline">
                 {matches.data.matches.map((m) => (
-                  <div key={m.id} className="flex items-center gap-3 p-3.5">
+                  <button
+                    key={m.id}
+                    type="button"
+                    className="flex w-full items-center gap-3 p-3.5 text-left transition-colors hover:bg-paper-soft"
+                    onClick={() => setExpandedMatch(m)}
+                  >
                     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-500/10 text-lg">
                       {m.activity.categoryIcon}
                     </span>
@@ -206,12 +213,13 @@ export function GroupHome() {
                     {m.needsDateMatch && (
                       <Link
                         to={`/groups/${id}/date`}
+                        onClick={(e) => e.stopPropagation()}
                         className="btn-outline shrink-0 px-3 py-1.5 text-xs"
                       >
                         Vote
                       </Link>
                     )}
-                  </div>
+                  </button>
                 ))}
               </div>
             ) : (
@@ -286,6 +294,14 @@ export function GroupHome() {
             />
           </div>
         </>
+      )}
+
+      {expandedMatch && (
+        <ActivityExpanded
+          activity={expandedMatch.activity}
+          groupId={id}
+          onClose={() => setExpandedMatch(null)}
+        />
       )}
     </div>
   );

@@ -3,7 +3,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import type { Env, Vars } from "../env";
 import { createDb } from "../db/client";
-import { dateOptions, dateVotes, matches } from "../db/schema";
+import { activities, dateOptions, dateVotes, matches } from "../db/schema";
 import { parseBody } from "../lib/validate";
 import { badRequest, conflict, notFound } from "../lib/errors";
 import { newId } from "../lib/id";
@@ -13,6 +13,7 @@ import { track } from "../lib/analytics";
 import { dateMatchStateDTO } from "../lib/match-view";
 import { formatWhen } from "../lib/dates";
 import { systemMessage } from "../lib/notify";
+import { isOpenAt, localDayKey, parseDisplayHours } from "../lib/opening-hours";
 
 type Ctx = { Bindings: Env; Variables: Vars };
 const app = new Hono<Ctx>();
@@ -118,6 +119,33 @@ app.post("/:id/date-match/options", async (c) => {
   const match = await db.query.matches.findFirst({ where: eq(matches.id, matchId) });
   if (!match || match.status === "complete") {
     throw conflict("The date is already decided.");
+  }
+
+  // Never let the group vote on a time the venue is verifiably closed — but
+  // only when we actually know the hours (most activities don't have
+  // structured hours yet; unknown is not the same as closed, so it's never
+  // blocked on uncertainty).
+  const activity = await db.query.activities.findFirst({
+    where: eq(activities.id, match.activityId),
+    columns: { openingHours: true, title: true },
+  });
+  if (activity) {
+    let display: Partial<Record<string, string>> = {};
+    try {
+      display = JSON.parse(activity.openingHours);
+    } catch {
+      /* malformed — treat as unknown, never block */
+    }
+    const spans = parseDisplayHours(display);
+    if (isOpenAt(spans, body.startsAt) === false) {
+      const dayKey = localDayKey(body.startsAt);
+      const hoursThatDay = display[dayKey];
+      throw badRequest(
+        hoursThatDay
+          ? `${activity.title} is closed at that time — it's open ${dayKey} ${hoursThatDay}.`
+          : `${activity.title} is closed at that time.`,
+      );
+    }
   }
 
   const existing = await db

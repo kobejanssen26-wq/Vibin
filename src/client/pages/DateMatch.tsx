@@ -4,6 +4,7 @@ import { api, ApiRequestError } from "../lib/api";
 import { AvatarStack, Button, ErrorState, LoadingScreen } from "../components/ui";
 import { Confetti } from "../components/Confetti";
 import { PageHeader } from "../components/PageHeader";
+import { ActivityExpanded } from "../components/ActivityExpanded";
 import { IconCheck, IconPlus } from "../components/icons";
 import { formatDay, formatTime } from "../lib/format";
 import type { DateMatchStateDTO } from "@shared/types";
@@ -24,6 +25,7 @@ export function DateMatch() {
   const [justCompleted, setJustCompleted] = useState(false);
   const [adding, setAdding] = useState(false);
   const [newSlot, setNewSlot] = useState("");
+  const [showDetails, setShowDetails] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -79,6 +81,7 @@ export function DateMatch() {
       setState(res.state);
       setAdding(false);
       setNewSlot("");
+      setErr(null);
     } catch (e) {
       setErr(e instanceof ApiRequestError ? e.message : "Could not add option.");
     } finally {
@@ -111,13 +114,37 @@ export function DateMatch() {
       <PageHeader
         back={{ to: `/groups/${id}`, label: "Group" }}
         title="When should we go?"
-        subtitle={
-          <>
-            For <strong className="text-navy">{state.activity.title}</strong>.
-            VIBIN picks the first slot everyone can make.
-          </>
-        }
+        subtitle="VIBIN picks the first slot everyone can make."
       />
+
+      <button
+        type="button"
+        onClick={() => setShowDetails(true)}
+        className="flex w-full items-center gap-3 rounded-2xl border border-paper-line bg-paper-card p-3 text-left transition-colors hover:bg-paper-soft"
+      >
+        {state.activity.imageUrl ? (
+          <img
+            src={state.activity.imageUrl}
+            alt={state.activity.title}
+            className="h-14 w-14 shrink-0 rounded-xl object-cover"
+          />
+        ) : (
+          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-vibin-blue text-2xl">
+            {state.activity.categoryIcon}
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-extrabold tracking-[-0.01em]">
+            {state.activity.title}
+          </p>
+          <p className="truncate text-sm text-navy-400">
+            {state.activity.locationLabel}
+          </p>
+        </div>
+        <span className="shrink-0 text-xs font-semibold text-brand-600">
+          Details
+        </span>
+      </button>
 
       <div className="flex items-center gap-3">
         <AvatarStack people={state.members} />
@@ -201,6 +228,9 @@ export function DateMatch() {
             min={minSlotValue()}
             onChange={(e) => setNewSlot(e.target.value)}
           />
+          {err && (
+            <p className="mt-2 text-sm font-medium text-danger-600">{err}</p>
+          )}
           <div className="mt-2.5 flex gap-2">
             <Button loading={busy} onClick={addOption} className="flex-1">
               Add option
@@ -208,16 +238,33 @@ export function DateMatch() {
             <button
               type="button"
               className="btn-outline flex-1"
-              onClick={() => setAdding(false)}
+              onClick={() => {
+                setAdding(false);
+                setErr(null);
+              }}
             >
               Cancel
             </button>
           </div>
         </div>
       ) : (
-        <button className="btn-outline w-full" onClick={() => setAdding(true)}>
+        <button
+          className="btn-outline w-full"
+          onClick={() => {
+            setErr(null);
+            setAdding(true);
+          }}
+        >
           <IconPlus size={16} /> Suggest another time
         </button>
+      )}
+
+      {showDetails && (
+        <ActivityExpanded
+          activity={state.activity}
+          groupId={id}
+          onClose={() => setShowDetails(false)}
+        />
       )}
     </div>
   );
