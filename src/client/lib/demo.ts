@@ -11,6 +11,8 @@ export function demoActivity(): ActivityDTO {
     title: "Free-roam VR mission",
     description:
       "Backpack VR with 100 m² of free-roam space: 30 minutes of co-op mini-games, then a 30-minute mission. Teams of two to six.",
+    fullDescription:
+      "Backpack VR with 100 m² of free-roam space: 30 minutes of co-op mini-games, then a 30-minute mission. Teams of two to six.",
     category: "gaming",
     subcategory: "Virtual reality",
     categoryLabel: "Gaming",
@@ -28,6 +30,7 @@ export function demoActivity(): ActivityDTO {
     priceType: "from_per_person",
     priceBand: "10_25",
     priceLabel: "From €23 / person",
+    priceIsEstimate: false,
     currency: "EUR",
     durationMin: 60,
     minParticipants: 2,
@@ -46,7 +49,7 @@ export function demoActivity(): ActivityDTO {
     ],
     imageSource: "Unsplash",
     imageAttribution: "Photo via Unsplash",
-    tags: ["indoor", "tech", "teamwork"],
+    tags: ["Tech", "Teamwork"],
     source: "web",
     sourceUrl: "https://theparkplayground.com/en-be/our-locations/antwerp",
     lastVerifiedAt: null,

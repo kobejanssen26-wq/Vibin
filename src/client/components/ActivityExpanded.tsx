@@ -169,7 +169,7 @@ export function ActivityExpanded({
           </div>
 
           <p className="mt-3 text-sm leading-relaxed text-navy-600">
-            {a.description}
+            {a.fullDescription}
           </p>
 
           <div className="mt-4 space-y-2 border-t border-paper-line pt-3 text-sm">

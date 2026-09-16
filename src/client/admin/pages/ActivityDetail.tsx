@@ -116,6 +116,15 @@ interface Detail {
   provider: Record<string, unknown> | null;
   matchedGroups: { id: string; name: string; status: string }[];
   quality: { score: number; checks: { k: string; ok: boolean }[] };
+  qualityBreakdown: {
+    description: number;
+    image: number;
+    price: number;
+    openingHours: number;
+    website: number;
+    location: number;
+    needsReview: string[];
+  };
 }
 
 const MONETIZATION_LABEL: Record<string, string> = {
@@ -254,6 +263,32 @@ export function ActivityDetail() {
               “Mark verified” also stamps the verification date. Archived
               activities leave the swipe deck immediately.
             </p>
+          </Panel>
+
+          <Panel
+            title="Data quality"
+            subtitle="Per-aspect completeness (§39) — fix the weakest aspect first, not the whole record"
+          >
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <QualityBar label="Description" value={data.qualityBreakdown.description} />
+              <QualityBar label="Image" value={data.qualityBreakdown.image} />
+              <QualityBar label="Price" value={data.qualityBreakdown.price} />
+              <QualityBar label="Opening hours" value={data.qualityBreakdown.openingHours} />
+              <QualityBar label="Website" value={data.qualityBreakdown.website} />
+              <QualityBar label="Location" value={data.qualityBreakdown.location} />
+            </div>
+            {data.qualityBreakdown.needsReview.length > 0 ? (
+              <p className="mt-3 text-xs text-amber-700">
+                Needs review:{" "}
+                <span className="font-medium">
+                  {data.qualityBreakdown.needsReview.join(", ")}
+                </span>
+              </p>
+            ) : (
+              <p className="mt-3 text-xs text-emerald-700">
+                No weak aspects flagged.
+              </p>
+            )}
           </Panel>
 
           {editing && editForm ? (
@@ -583,6 +618,25 @@ function MonetizationPanel({
         </div>
       )}
     </Panel>
+  );
+}
+
+function QualityBar({ label, value }: { label: string; value: number }) {
+  const tone =
+    value >= 4 ? "bg-emerald-500" : value >= 3 ? "bg-amber-400" : "bg-rose-500";
+  return (
+    <div>
+      <div className="flex items-center justify-between text-xs">
+        <span className="font-medium text-slate-700">{label}</span>
+        <span className="tabular-nums text-slate-500">{value}/5</span>
+      </div>
+      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+        <div
+          className={`h-full rounded-full ${tone}`}
+          style={{ width: `${(value / 5) * 100}%` }}
+        />
+      </div>
+    </div>
   );
 }
 

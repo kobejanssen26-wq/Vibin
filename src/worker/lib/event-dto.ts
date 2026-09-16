@@ -14,7 +14,7 @@ function priceLabel(e: EventRow): string {
     return `${euro(e.priceMinCents)}–${euro(e.priceMaxCents)}`;
   if (e.priceMinCents != null) return `From ${euro(e.priceMinCents)}`;
   if (e.priceType === "paid") return "Ticketed";
-  return "Price varies";
+  return "Price information unavailable";
 }
 
 /** Short, human "when" using the viewer's request time as "now". */

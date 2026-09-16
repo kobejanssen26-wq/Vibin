@@ -1382,8 +1382,80 @@ app.get("/activities/:id", async (c) => {
   /* internal quality score — factual completeness only, never shown to users */
   const q = qualityScore(a);
 
-  return c.json({ activity: a, metrics, provider, matchedGroups: recentGroups.results, quality: q });
+  return c.json({
+    activity: a,
+    metrics,
+    provider,
+    matchedGroups: recentGroups.results,
+    quality: q,
+    qualityBreakdown: qualityBreakdown(a),
+  });
 });
+
+/**
+ * Per-aspect 0-5 quality breakdown (§39) — lets Admin see *which* aspect of
+ * an activity is weak (e.g. price 2/5 while description is 5/5) instead of
+ * one blended score. Reuses the enrichment-pipeline fields when a real
+ * assessment has been made; falls back to a conservative guess from what's
+ * on file for never-enriched rows, and is always honest about "unknown"
+ * rather than inventing a mid score.
+ */
+function qualityBreakdown(a: Record<string, unknown>) {
+  const OSM_BOILERPLATE = /From OpenStreetMap\s*[—-]\s*not yet verified by VIBIN/i;
+  const rawDesc = typeof a.description === "string" ? a.description : "";
+  const hasShortDesc = typeof a.short_description === "string" && a.short_description.length > 0;
+  const description = hasShortDesc
+    ? 5
+    : rawDesc && !OSM_BOILERPLATE.test(rawDesc)
+      ? 3
+      : rawDesc
+        ? 1
+        : 0;
+
+  const imgScore = a.image_quality_score;
+  const image =
+    typeof imgScore === "number"
+      ? imgScore
+      : !isUrl(a.image_url)
+        ? 0
+        : a.image_is_generic
+          ? 2
+          : 3;
+
+  const price =
+    a.price_confidence === "exact"
+      ? 5
+      : a.price_type === "free"
+        ? 5
+        : a.price_min_cents != null || a.price_confidence === "estimate"
+          ? 3
+          : a.price_band && a.price_type === "varies"
+            ? 2
+            : a.price_cents != null
+              ? 4
+              : 0;
+
+  let hoursCount = 0;
+  try {
+    const parsed = JSON.parse(typeof a.opening_hours === "string" ? a.opening_hours : "{}");
+    hoursCount = parsed && typeof parsed === "object" ? Object.keys(parsed).length : 0;
+  } catch {
+    hoursCount = 0;
+  }
+  const openingHours = hoursCount > 0 ? 4 : 0;
+
+  const website = isUrl(a.website_url) || isUrl(a.provider_website) ? 5 : 0;
+  const location = a.lat != null && a.lng != null ? (a.address ? 5 : 3) : 0;
+
+  const needsReview: string[] = [];
+  if (description < 3) needsReview.push("description");
+  if (image < 3) needsReview.push("image");
+  if (price < 3) needsReview.push("price");
+  if (openingHours === 0) needsReview.push("opening_hours");
+  if (website === 0) needsReview.push("website");
+
+  return { description, image, price, openingHours, website, location, needsReview };
+}
 
 /** Internal completeness score (0–100). Not an editorial rating; not exposed
  *  to end users. */

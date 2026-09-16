@@ -293,6 +293,14 @@ export const activities = sqliteTable(
     externalId: text("external_id"),
     title: text("title").notNull(),
     description: text("description").notNull().default(""),
+    // User-facing copy written/verified by the enrichment pipeline (§28) —
+    // null for the ~6000 not-yet-enriched rows, which fall back to a
+    // display-layer cleanup of `description` (see dto.ts) rather than
+    // showing the raw import text. Never regenerated from a guess.
+    shortDescription: text("short_description"),
+    fullDescription: text("full_description"),
+    descriptionSource: text("description_source"),
+    descriptionCheckedAt: integer("description_checked_at"),
     categoryId: text("category_id")
       .notNull()
       .references(() => activityCategories.id),
@@ -321,6 +329,18 @@ export const activities = sqliteTable(
       enum: ["free", "0_10", "10_25", "25_50", "50_100", "100_plus"],
     }).notNull(),
     currency: text("currency").notNull().default("EUR"),
+    // Researched price range + provenance (§10-14) — separate from the
+    // single priceCents above so a genuine "€10-20 p.p." range never has to
+    // be collapsed into one misleading number. null until the enrichment
+    // pipeline actually checks a source; never guessed.
+    priceMinCents: integer("price_min_cents"),
+    priceMaxCents: integer("price_max_cents"),
+    priceUnitNote: text("price_unit_note"), // e.g. "per court / hour", "per game"
+    priceConfidence: text("price_confidence", {
+      enum: ["exact", "estimate", "unknown"],
+    }),
+    priceSourceUrl: text("price_source_url"),
+    priceCheckedAt: integer("price_checked_at"),
 
     // logistics
     durationMin: integer("duration_min"),
@@ -379,6 +399,10 @@ export const activities = sqliteTable(
     // place — lets the image-quality audit surface "generic" reuse honestly
     // instead of admins mistaking it for a data bug.
     imageIsGeneric: integer("image_is_generic").notNull().default(0),
+    // 0 (broken) - 5 (official/authorized, venue-specific) per §22. Null
+    // means "not yet assessed" — distinct from 0, which means "checked and
+    // broken".
+    imageQualityScore: integer("image_quality_score"),
     tags: text("tags").notNull().default("[]"), // JSON array
 
     // provenance & verification (§14, §27)
@@ -390,6 +414,12 @@ export const activities = sqliteTable(
     })
       .notNull()
       .default("needs_review"),
+    // Which specific aspects still need a human look (§39/§59), e.g.
+    // '["price","image"]' — lets Admin surface *what* is weak instead of
+    // one blanket "needs review" flag. JSON array of strings; "[]" means
+    // nothing specific is flagged (still may be the default needs_review
+    // status for a never-enriched row).
+    needsReviewFields: text("needs_review_fields").notNull().default("[]"),
 
     active: integer("active").notNull().default(1),
     createdAt: integer("created_at").notNull().default(now),

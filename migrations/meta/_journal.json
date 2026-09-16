@@ -71,6 +71,13 @@
       "when": 1789418992359,
       "tag": "0009_lowly_hobgoblin",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1789560341364,
+      "tag": "0010_breezy_wolverine",
+      "breakpoints": true
     }
   ]
 }

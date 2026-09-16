@@ -87,7 +87,11 @@ export type ActivityStatus = "verified" | "needs_review" | "outdated" | "inactiv
 export interface ActivityDTO {
   id: string;
   title: string;
+  /** short, card-length copy (~25-55 words) */
   description: string;
+  /** longer copy for the expanded/match view — falls back to `description`
+   *  when no separately-written full description exists */
+  fullDescription: string;
   category: CategoryId;
   subcategory: string | null;
   categoryLabel: string;
@@ -109,6 +113,9 @@ export interface ActivityDTO {
   priceType: PriceType;
   priceBand: PriceBand;
   priceLabel: string;
+  /** true when priceLabel is a category/estimate-level figure, not a
+   *  venue-verified exact price — UI should show it as an approximation */
+  priceIsEstimate: boolean;
   currency: string;
   // logistics
   durationMin: number | null;

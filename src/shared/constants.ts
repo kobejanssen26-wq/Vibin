@@ -24,6 +24,64 @@ export const CATEGORY_ICON: Record<string, string> = Object.fromEntries(
   ACTIVITY_CATEGORIES.map((c) => [c.id, c.icon]),
 );
 
+/**
+ * Icon for the specific activity subcategory (§5 — "Tennis" beats "Sport"
+ * as the primary card badge). Covers every subcategory the OSM importer and
+ * admin activity form actually produce; unmapped values fall back to the
+ * broad category icon rather than guessing a new emoji.
+ */
+export const SUBCATEGORY_ICON: Record<string, string> = {
+  Bowling: "🎳",
+  Climbing: "🧗",
+  Bouldering: "🧗",
+  Padel: "🎾",
+  Squash: "🎾",
+  Tennis: "🎾",
+  "Ice skating": "⛸️",
+  "Trampoline park": "🤸",
+  Karting: "🏎️",
+  "Mini-golf": "⛳",
+  Golf: "⛳",
+  "Laser game": "🔫",
+  Paintball: "🔫",
+  "Swimming pool": "🏊",
+  "Water park": "🏊",
+  "Sports centre": "🏅",
+  Football: "⚽",
+  Cinema: "🎬",
+  Arcade: "🕹️",
+  Theatre: "🎭",
+  "Escape room": "🔐",
+  "Theme park": "🎢",
+  Karaoke: "🎤",
+  "Events venue": "🎉",
+  Museum: "🏛️",
+  "Art gallery": "🖼️",
+  "Cultural centre": "🏛️",
+  Castle: "🏰",
+  "Historic site": "🏛️",
+  Planetarium: "🔭",
+  Library: "📚",
+  Zoo: "🦁",
+  Aquarium: "🐠",
+  "Botanical garden": "🌷",
+  "Nature reserve": "🌲",
+  Park: "🌳",
+  Viewpoint: "🏞️",
+  "Forest walk": "🌲",
+  "Spa & sauna": "🧖",
+  "Pottery workshop": "🎨",
+  "Board games": "🎲",
+  Club: "🎤",
+  Bar: "🍹",
+  Brewery: "🍺",
+  Restaurant: "🍽️",
+  Café: "☕",
+  "Chocolate shop": "🍫",
+  "Shopping centre": "🛍️",
+  Market: "🛍️",
+};
+
 export const BUDGET_BANDS = [
   { id: "any", label: "Any budget" },
   { id: "free", label: "Free" },
