@@ -110,7 +110,7 @@ export function DateMatch() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="mx-auto w-full max-w-2xl space-y-5">
       <PageHeader
         back={{ to: `/groups/${id}`, label: "Group" }}
         title="When should we go?"

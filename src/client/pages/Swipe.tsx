@@ -216,7 +216,7 @@ export function Swipe() {
   const trulyDone = queue.length === 0 && !meta.hasMore;
 
   return (
-    <div className="flex min-h-[calc(100vh-8rem)] flex-col">
+    <div className="mx-auto flex min-h-[calc(100vh-8rem)] w-full max-w-xl flex-col">
       <div className="mb-3 flex items-center justify-between gap-2">
         <Link
           to={`/groups/${id}`}

@@ -42,7 +42,7 @@ export function MatchCelebration({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-5 transition-colors duration-500"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden p-5 transition-colors duration-500"
       style={{
         background: stage >= 1
           ? "linear-gradient(160deg, #101426 0%, #1c2a6b 55%, #3155ff 100%)"

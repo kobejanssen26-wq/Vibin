@@ -51,7 +51,7 @@ export function Dashboard() {
   const groups = data?.groups ?? [];
 
   return (
-    <div>
+    <div className="mx-auto w-full max-w-5xl">
       <PageHeader
         title="Your groups"
         subtitle={
@@ -74,7 +74,7 @@ export function Dashboard() {
           action={<LinkButton to="/groups/new">Create your first group</LinkButton>}
         />
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-3 sm:grid sm:grid-cols-2 sm:gap-3 sm:space-y-0 lg:grid-cols-3">
           {groups.map((g, i) => {
             const s = STATUS[g.status] ?? STATUS.configuring!;
             const pct =

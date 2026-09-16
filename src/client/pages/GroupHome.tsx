@@ -45,7 +45,7 @@ export function GroupHome() {
   const cta = primaryCta(group);
 
   return (
-    <div className="space-y-5">
+    <div className="mx-auto w-full max-w-3xl space-y-5">
       <PageHeader
         back={{ to: "/app", label: "Groups" }}
         title={group.name}

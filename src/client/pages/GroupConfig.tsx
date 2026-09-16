@@ -155,7 +155,7 @@ export function GroupConfig() {
     );
 
   return (
-    <div className="space-y-7 pb-40">
+    <div className="mx-auto w-full max-w-xl space-y-7 pb-40">
       <PageHeader
         back={
           midSwipe
@@ -338,7 +338,7 @@ export function GroupConfig() {
         </p>
       )}
 
-      <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-paper-line bg-paper-card/95 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-xl border-t border-paper-line bg-paper-card/95 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur">
         <Button
           className="w-full"
           loading={starting || saving}

@@ -36,7 +36,7 @@ export function CreateGroup() {
   };
 
   return (
-    <div>
+    <div className="mx-auto w-full max-w-md">
       <h1 className="text-2xl font-extrabold">Name your group</h1>
       <p className="mt-1 text-sm text-navy-400">
         You can change this later. Next you’ll set what, where and when.

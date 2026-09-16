@@ -78,7 +78,7 @@ export function PlanView() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="mx-auto w-full max-w-4xl space-y-5">
       <PageHeader
         back={{ to: `/groups/${plan.groupId}`, label: plan.groupName }}
         title="It's a plan"
@@ -89,6 +89,7 @@ export function PlanView() {
         }
       />
 
+      <div className="lg:grid lg:grid-cols-[1.6fr_1fr] lg:items-start lg:gap-6">
       <article className="card overflow-hidden">
         <div className="relative h-48 w-full overflow-hidden">
           {a.imageUrl ? (
@@ -149,6 +150,7 @@ export function PlanView() {
         </div>
       </article>
 
+      <div className="mt-5 space-y-5 lg:mt-0">
       <div className="card p-4">
         <p className="mb-2 text-sm font-bold">Everyone's going</p>
         <AvatarStack people={plan.members} size={40} max={10} />
@@ -206,7 +208,7 @@ export function PlanView() {
         <button className="btn-outline" onClick={share}>
           <IconShare size={16} /> Share
         </button>
-        <Link to={`/groups/${plan.groupId}`} className="btn-dark col-span-2">
+        <Link to={`/groups/${plan.groupId}?tab=chat`} className="btn-dark col-span-2">
           <IconChat size={16} /> Open group chat
         </Link>
       </div>
@@ -225,6 +227,8 @@ export function PlanView() {
           label="Report a problem with this activity"
           modalTitle="Report this activity"
         />
+      </div>
+      </div>
       </div>
     </div>
   );

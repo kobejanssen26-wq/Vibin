@@ -55,7 +55,7 @@ export function HelpTicket() {
   const closed = data.ticket.status === "closed";
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto w-full max-w-2xl space-y-4">
       <PageHeader back={{ to: "/help", label: "Help" }} title={data.ticket.subject} />
 
       <div className="space-y-3">
