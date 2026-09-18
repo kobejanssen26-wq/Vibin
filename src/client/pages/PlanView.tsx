@@ -22,6 +22,7 @@ import {
 } from "../components/icons";
 import { formatDay, formatDuration, formatWhen } from "../lib/format";
 import { track } from "../lib/track";
+import { AvailabilityNote } from "../components/AvailabilityNote";
 import type { PlanDTO } from "@shared/types";
 
 export function PlanView() {
@@ -139,6 +140,7 @@ export function PlanView() {
           <div className="grid gap-2 border-t border-paper-line pt-3 text-sm">
             <Row icon={<IconMapPin size={16} />} text={plan.locationLabel} />
             <Row icon={<IconCalendar size={16} />} text={formatWhen(plan.startsAt)} />
+            <AvailabilityNote status={plan.availabilityStatus} className="-mt-1.5 pl-[26px]" />
             <Row icon={<IconTag size={16} />} text={a.priceLabel} />
             {a.durationMin ? (
               <Row icon={<IconClock size={16} />} text={formatDuration(a.durationMin)} />

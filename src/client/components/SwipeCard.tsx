@@ -133,7 +133,7 @@ export function SwipeCard({
       onPointerUp={onUp}
       onPointerCancel={onUp}
     >
-      <article className="card-raised relative h-full overflow-hidden">
+      <article className="card-raised group relative h-full overflow-hidden">
         {/* edge glow feedback */}
         <div
           className="pointer-events-none absolute inset-0 z-10 rounded-3xl ring-4 ring-inset ring-brand-500 transition-opacity"
@@ -264,14 +264,23 @@ export function SwipeCard({
               ))}
             </div>
           )}
-          {activity.provider && (
-            <p className="mt-auto pt-1 text-xs text-navy-400">
-              at{" "}
-              <span className="font-semibold text-navy-600">
-                {activity.provider}
+          <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+            {activity.provider ? (
+              <p className="min-w-0 truncate text-xs text-navy-400">
+                at{" "}
+                <span className="font-semibold text-navy-600">
+                  {activity.provider}
+                </span>
+              </p>
+            ) : (
+              <span />
+            )}
+            {onExpand && (
+              <span className="shrink-0 text-xs font-bold text-brand-600 transition-transform group-active:translate-x-0.5">
+                More info →
               </span>
-            </p>
-          )}
+            )}
+          </div>
         </div>
       </article>
     </div>

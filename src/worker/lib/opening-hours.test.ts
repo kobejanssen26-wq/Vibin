@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { isKnownClosed, isOpenAt, parseDisplayHours, parseOpeningHours, toDisplayHours } from "./opening-hours";
+import {
+  availabilityStatusFor,
+  isKnownClosed,
+  isOpenAt,
+  parseDisplayHours,
+  parseOpeningHours,
+  toDisplayHours,
+} from "./opening-hours";
 
 describe("parseOpeningHours", () => {
   it("parses a simple day-range + time-range spec", () => {
@@ -91,5 +98,26 @@ describe("parseDisplayHours round-trip", () => {
     const display = toDisplayHours(original);
     const roundTripped = parseDisplayHours(display);
     expect(toDisplayHours(roundTripped)).toEqual(display);
+  });
+});
+
+describe("availabilityStatusFor — never claims confirmed availability from hours alone", () => {
+  const json = JSON.stringify({ Fri: "17:00-23:00" });
+
+  it("says 'opening_hours_only' — not 'confirmed' — when real hours say it's open then", () => {
+    const fri19 = Math.floor(new Date("2026-09-18T19:00:00+02:00").getTime() / 1000); // a Friday
+    expect(availabilityStatusFor(json, fri19)).toBe("opening_hours_only");
+  });
+
+  it("says 'unknown' when there's no usable opening-hours data at all", () => {
+    const anytime = Math.floor(Date.now() / 1000);
+    expect(availabilityStatusFor("{}", anytime)).toBe("unknown");
+    expect(availabilityStatusFor(null, anytime)).toBe("unknown");
+    expect(availabilityStatusFor("not json", anytime)).toBe("unknown");
+  });
+
+  it("says 'unknown' rather than 'opening_hours_only' for a day with no listed hours at all", () => {
+    const monday = Math.floor(new Date("2026-09-14T19:00:00+02:00").getTime() / 1000);
+    expect(availabilityStatusFor(json, monday)).toBe("unknown");
   });
 });

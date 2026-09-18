@@ -269,6 +269,26 @@ export interface MatchDTO {
   matchedAt: number;
 }
 
+/**
+ * How confident VIBIN actually is that a specific date/time works — never
+ * collapsed into a bare "available" unless a real booking/ticketing source
+ * confirmed it. VIBIN currently has no live booking-API integration for any
+ * provider, so CONFIRMED_AVAILABLE / ALTERNATIVE_AVAILABLE / SOLD_OUT /
+ * BOOKING_NOT_SUPPORTED are modelled for when such an integration exists,
+ * but are never produced today — only OPENING_HOURS_ONLY and UNKNOWN are.
+ * A time already confirmed *closed* is never offered as an option at all
+ * (filtered before it reaches the client), so CONFIRMED_UNAVAILABLE isn't
+ * a status a shown option can carry either.
+ */
+export type AvailabilityStatus =
+  | "confirmed_available"
+  | "confirmed_unavailable"
+  | "alternative_available"
+  | "opening_hours_only"
+  | "unknown"
+  | "booking_not_supported"
+  | "sold_out";
+
 export interface DateOptionDTO {
   id: string;
   startsAt: number;
@@ -276,6 +296,7 @@ export interface DateOptionDTO {
   yourVote: "yes" | "no" | "maybe" | null;
   tally: { yes: number; no: number; maybe: number; notVoted: number };
   unanimous: boolean;
+  availabilityStatus: AvailabilityStatus;
 }
 
 export interface DateMatchStateDTO {
@@ -300,6 +321,8 @@ export interface PlanDTO {
     icsUrl: string;
   };
   createdAt: number;
+  /** honest status for the plan's actual startsAt — see AvailabilityStatus */
+  availabilityStatus: AvailabilityStatus;
 }
 
 export interface MessageDTO {

@@ -184,6 +184,10 @@ async function run() {
   ok("unanimous 'yes' completes the plan", yes.json.completed === true);
   const g2plan = (await d("GET", `/groups/${g2.id}/plans`)).json.plans;
   ok("date-matched plan exists with the chosen start time", g2plan[0]?.startsAt > 0);
+  ok(
+    "a plan's availabilityStatus is never 'confirmed_available' — no real booking API exists",
+    g2plan[0]?.availabilityStatus !== "confirmed_available",
+  );
 
   // --- smart time availability: never auto-complete a plan for a time the
   // venue is confirmed closed, even on a "known date" group; the auto-
@@ -240,6 +244,11 @@ async function run() {
     ok(
       "auto-generated date options for a closed-at-usual-time match are all on days the venue is actually open",
       dm4.options.length > 0 && allOpen,
+    );
+    ok(
+      "date options for a venue with real hours are honestly labelled 'opening_hours_only', never 'confirmed_available' (no real booking API exists)",
+      dm4.options.length > 0 &&
+        dm4.options.every((o) => o.availabilityStatus === "opening_hours_only"),
     );
   } else {
     console.log("  (skipped opening-hours smart-time test — Bowling Leuven not in this batch)");

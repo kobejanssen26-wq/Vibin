@@ -232,6 +232,37 @@ export function isOpenAt(
   return todaySpans.length || yesterdaySpans.length ? false : null;
 }
 
+/**
+ * Turn a raw isOpenAt() result into the honest, user-facing availability
+ * status for one specific date/time (§7-10 of the availability spec).
+ *
+ * VIBIN has no live booking/reservation API integrated for any provider
+ * today, so this can only ever return "opening_hours_only" (real hours say
+ * the venue is open then — not a confirmed reservation) or "unknown" (no
+ * usable hours data, the majority of the catalogue). It deliberately never
+ * returns "confirmed_available" — that would require an actual booking
+ * source to have confirmed a slot, which doesn't exist yet. A time already
+ * known to be closed is filtered out before it becomes an option at all
+ * (see generateDateOptions / the date-match/options 400), so this function
+ * is never even called for a confirmed-closed time.
+ */
+export function availabilityStatusFor(
+  openingHoursJson: string | null | undefined,
+  unixSeconds: number,
+): "opening_hours_only" | "unknown" {
+  if (!openingHoursJson) return "unknown";
+  let display: Partial<Record<string, string>> = {};
+  try {
+    display = JSON.parse(openingHoursJson);
+  } catch {
+    return "unknown";
+  }
+  if (Object.keys(display).length === 0) return "unknown";
+  return isOpenAt(parseDisplayHours(display), unixSeconds) === true
+    ? "opening_hours_only"
+    : "unknown";
+}
+
 /** The DayKey a timestamp falls on in the given timezone (defaults to
  *  Europe/Brussels) — for labelling, not for the open/closed decision
  *  itself (isOpenAt already handles the timezone internally). */

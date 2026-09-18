@@ -7,6 +7,7 @@ import { PageHeader } from "../components/PageHeader";
 import { ActivityExpanded } from "../components/ActivityExpanded";
 import { IconCheck, IconPlus } from "../components/icons";
 import { formatDay, formatTime } from "../lib/format";
+import { AvailabilityNote } from "../components/AvailabilityNote";
 import type { DateMatchStateDTO } from "@shared/types";
 
 const VOTES = [
@@ -177,6 +178,7 @@ export function DateMatch() {
                   {formatDay(o.startsAt)}
                 </p>
                 <p className="text-sm text-navy-400">{formatTime(o.startsAt)}</p>
+                <AvailabilityNote status={o.availabilityStatus} />
               </div>
               {o.unanimous && (
                 <span className="chip-lime px-2.5 py-1 text-xs font-bold">

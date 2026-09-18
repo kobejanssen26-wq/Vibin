@@ -15,6 +15,7 @@ import {
   buildIcs,
   googleCalendarUrl,
 } from "./dates";
+import { availabilityStatusFor } from "./opening-hours";
 
 async function membersOf(db: DB, groupId: string) {
   const rows = await db
@@ -80,6 +81,10 @@ export async function planRowToDTO(
     members,
     calendar: { googleUrl, icsUrl },
     createdAt: plan.createdAt,
+    availabilityStatus:
+      plan.startsAt != null
+        ? availabilityStatusFor(activity?.openingHours, plan.startsAt)
+        : "unknown",
   };
 }
 

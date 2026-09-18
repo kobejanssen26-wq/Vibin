@@ -16,6 +16,7 @@ import type {
 } from "@shared/types";
 import { toActivityDTO, toPublicUser } from "./dto";
 import { formatWhen } from "./dates";
+import { availabilityStatusFor } from "./opening-hours";
 
 export async function groupPublicMembers(db: DB, groupId: string) {
   const rows = await db
@@ -104,6 +105,7 @@ export async function dateMatchStateDTO(
       yourVote: mine,
       tally: { yes, no, maybe, notVoted: Math.max(0, total - yes - no - maybe) },
       unanimous: no === 0 && yes + maybe >= total && total > 0,
+      availabilityStatus: availabilityStatusFor(activity?.openingHours, o.startsAt),
     };
   });
 
