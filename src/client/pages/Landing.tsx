@@ -89,45 +89,52 @@ export function Landing() {
       </header>
 
       {/* ---------- hero ---------- */}
-      <section className="relative">
+      <section className="relative overflow-hidden">
         <div className="pointer-events-none absolute inset-0 bg-vibin-hero" />
-        <div className="pointer-events-none absolute -left-24 top-40 h-72 w-72 rounded-full bg-brand-400/20 blur-3xl" />
-        <div className="pointer-events-none absolute -right-16 top-10 h-64 w-64 rounded-full bg-lime-400/25 blur-3xl" />
+        <div className="pointer-events-none absolute inset-0 dot-grid text-navy/[0.05]" />
 
         <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-5 pb-16 pt-8 md:grid-cols-[1.12fr_0.88fr] md:gap-14 md:pb-24 md:pt-12">
           <div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-navy/10 bg-white px-3 py-1.5 text-sm font-semibold shadow-sm">
-              <LogoMark className="h-4 w-4" />
-              Swipe together. Agree in minutes.
-            </span>
-
-            <h1 className="mt-6 text-5xl font-extrabold leading-[0.95] tracking-[-0.035em] [text-wrap:balance] sm:text-[3.4rem] md:text-[3.6rem] lg:text-[4.4rem]">
-              <span className="block">Find your vibe.</span>
-              <span className="block bg-gradient-to-r from-brand-500 to-brand-400 bg-clip-text text-transparent">
-                Make a plan.
+            <Reveal>
+              <span className="inline-flex items-center gap-2 rounded-full border border-navy/10 bg-white px-3 py-1.5 text-sm font-semibold shadow-sm">
+                <LogoMark className="h-4 w-4" />
+                Swipe together. Agree in minutes.
               </span>
-            </h1>
+            </Reveal>
 
-            <p className="mt-5 max-w-md text-[17px] leading-relaxed text-navy-500">
-              Your group swipes on real activities. It only matches when everyone's
-              in. Then VIBIN locks the time and the booking.
-            </p>
+            <Reveal delay={80}>
+              <h1 className="mt-6 text-5xl font-extrabold leading-[0.95] tracking-[-0.035em] [text-wrap:balance] sm:text-[3.4rem] md:text-[3.6rem] lg:text-[4.4rem]">
+                <span className="block">Find your vibe.</span>
+                <span className="block text-brand-500">Make a plan.</span>
+              </h1>
+            </Reveal>
 
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <LinkButton to="/signup" className="px-6 text-base">
-                Create a group
-              </LinkButton>
-              <LinkButton to="/login" variant="outline" className="px-6 text-base">
-                Join a group
-              </LinkButton>
-            </div>
+            <Reveal delay={160}>
+              <p className="mt-5 max-w-md text-[17px] leading-relaxed text-navy-500">
+                Your group swipes on real activities. It only matches when everyone's
+                in. Then VIBIN locks the time and the booking.
+              </p>
+            </Reveal>
 
-            <p className="mt-4 text-xs font-medium text-navy-400">
-              Free to use. No card. Built in the EU.
-            </p>
+            <Reveal delay={240}>
+              <div className="mt-8 flex flex-wrap items-center gap-3">
+                <LinkButton to="/signup" className="px-6 text-base">
+                  Create a group
+                </LinkButton>
+                <LinkButton to="/login" variant="outline" className="px-6 text-base">
+                  Join a group
+                </LinkButton>
+              </div>
+
+              <p className="mt-4 text-xs font-medium text-navy-400">
+                Free to use. No card. Built in the EU.
+              </p>
+            </Reveal>
           </div>
 
-          <HeroCard />
+          <Reveal delay={200}>
+            <HeroCard />
+          </Reveal>
         </div>
       </section>
 
@@ -135,10 +142,7 @@ export function Landing() {
       <section className="bg-navy px-5 py-20 text-white md:py-28">
         <div className="mx-auto max-w-4xl text-center">
           <Reveal>
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-lime-400">
-              The whole idea
-            </p>
-            <h2 className="mx-auto mt-4 max-w-2xl text-3xl font-extrabold leading-tight md:text-5xl">
+            <h2 className="mx-auto max-w-2xl text-3xl font-extrabold leading-tight md:text-5xl">
               It doesn't count until{" "}
               <span className="text-lime-400">everyone's in.</span>
             </h2>
@@ -255,7 +259,7 @@ export function Landing() {
       <section className="mx-auto max-w-6xl px-5 pb-20">
         <Reveal>
           <div className="relative overflow-hidden rounded-[2rem] bg-vibin-match p-10 text-center text-white md:p-16">
-            <div className="pointer-events-none absolute -right-10 -top-10 h-56 w-56 rounded-full bg-lime-400/25 blur-3xl" />
+            <div className="dot-grid pointer-events-none absolute inset-0 text-white/[0.06]" />
             <h2 className="relative text-3xl font-extrabold md:text-5xl">
               Stop planning. Start{" "}
               <span className="text-lime-400">doing.</span>

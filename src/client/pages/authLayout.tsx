@@ -16,8 +16,7 @@ export function AuthLayout({
   return (
     <div className="relative min-h-full overflow-x-clip bg-paper">
       <div className="pointer-events-none absolute inset-0 bg-vibin-hero" />
-      <div className="pointer-events-none absolute -left-24 top-24 h-64 w-64 rounded-full bg-brand-400/15 blur-3xl" />
-      <div className="pointer-events-none absolute -right-16 top-8 h-56 w-56 rounded-full bg-lime-400/20 blur-3xl" />
+      <div className="pointer-events-none absolute inset-0 dot-grid text-navy/[0.05]" />
 
       <div className="safe-t safe-b relative mx-auto flex min-h-full max-w-md flex-col justify-center px-5 py-12">
         <Link

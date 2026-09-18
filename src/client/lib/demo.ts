@@ -48,7 +48,7 @@ export function demoActivity(): ActivityDTO {
       "https://images.unsplash.com/photo-1758273239313-6c703d089dd4?w=1200&q=75&auto=format&fit=crop",
     ],
     imageSource: "Unsplash",
-    imageAttribution: "Photo via Unsplash",
+    imageAttribution: null,
     tags: ["Tech", "Teamwork"],
     source: "web",
     sourceUrl: "https://theparkplayground.com/en-be/our-locations/antwerp",

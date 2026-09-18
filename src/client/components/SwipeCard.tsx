@@ -115,7 +115,7 @@ export function SwipeCard({
     ? "transform 0.24s cubic-bezier(0.4, 0, 1, 1), opacity 0.24s ease"
     : drag.active
       ? "none"
-      : "transform 0.4s cubic-bezier(0.22, 1.4, 0.4, 1)"; // springy snap-back
+      : "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)"; // exponential snap-back, no overshoot
 
   return (
     <div
