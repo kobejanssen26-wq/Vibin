@@ -136,7 +136,9 @@ export function PlanView() {
         </div>
 
         <div className="space-y-3 p-4">
-          <p className="text-sm leading-relaxed text-navy-500">{a.fullDescription}</p>
+          {a.fullDescription && (
+            <p className="text-sm leading-relaxed text-navy-500">{a.fullDescription}</p>
+          )}
           <div className="grid gap-2 border-t border-paper-line pt-3 text-sm">
             <Row icon={<IconMapPin size={16} />} text={plan.locationLabel} />
             <Row icon={<IconCalendar size={16} />} text={formatWhen(plan.startsAt)} />

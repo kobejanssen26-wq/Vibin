@@ -72,21 +72,34 @@ function activityFixture(overrides: Partial<Activity> = {}): Activity {
 }
 
 describe("toActivityDTO — user-facing cleanup of internal metadata (§1/§2/§6/§38)", () => {
-  it("strips the OSM provenance sentence and falls back to a clean, honest fact-only description", () => {
+  it("returns no description at all when all that's left is a 'type in city' location label", () => {
     const dto = toActivityDTO(activityFixture());
-    expect(dto.description).toBe("Tennis in Hoogstraten.");
-    expect(dto.description).not.toMatch(/OpenStreetMap/i);
-    expect(dto.description).not.toMatch(/verified/i);
+    expect(dto.description).toBe("");
+    expect(dto.fullDescription).toBe("");
   });
 
-  it("strips raw opening-hours micro-syntax leaked into the description", () => {
+  it("never shows type+city as prose, even after stripping provenance + raw hours", () => {
     const dto = toActivityDTO(
       activityFixture({
+        subcategory: "Spa & sauna",
+        categoryId: "relaxation",
         description:
           "Spa & sauna in Bouwel. From OpenStreetMap — not yet verified by VIBIN. Listed hours: Mo-Sa 11:00-23:30; Su 11:00-22:30.",
       }),
     );
-    expect(dto.description).toBe("Spa & sauna in Bouwel.");
+    expect(dto.description).toBe("");
+  });
+
+  it("keeps a real hand-written sentence and only strips the provenance tail", () => {
+    const dto = toActivityDTO(
+      activityFixture({
+        description:
+          "Family-run brasserie with a shaded terrace on the market square. From OpenStreetMap — not yet verified by VIBIN.",
+      }),
+    );
+    expect(dto.description).toBe(
+      "Family-run brasserie with a shaded terrace on the market square.",
+    );
   });
 
   it("prefers a real enrichment-pipeline shortDescription over the cleaned fallback", () => {

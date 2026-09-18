@@ -125,11 +125,26 @@ const OSM_PROVENANCE_RE =
 const OSM_HOURS_RE = /\s*Listed hours:[^.]*\.?/gi;
 
 /**
+ * "Tennis in Hoogstraten." is a location label, not a description: the card
+ * already shows the specific type as its badge and the place right under
+ * the title, so repeating them as prose adds nothing (§3 "NO TYPE + CITY
+ * DESCRIPTIONS", §8 "do not repeat information").
+ */
+function isTypePlusCityLabel(text: string, a: Activity): boolean {
+  const t = text.trim().replace(/\.$/, "").toLowerCase();
+  const sub = (a.subcategory || CATEGORY_LABEL[a.categoryId] || "").toLowerCase();
+  if (!sub || t.includes(". ")) return false;
+  return t.startsWith(`${sub} in `) || t === sub;
+}
+
+/**
  * User-facing description: prefer real enrichment-pipeline copy
- * (`shortDescription`) when it exists; otherwise strip known internal
- * jargon from the raw import text; otherwise fall back to a minimal,
- * honest, fact-only line built from real structured fields — never an
- * invented sentence (§9, §36).
+ * (`shortDescription`); otherwise strip known internal jargon from the raw
+ * import text and keep it if what's left is a real sentence written for
+ * that place. If all that's left is a "type in city" label, return an empty
+ * string — the UI hides an empty description rather than repeat the badge
+ * and location as fake prose, and Admin still flags the row as
+ * never-enriched (never an invented sentence, §6, §9, §36).
  */
 function displayDescription(a: Activity): string {
   if (a.shortDescription) return a.shortDescription;
@@ -137,9 +152,8 @@ function displayDescription(a: Activity): string {
     .replace(OSM_PROVENANCE_RE, "")
     .replace(OSM_HOURS_RE, "")
     .trim();
-  if (cleaned) return cleaned;
-  const what = a.subcategory || CATEGORY_LABEL[a.categoryId] || "Activity";
-  return a.city ? `${what} in ${a.city}.` : `${what}.`;
+  if (!cleaned || isTypePlusCityLabel(cleaned, a)) return "";
+  return cleaned;
 }
 
 /**

@@ -58,3 +58,51 @@ export function demoActivity(): ActivityDTO {
     availabilityNote: "",
   };
 }
+
+/**
+ * The card waiting underneath in the hero's swipe loop. Also a real venue
+ * with facts from its own site (cinemangiare.be, checked 2026-09-16); no
+ * photo, so it renders the brand gradient rather than a stock image that
+ * doesn't show the place.
+ */
+export function demoNextActivity(): ActivityDTO {
+  return {
+    ...demoActivity(),
+    id: "demo-next",
+    title: "Ciné Mangiare",
+    description:
+      "Home-cooked dinner served before the film, different at every screening.",
+    fullDescription:
+      "Home-cooked dinner served before the film, different at every screening.",
+    category: "entertainment",
+    subcategory: "Cinema",
+    categoryLabel: "Cinema",
+    categoryIcon: "🎬",
+    provider: "Ciné Mangiare",
+    providerWebsite: "https://www.cinemangiare.be/",
+    locationLabel: "Ciné Mangiare, Gent",
+    address: null,
+    city: "Gent",
+    lat: null,
+    lng: null,
+    distanceKm: null,
+    priceCents: null,
+    priceType: "per_person",
+    priceBand: "25_50",
+    priceLabel: "€35 p.p. (groups of 15+)",
+    priceIsEstimate: false,
+    durationMin: null,
+    minParticipants: null,
+    maxParticipants: null,
+    minAge: null,
+    indoorOutdoor: "indoor",
+    websiteUrl: "https://www.cinemangiare.be/",
+    bookingUrl: null,
+    imageUrl: null,
+    images: [],
+    imageSource: null,
+    imageAttribution: null,
+    tags: [],
+    sourceUrl: "https://www.cinemangiare.be/",
+  };
+}

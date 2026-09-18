@@ -5,7 +5,7 @@ import { LinkButton } from "../components/ui";
 import { Reveal } from "../components/Reveal";
 import { SwipeCard } from "../components/SwipeCard";
 import { IconCheck } from "../components/icons";
-import { demoActivity } from "../lib/demo";
+import { demoActivity, demoNextActivity } from "../lib/demo";
 import { ACTIVITY_CATEGORIES } from "@shared/constants";
 
 const CREW = [
@@ -299,27 +299,59 @@ export function Landing() {
 
 function HeroCard() {
   const activity = demoActivity();
+  const next = demoNextActivity();
   return (
     <div className="relative mx-auto w-full max-w-[280px] py-2">
       {/* soft device shadow */}
       <div className="absolute inset-x-6 bottom-0 top-10 rounded-[2.4rem] bg-navy/10 blur-2xl" />
 
-      <div className="relative aspect-[3/4.05] w-full animate-[heroDrift_7s_ease-in-out_infinite] motion-reduce:animate-none">
-        {/* back card peeking */}
-        <div className="absolute inset-0 translate-y-3 rotate-[5deg] rounded-[1.75rem] bg-white shadow-card" />
+      <div className="relative aspect-[3/4.05] w-full">
+        {/* the next card waiting underneath — revealed when the top one is swiped away */}
+        <div className="absolute inset-0 translate-y-3 rotate-[5deg]">
+          <SwipeCard activity={next} interactive={false} />
+        </div>
         <div className="absolute inset-0 -rotate-2">
-          <SwipeCard activity={activity} interactive={false} />
+          {/* the product's own core moment on a loop: a card gets swiped
+              right, then the group matches. Motion-reduced users get the
+              still composition. */}
+          <div className="hero-swipe absolute inset-0">
+            <SwipeCard activity={activity} interactive={false} />
+            <span className="hero-yes pointer-events-none absolute left-4 top-6 z-20 rounded-xl border-[3px] border-brand-500 bg-white/80 px-3 py-1 text-2xl font-extrabold uppercase tracking-wider text-brand-500 backdrop-blur">
+              YES
+            </span>
+          </div>
         </div>
       </div>
 
-      <span className="absolute right-0 -top-2 z-10 inline-flex rotate-6 items-center gap-1.5 rounded-2xl bg-lime-400 px-3 py-1.5 text-sm font-extrabold text-navy shadow-lime">
+      <span className="hero-match absolute right-0 -top-2 z-10 inline-flex items-center gap-1.5 rounded-2xl bg-lime-400 px-3 py-1.5 text-sm font-extrabold text-navy shadow-lime">
         <IconCheck size={16} /> Everyone's in
       </span>
 
       <style>{`
-        @keyframes heroDrift {
-          0%, 100% { transform: translateY(0) rotate(0deg); }
-          50% { transform: translateY(-8px) rotate(-1deg); }
+        .hero-swipe { transform-origin: 50% 100%; animation: heroSwipe 8s cubic-bezier(0.16, 1, 0.3, 1) infinite; will-change: transform, opacity; }
+        .hero-yes { opacity: 0; animation: heroYes 8s cubic-bezier(0.16, 1, 0.3, 1) infinite; }
+        .hero-match { transform: rotate(6deg); animation: heroMatch 8s cubic-bezier(0.16, 1, 0.3, 1) infinite; }
+        @keyframes heroSwipe {
+          0%, 36% { transform: translate3d(0, 0, 0) rotate(0deg); opacity: 1; }
+          43% { transform: translate3d(34px, -6px, 0) rotate(3deg); opacity: 1; }
+          52% { transform: translate3d(155%, -34px, 0) rotate(17deg); opacity: 1; }
+          53% { transform: translate3d(155%, -34px, 0) rotate(17deg); opacity: 0; }
+          54%, 68% { transform: translate3d(0, 14px, 0) scale(0.97); opacity: 0; }
+          80%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 1; }
+        }
+        @keyframes heroYes {
+          0%, 38% { opacity: 0; transform: rotate(-13deg) scale(0.8); }
+          45%, 51% { opacity: 1; transform: rotate(-13deg) scale(1); }
+          53%, 100% { opacity: 0; transform: rotate(-13deg) scale(1); }
+        }
+        @keyframes heroMatch {
+          0%, 36% { opacity: 1; transform: rotate(6deg) scale(1); }
+          40%, 57% { opacity: 0; transform: rotate(6deg) scale(0.6); }
+          62% { opacity: 1; transform: rotate(6deg) scale(1.08); }
+          67%, 100% { opacity: 1; transform: rotate(6deg) scale(1); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .hero-swipe, .hero-yes, .hero-match { animation: none; }
         }
       `}</style>
     </div>

@@ -249,9 +249,11 @@ export function SwipeCard({
               </span>
             ) : null}
           </div>
-          <p className="line-clamp-4 text-sm leading-relaxed text-navy-500">
-            {activity.description}
-          </p>
+          {activity.description && (
+            <p className="line-clamp-4 text-sm leading-relaxed text-navy-500">
+              {activity.description}
+            </p>
+          )}
           {activity.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {activity.tags.slice(0, 3).map((t) => (
