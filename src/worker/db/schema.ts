@@ -420,6 +420,14 @@ export const activities = sqliteTable(
     // nothing specific is flagged (still may be the default needs_review
     // status for a never-enriched row).
     needsReviewFields: text("needs_review_fields").notNull().default("[]"),
+    // What the automated check of the venue's own website found (see
+    // scripts/enrich/). The URL itself is never deleted — a "dead"/"parked"
+    // site is just not offered to users as a link — so a wrong verdict is
+    // reversible by flipping this column. null = never checked.
+    webStatus: text("web_status", {
+      enum: ["alive", "dead", "parked", "closed_signal", "blocked", "unknown"],
+    }),
+    webCheckedAt: integer("web_checked_at"),
 
     active: integer("active").notNull().default(1),
     createdAt: integer("created_at").notNull().default(now),

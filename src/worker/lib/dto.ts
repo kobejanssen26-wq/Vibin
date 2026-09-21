@@ -104,6 +104,15 @@ function priceLabel(a: Activity): string {
   }
 }
 
+/**
+ * A site the automated check found dead (DNS failure) or parked (placeholder
+ * page) is not offered to users as a "Website" link — a dead link is worse
+ * than none. The URL stays in the database; only the DTO hides it.
+ */
+function siteIsUsable(a: Activity): boolean {
+  return a.webStatus !== "dead" && a.webStatus !== "parked";
+}
+
 function safeJson<T>(raw: string, fallback: T): T {
   try {
     return JSON.parse(raw) as T;
@@ -230,7 +239,7 @@ export function toActivityDTO(
       CATEGORY_ICON[a.categoryId] ||
       "✨",
     provider: a.provider,
-    providerWebsite: a.providerWebsite,
+    providerWebsite: siteIsUsable(a) ? a.providerWebsite : null,
     locationLabel: a.locationLabel,
     address: a.address,
     city: a.city,
@@ -251,7 +260,7 @@ export function toActivityDTO(
     indoorOutdoor: a.indoorOutdoor ?? null,
     accessibility: a.accessibility,
     openingHours: safeJson<Record<string, string>>(a.openingHours, {}),
-    websiteUrl: a.websiteUrl,
+    websiteUrl: siteIsUsable(a) ? a.websiteUrl : null,
     bookingUrl: a.bookingUrl,
     ticketUrl: a.ticketUrl,
     imageUrl: a.imageUrl,

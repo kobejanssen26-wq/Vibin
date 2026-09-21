@@ -64,6 +64,8 @@ function activityFixture(overrides: Partial<Activity> = {}): Activity {
     lastVerifiedAt: null,
     status: "needs_review",
     needsReviewFields: "[]",
+    webStatus: null,
+    webCheckedAt: null,
     active: 1,
     createdAt: 0,
     updatedAt: 0,
@@ -198,6 +200,25 @@ describe("toActivityDTO — image attribution (§20: no 'Photo via Unsplash' on-
     );
     expect(dto.imageAttribution).toBe("Jane Doe / CC BY-SA 4.0 — Wikimedia Commons");
   });
+});
+
+describe("toActivityDTO — dead/parked websites are not offered as links", () => {
+  const site = { websiteUrl: "https://example.be", providerWebsite: "https://example.be" };
+
+  it.each(["dead", "parked"] as const)("hides the website links when the automated check found the site %s", (webStatus) => {
+    const dto = toActivityDTO(activityFixture({ ...site, webStatus }));
+    expect(dto.websiteUrl).toBeNull();
+    expect(dto.providerWebsite).toBeNull();
+  });
+
+  it.each([null, "alive", "blocked", "unknown", "closed_signal"] as const)(
+    "keeps the website links when the check said %s (only dead/parked are hidden)",
+    (webStatus) => {
+      const dto = toActivityDTO(activityFixture({ ...site, webStatus }));
+      expect(dto.websiteUrl).toBe("https://example.be");
+      expect(dto.providerWebsite).toBe("https://example.be");
+    },
+  );
 });
 
 describe("toActivityDTO — specific subcategory badge beats the broad category (§5)", () => {
