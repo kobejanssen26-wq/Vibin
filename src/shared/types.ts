@@ -92,6 +92,9 @@ export interface ActivityDTO {
   /** longer copy for the expanded/match view — falls back to `description`
    *  when no separately-written full description exists */
   fullDescription: string;
+  /** set when the description text is adapted from a CC BY-SA source (Wikipedia):
+   *  the licence requires the credit to be shown next to the text */
+  descriptionCredit: { label: string; url: string } | null;
   category: CategoryId;
   subcategory: string | null;
   categoryLabel: string;

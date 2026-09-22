@@ -13,6 +13,7 @@ export function demoActivity(): ActivityDTO {
       "Backpack VR with 100 m² of free-roam space: 30 minutes of co-op mini-games, then a 30-minute mission. Teams of two to six.",
     fullDescription:
       "Backpack VR with 100 m² of free-roam space: 30 minutes of co-op mini-games, then a 30-minute mission. Teams of two to six.",
+    descriptionCredit: null,
     category: "gaming",
     subcategory: "Virtual reality",
     categoryLabel: "Gaming",
@@ -74,6 +75,7 @@ export function demoNextActivity(): ActivityDTO {
       "Home-cooked dinner served before the film, different at every screening.",
     fullDescription:
       "Home-cooked dinner served before the film, different at every screening.",
+    descriptionCredit: null,
     category: "entertainment",
     subcategory: "Cinema",
     categoryLabel: "Cinema",

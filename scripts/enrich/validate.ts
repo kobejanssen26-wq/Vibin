@@ -61,7 +61,7 @@ const rejected: { id: string; reasons: string[] }[] = [];
 const reasonCount: Record<string, number> = {};
 const bump = (r: string) => (reasonCount[r] = (reasonCount[r] || 0) + 1);
 
-const staged: { id: string; description: string; cuisine: string | null; hours: string | null; hoursDisplay: Record<string, string> | null }[] = [];
+const staged: { id: string; description: string; cuisine: string | null; hours: string | null; hoursDisplay: Record<string, string> | null; wikiUrl: string | null; price: { min: number; max: number; unit: string; url: string | null } | null }[] = [];
 
 for (const o of outputs) {
   const p = packets.get(o.id);
@@ -102,6 +102,16 @@ for (const o of outputs) {
       [/chocolate/, /chocol|praline|cacao/],
     ];
     if (TYPE_WORDS.some(([tre, sre]) => tre.test(t) && !sre.test(srcLower))) reasons.push("type-not-in-source");
+    // Wikipedia packets come from an OSM->Wikidata link that is sometimes wrong (a forest linked
+    // to a neighbouring forest's article): the article title must share a name word with the venue.
+    if (p.wikiUrl) {
+      const STOP = new Set(["castle", "chateau", "museum", "brewery", "brouwerij", "kasteel", "park", "parc", "the", "van", "der", "den", "het", "des", "les", "de", "du", "la", "le", "et", "and", "of"]);
+      const toks = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().split(/[^a-z0-9]+/).filter((x) => x.length >= 3 && !STOP.has(x));
+      // same word, or the same 5-letter stem (Bourlaschouwburg / Bourla, Meerdaalwoud / Meerdaal, Congreskolom / Congress)
+      const same = (x: string, y: string) => x === y || (x.length >= 5 && y.length >= 5 && x.slice(0, 5) === y.slice(0, 5));
+      const a = toks(p.name || ""), b = toks(p.siteTitle || "");
+      if (!a.some((x) => b.some((y) => same(x, y)))) reasons.push("wiki-title-mismatch");
+    }
   } else description = null;
 
   let cuisine: string | null = null;
@@ -134,12 +144,33 @@ for (const o of outputs) {
     }
   }
 
+  // Price: every amount must appear literally in the price passages recorded from the
+  // venue's own page, the unit must come from a fixed list, and the range must be sane.
+  let price: { min: number; max: number; unit: string; url: string | null } | null = null;
+  const UNITS: Record<string, string> = { person: "p.p.", hour: "per hour", game: "per game", ticket: "per ticket", session: "per session", group: "per group", menu: "per menu", night: "per night" };
+  if (o.price && typeof o.price === "object" && p.priceText?.length) {
+    const rp = o.price as { amount?: unknown; min?: unknown; max?: unknown; unit: unknown };
+    // one regular price only; the old {min,max} shape is accepted only when both are equal
+    const amt = typeof rp.amount === "number" ? rp.amount : rp.min === rp.max ? rp.min : undefined;
+    const min = amt, max = amt, unit = rp.unit;
+    const pt = (p.priceText as string[]).join(" ");
+    const inText = (n: number) => {
+      const forms = new Set([String(n), n.toFixed(2), n.toFixed(1)]);
+      return [...forms].some((f) => new RegExp(`(?<![\\d.,])${f.replace(/[.,]/g, "[.,]")}(?!\\d|[.,]\\d)`).test(pt));
+    };
+    if (
+      typeof min === "number" && typeof max === "number" && typeof unit === "string" && UNITS[unit] &&
+      min > 0 && max >= min && max <= 500 && inText(min) && inText(max)
+    ) price = { min, max, unit: UNITS[unit]!, url: p.priceUrl ?? null };
+    else bump("price-rejected");
+  }
+
   if (reasons.length) {
     reasons.forEach((r) => bump(r.split(":")[0]!));
     rejected.push({ id: o.id, reasons });
     description = null;
   }
-  if (description || cuisine || hours) staged.push({ id: o.id, description: description ?? "", cuisine, hours, hoursDisplay });
+  if (description || cuisine || hours || price) staged.push({ id: o.id, description: description ?? "", cuisine, hours, hoursDisplay, wikiUrl: p.wikiUrl ?? null, price });
 }
 
 // ---- cross-venue template detection (the "swap test", mechanically) ---------
@@ -175,11 +206,11 @@ for (const s of staged) {
   seenSets.push(set);
 }
 
-for (const s of staged) if (s.description || s.cuisine || s.hours) accepted.push(s);
+for (const s of staged) if (s.description || s.cuisine || s.hours || s.price) accepted.push(s);
 fs.writeFileSync(path.join(ROOT, "data/enrichment/validated.json"), JSON.stringify({ accepted, rejected }, null, 1));
 
 console.log(`writer outputs: ${outputs.length}, non-null descriptions offered: ${outputs.filter((o) => o.description).length}`);
 console.log(`accepted descriptions: ${accepted.filter((a) => a.description).length}`);
-console.log(`accepted cuisine: ${accepted.filter((a) => a.cuisine).length}, accepted hours: ${accepted.filter((a) => a.hours).length}`);
+console.log(`accepted cuisine: ${accepted.filter((a) => a.cuisine).length}, accepted hours: ${accepted.filter((a) => a.hours).length}, accepted prices: ${accepted.filter((a) => a.price).length}`);
 console.log("rejection reasons:", reasonCount);
 console.log("most common openings:", [...prefixes].sort((a, b) => b[1] - a[1]).slice(0, 6));

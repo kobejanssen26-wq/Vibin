@@ -1,3 +1,4 @@
+import { DescriptionCredit } from "../components/DescriptionCredit";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, ApiRequestError } from "../lib/api";
@@ -139,6 +140,7 @@ export function PlanView() {
           {a.fullDescription && (
             <p className="text-sm leading-relaxed text-navy-500">{a.fullDescription}</p>
           )}
+          <DescriptionCredit credit={a.descriptionCredit} />
           <div className="grid gap-2 border-t border-paper-line pt-3 text-sm">
             <Row icon={<IconMapPin size={16} />} text={plan.locationLabel} />
             <Row icon={<IconCalendar size={16} />} text={formatWhen(plan.startsAt)} />

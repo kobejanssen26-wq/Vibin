@@ -1210,6 +1210,20 @@ app.get("/activities", async (c) => {
     args.push(Number(activeParam));
     where.push(`a.active = ?${args.length}`);
   }
+  // Work queue: which live activities are still missing a given kind of data.
+  // Fixed SQL fragments only (the param picks one, it is never interpolated).
+  const GAPS: Record<string, string> = {
+    description: `NOT ((a.short_description IS NOT NULL AND a.short_description <> '') OR (trim(coalesce(a.description, '')) <> '' AND a.description NOT LIKE '%From OpenStreetMap%' AND a.description NOT LIKE '%not yet verified%'))`,
+    photo: `a.image_is_generic = 1`,
+    hours: `a.opening_hours = '{}'`,
+    price: `a.price_min_cents IS NULL AND a.price_type <> 'free'`,
+    website: `a.website_url IS NULL`,
+    dead_link: `a.web_status IN ('dead', 'parked')`,
+  };
+  const gap = url.searchParams.get("gap");
+  if (gap && GAPS[gap]) {
+    where.push(`a.active = 1 AND a.status NOT IN ('outdated', 'inactive') AND ${GAPS[gap]}`);
+  }
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
   const total = await c.env.DB.prepare(

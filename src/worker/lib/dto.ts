@@ -113,6 +113,17 @@ function siteIsUsable(a: Activity): boolean {
   return a.webStatus !== "dead" && a.webStatus !== "parked";
 }
 
+/**
+ * Text adapted from Wikipedia is CC BY-SA: it must be credited where it is shown.
+ * The importer records that as description_source = "wikipedia:<article url>".
+ * Only shown while our short description is what is displayed.
+ */
+function descriptionCreditFor(a: Activity, shownDescription: string): { label: string; url: string } | null {
+  if (!shownDescription || !a.shortDescription || !a.descriptionSource?.startsWith("wikipedia:")) return null;
+  const url = a.descriptionSource.slice("wikipedia:".length);
+  return /^https:\/\/en\.wikipedia\.org\/wiki\//.test(url) ? { label: "Wikipedia", url } : null;
+}
+
 function safeJson<T>(raw: string, fallback: T): T {
   try {
     return JSON.parse(raw) as T;
@@ -228,6 +239,7 @@ export function toActivityDTO(
     title: a.title,
     description: shortDesc,
     fullDescription: a.fullDescription || shortDesc,
+    descriptionCredit: descriptionCreditFor(a, shortDesc),
     category: a.categoryId as ActivityDTO["category"],
     subcategory: a.subcategory,
     // Prefer the specific subcategory as the primary badge (§5 — "Tennis"

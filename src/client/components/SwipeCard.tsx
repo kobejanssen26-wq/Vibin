@@ -1,3 +1,4 @@
+import { DescriptionCredit } from "./DescriptionCredit";
 import { useCallback, useRef, useState } from "react";
 import type { ActivityDTO } from "@shared/types";
 import { CATEGORY_ICON } from "@shared/constants";
@@ -254,6 +255,7 @@ export function SwipeCard({
               {activity.description}
             </p>
           )}
+          <DescriptionCredit credit={activity.descriptionCredit} />
           {activity.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {activity.tags.slice(0, 3).map((t) => (

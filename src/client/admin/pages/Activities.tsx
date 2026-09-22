@@ -75,6 +75,7 @@ export function Activities() {
   const q = useDebounced(qInput, 350);
   const status = sp.get("status") ?? "";
   const category = sp.get("category") ?? "";
+  const gap = sp.get("gap") ?? "";
   const sort = sp.get("sort") ?? "updated";
   const order = sp.get("order") ?? "desc";
   const page = Number(sp.get("page")) || 1;
@@ -90,7 +91,7 @@ export function Activities() {
       { replace: true },
     );
 
-  const query = `q=${encodeURIComponent(q)}&status=${status}&category=${category}&sort=${sort}&order=${order}&page=${page}`;
+  const query = `q=${encodeURIComponent(q)}&status=${status}&category=${category}&gap=${gap}&sort=${sort}&order=${order}&page=${page}`;
   const { data, loading, error, reload } = useResource<Resp>(
     () => cc<Resp>(`/activities?${query}`),
     query,
@@ -202,6 +203,15 @@ export function Activities() {
                   {c}
                 </option>
               ))}
+            </Select>
+            <Select value={gap} onChange={(e) => setParam("gap", e.target.value)}>
+              <option value="">Any data</option>
+              <option value="description">Missing description</option>
+              <option value="photo">Stock photo only</option>
+              <option value="hours">Missing opening hours</option>
+              <option value="price">No exact price</option>
+              <option value="website">No website</option>
+              <option value="dead_link">Dead / parked website</option>
             </Select>
             <a
               href="/api/admin/cc/activities/export.csv"

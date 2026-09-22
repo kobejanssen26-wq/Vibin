@@ -202,6 +202,30 @@ describe("toActivityDTO — image attribution (§20: no 'Photo via Unsplash' on-
   });
 });
 
+describe("toActivityDTO — CC BY-SA credit for Wikipedia-derived descriptions", () => {
+  const wiki = { shortDescription: "Family-owned lambic brewery founded in the nineteenth century.", descriptionSource: "wikipedia:https://en.wikipedia.org/wiki/Girardin_Brewery" };
+
+  it("credits Wikipedia next to a description adapted from it", () => {
+    expect(toActivityDTO(activityFixture(wiki)).descriptionCredit).toEqual({
+      label: "Wikipedia",
+      url: "https://en.wikipedia.org/wiki/Girardin_Brewery",
+    });
+  });
+
+  it("shows no credit for website-derived or hand-written descriptions", () => {
+    expect(toActivityDTO(activityFixture({ ...wiki, descriptionSource: "website summary 2026-09 (auto, source-validated)" })).descriptionCredit).toBeNull();
+    expect(toActivityDTO(activityFixture({ ...wiki, descriptionSource: null })).descriptionCredit).toBeNull();
+  });
+
+  it("never links anywhere except an English Wikipedia article", () => {
+    expect(toActivityDTO(activityFixture({ ...wiki, descriptionSource: "wikipedia:https://evil.example/wiki/x" })).descriptionCredit).toBeNull();
+  });
+
+  it("shows no credit when there is no description to credit", () => {
+    expect(toActivityDTO(activityFixture({ ...wiki, shortDescription: null })).descriptionCredit).toBeNull();
+  });
+});
+
 describe("toActivityDTO — dead/parked websites are not offered as links", () => {
   const site = { websiteUrl: "https://example.be", providerWebsite: "https://example.be" };
 

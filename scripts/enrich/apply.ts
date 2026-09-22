@@ -13,7 +13,7 @@ import path from "node:path";
 import { parseOpeningHours, toDisplayHours } from "../../src/worker/lib/opening-hours";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
-const only = (process.argv.includes("--only") ? process.argv[process.argv.indexOf("--only") + 1]! : "web,desc,hours,cuisine,outdated,images").split(",");
+const only = (process.argv.includes("--only") ? process.argv[process.argv.indexOf("--only") + 1]! : "web,desc,hours,cuisine,outdated,images,price").split(",");
 const J = (p: string) => JSON.parse(fs.readFileSync(path.join(ROOT, p), "utf8").replace(/^﻿/, ""));
 const has = (p: string) => fs.existsSync(path.join(ROOT, p));
 
@@ -67,7 +67,7 @@ if (only.includes("desc")) {
     if (OUTDATED.has(a.id)) continue;
     add(
       "description",
-      `UPDATE activities SET short_description=${q(a.description)}, description_source='website summary 2026-09 (auto, source-validated)', description_checked_at=${now} WHERE id=${q(a.id)} AND short_description IS NULL;`,
+      `UPDATE activities SET short_description=${q(a.description)}, description_source=${q(a.wikiUrl ? 'wikipedia:' + a.wikiUrl : 'website summary 2026-09 (auto, source-validated)')}, description_checked_at=${now} WHERE id=${q(a.id)} AND short_description IS NULL;`,
     );
   }
 }
@@ -116,6 +116,16 @@ if (only.includes("cuisine")) {
     if (tags.some((t) => t.startsWith("cuisine:"))) continue;
     const next = JSON.stringify([...tags, `cuisine:${a.cuisine}`]);
     add("cuisine", `UPDATE activities SET tags=${q(next)} WHERE id=${q(a.id)} AND tags=${q(act.tags)};`);
+  }
+}
+
+if (only.includes("price")) {
+  for (const a of validated.accepted) {
+    if (!a.price || OUTDATED.has(a.id)) continue;
+    add(
+      "price",
+      `UPDATE activities SET price_min_cents=${Math.round(a.price.min * 100)}, price_max_cents=${Math.round(a.price.max * 100)}, price_unit_note=${q(a.price.unit)}, price_confidence='exact', price_source_url=${q(a.price.url)}, price_checked_at=${now} WHERE id=${q(a.id)} AND price_min_cents IS NULL AND price_type<>'free';`,
+    );
   }
 }
 

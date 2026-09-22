@@ -1,3 +1,4 @@
+import { DescriptionCredit } from "./DescriptionCredit";
 import { useEffect } from "react";
 import type { ActivityDTO } from "@shared/types";
 import { CATEGORY_ICON } from "@shared/constants";
@@ -173,6 +174,7 @@ export function ActivityExpanded({
               {a.fullDescription}
             </p>
           )}
+          <DescriptionCredit credit={a.descriptionCredit} />
 
           <div className="mt-4 space-y-2 border-t border-paper-line pt-3 text-sm">
             <Row icon={<IconMapPin size={16} />}>
