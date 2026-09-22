@@ -73,6 +73,19 @@ export const IconUndo = (p: P) => (
     <path d="M5 10h9a5 5 0 0 1 0 10h-3" />
   </Svg>
 );
+export const IconRestart = (p: P) => (
+  <Svg {...p}>
+    <path d="M20 11a8 8 0 1 0-2.34 5.66" />
+    <path d="M20 5v6h-6" />
+  </Svg>
+);
+export const IconGlobe = (p: P) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18" />
+    <path d="M12 3c2.5 2.5 3.8 5.7 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.7-3.8-9S9.5 5.5 12 3Z" />
+  </Svg>
+);
 export const IconHeart = (p: P) => (
   <Svg {...p} fill="currentColor">
     <path d="M12 21s-7.5-4.7-9.7-9C.9 8.6 2.5 5 6 5c2.1 0 3.6 1.2 4.5 2.6L12 9.8l1.5-2.2C14.4 6.2 15.9 5 18 5c3.5 0 5.1 3.6 3.7 7-2.2 4.3-9.7 9-9.7 9Z" />

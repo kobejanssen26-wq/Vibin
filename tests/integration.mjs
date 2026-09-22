@@ -496,6 +496,69 @@ async function run() {
     st.queue.length === 0 && st.hasMore === false && st.finished === true,
   );
 
+  // --- "Swipe Again": reset an exhausted deck, group/members/chat untouched ---
+  const beforeReset = (await sw("GET", `/groups/${sg.id}`)).json.group;
+  const resetSt = (await sw("POST", `/groups/${sg.id}/swipe/reset`, {})).json;
+  ok("reset reports the group swiping again", resetSt.status === "swiping");
+  ok("reset clears the exhausted flag", resetSt.finished === false);
+  const afterReset = (await sw("GET", `/groups/${sg.id}`)).json.group;
+  ok(
+    "reset never touches the group itself (name, members)",
+    afterReset.name === beforeReset.name &&
+      afterReset.members.length === beforeReset.members.length,
+  );
+  // the pool is empty right after reset (nothing pooled yet) — pull a batch,
+  // same as the client's own prefetch would
+  const postResetState = (await sw("POST", `/groups/${sg.id}/swipe/extend`, {})).json;
+  ok(
+    "a card passed before the reset is swipeable again",
+    postResetState.queue.some((c) => seenIds.has(c.activity.id)),
+  );
+  const other = client();
+  await signup(other, "NotCreator");
+  await other("POST", `/invites/${beforeReset.inviteCode}/join`, {});
+  const resetForbidden = await other("POST", `/groups/${sg.id}/swipe/reset`, {});
+  ok(
+    "only the group creator can reset the swipe session",
+    resetForbidden.status === 403 || resetForbidden.status === 404,
+  );
+
+  // --- "Swipe Again" after an actual match: the match is discarded too ---
+  const rag = client();
+  await signup(rag, "Restarter");
+  const ragGroup = (await rag("POST", "/groups", { name: `Restart ${uniq()}` })).json.group;
+  await rag("PUT", `/groups/${ragGroup.id}/settings`, {
+    categories: ["relaxation"],
+    allActivities: false,
+    locationLabel: null,
+    lat: null,
+    lng: null,
+    radiusKm: 25,
+    budgetBand: "any",
+    dateMode: "unknown", // a solo "like" matches straight to date_matching, not planned —
+    dateSpecific: null, // reset must still be allowed at that stage (§11)
+    timeBand: "unknown",
+    timeSpecific: null,
+  });
+  await rag("POST", `/groups/${ragGroup.id}/start`, {});
+  const ragState = (await rag("GET", `/groups/${ragGroup.id}/swipe`)).json;
+  const ragCard = ragState.queue[0].activity.id;
+  const ragVote = await rag("POST", `/groups/${ragGroup.id}/swipe`, {
+    activityId: ragCard,
+    value: "like",
+  });
+  ok("solo like on a known-date-mode-unknown group matches instantly", !!ragVote.json.newMatch);
+  const ragMatched = (await rag("GET", `/groups/${ragGroup.id}`)).json.group;
+  ok("group moved to date_matching after the match", ragMatched.status === "date_matching");
+  const ragReset = (await rag("POST", `/groups/${ragGroup.id}/swipe/reset`, {})).json;
+  ok("reset from date_matching goes back to swiping", ragReset.status === "swiping");
+  ok("reset clears the match", ragReset.newMatch === null);
+  const ragAfter = (await rag("POST", `/groups/${ragGroup.id}/swipe/extend`, {})).json;
+  ok(
+    "the matched card can be swiped again after reset",
+    ragAfter.queue.some((c) => c.activity.id === ragCard),
+  );
+
   // --- change category mid-swipe: new results, votes kept ---
   const fc = client();
   await signup(fc, "FilterChanger");

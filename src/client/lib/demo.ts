@@ -1,58 +1,61 @@
 import type { ActivityDTO } from "@shared/types";
 
 /**
- * A fully-formed ActivityDTO used only to render a REAL <SwipeCard> on the
- * marketing landing page (a live component preview, not a fake screenshot).
- * The venue is real and public; this is the same shape the API returns.
+ * Fully-formed ActivityDTOs used only to render REAL <SwipeCard>s on the
+ * marketing landing page (a live component preview, not a fake screenshot
+ * or stock mockup). Both venues are real, live in the catalogue, with an
+ * exact price and a photo pulled from the venue's own website — not a
+ * generic stock photo standing in for "an activity" (checked 2026-09-24;
+ * re-verify against the live row if these venues' own data changes).
  */
 export function demoActivity(): ActivityDTO {
   return {
     id: "demo",
-    title: "Free-roam VR mission",
+    title: "Museum of Illusions",
     description:
-      "Backpack VR with 100 m² of free-roam space: 30 minutes of co-op mini-games, then a 30-minute mission. Teams of two to six.",
+      "Billed as the largest of its kind in Brussels, it explores science and math concepts through exhibits that reveal how human perception can be tricked.",
     fullDescription:
-      "Backpack VR with 100 m² of free-roam space: 30 minutes of co-op mini-games, then a 30-minute mission. Teams of two to six.",
+      "Billed as the largest of its kind in Brussels, it explores science and math concepts through exhibits that reveal how human perception can be tricked.",
     descriptionCredit: null,
-    category: "gaming",
-    subcategory: "Virtual reality",
-    categoryLabel: "Gaming",
-    categoryIcon: "🎮",
-    provider: "The Park Playground",
-    providerWebsite: "https://theparkplayground.com",
-    locationLabel: "The Park Playground, Antwerp",
-    address: "Vlaamsekaai 30, 2000 Antwerpen",
-    city: "Antwerp",
+    category: "culture",
+    subcategory: "Museum",
+    categoryLabel: "Museum",
+    categoryIcon: "🖼️",
+    provider: "Museum of Illusions",
+    providerWebsite: "https://museumofillusions.be",
+    locationLabel: "Museum of Illusions, Brussels",
+    address: "Rue du Lombard 27, 1000 Bruxelles",
+    city: "Brussels",
     country: "BE",
-    lat: 51.2137,
-    lng: 4.3919,
-    distanceKm: 2.4,
-    priceCents: 2299,
-    priceType: "from_per_person",
+    lat: 50.8459,
+    lng: 4.3486,
+    distanceKm: 1.8,
+    priceCents: 1750,
+    priceType: "per_person",
     priceBand: "10_25",
-    priceLabel: "From €23 / person",
+    priceLabel: "€17.50 / person",
     priceIsEstimate: false,
     currency: "EUR",
-    durationMin: 60,
-    minParticipants: 2,
-    maxParticipants: 6,
-    minAge: 10,
+    durationMin: null,
+    minParticipants: null,
+    maxParticipants: null,
+    minAge: null,
     indoorOutdoor: "indoor",
     accessibility: null,
     openingHours: {},
-    websiteUrl: "https://theparkplayground.com",
-    bookingUrl: "https://theparkplayground.com/en-be/our-locations/antwerp",
+    websiteUrl: "https://museumofillusions.be",
+    bookingUrl: "https://museumofillusions.be",
     ticketUrl: null,
     imageUrl:
-      "https://images.unsplash.com/photo-1758273239313-6c703d089dd4?w=1200&q=75&auto=format&fit=crop",
+      "https://museumofillusions.be/wp-content/uploads/2024/08/moi-home-carousel5-Brussels-Belgium-1200x900-1.png",
     images: [
-      "https://images.unsplash.com/photo-1758273239313-6c703d089dd4?w=1200&q=75&auto=format&fit=crop",
+      "https://museumofillusions.be/wp-content/uploads/2024/08/moi-home-carousel5-Brussels-Belgium-1200x900-1.png",
     ],
-    imageSource: "Unsplash",
+    imageSource: "Official website (museumofillusions.be)",
     imageAttribution: null,
-    tags: ["Tech", "Teamwork"],
+    tags: [],
     source: "web",
-    sourceUrl: "https://theparkplayground.com/en-be/our-locations/antwerp",
+    sourceUrl: "https://museumofillusions.be",
     lastVerifiedAt: null,
     status: "needs_review",
     monetizationType: "outbound_tracking",
@@ -60,51 +63,48 @@ export function demoActivity(): ActivityDTO {
   };
 }
 
-/**
- * The card waiting underneath in the hero's swipe loop. Also a real venue
- * with facts from its own site (cinemangiare.be, checked 2026-09-16); no
- * photo, so it renders the brand gradient rather than a stock image that
- * doesn't show the place.
- */
+/** The card waiting underneath in the hero's swipe loop. Also real, live data. */
 export function demoNextActivity(): ActivityDTO {
   return {
     ...demoActivity(),
     id: "demo-next",
-    title: "Ciné Mangiare",
+    title: "MoMu Fashion Museum",
     description:
-      "Home-cooked dinner served before the film, different at every screening.",
+      "Fashion museum that collects, conserves, studies and exhibits Belgian fashion, with a collection to explore, a magazine and online tickets that secure entry at a chosen time.",
     fullDescription:
-      "Home-cooked dinner served before the film, different at every screening.",
+      "Fashion museum that collects, conserves, studies and exhibits Belgian fashion, with a collection to explore, a magazine and online tickets that secure entry at a chosen time.",
     descriptionCredit: null,
-    category: "entertainment",
-    subcategory: "Cinema",
-    categoryLabel: "Cinema",
-    categoryIcon: "🎬",
-    provider: "Ciné Mangiare",
-    providerWebsite: "https://www.cinemangiare.be/",
-    locationLabel: "Ciné Mangiare, Gent",
-    address: null,
-    city: "Gent",
-    lat: null,
-    lng: null,
-    distanceKm: null,
-    priceCents: null,
+    category: "culture",
+    subcategory: "Museum",
+    categoryLabel: "Museum",
+    categoryIcon: "🖼️",
+    provider: "MoMu",
+    providerWebsite: "https://www.momu.be",
+    locationLabel: "MoMu, Antwerp",
+    address: "Nationalestraat 28, 2000 Antwerpen",
+    city: "Antwerp",
+    lat: 51.2178,
+    lng: 4.3997,
+    distanceKm: 3.1,
+    priceCents: 1300,
     priceType: "per_person",
-    priceBand: "25_50",
-    priceLabel: "€35 p.p. (groups of 15+)",
+    priceBand: "0_10",
+    priceLabel: "€13 / person",
     priceIsEstimate: false,
     durationMin: null,
     minParticipants: null,
     maxParticipants: null,
     minAge: null,
     indoorOutdoor: "indoor",
-    websiteUrl: "https://www.cinemangiare.be/",
-    bookingUrl: null,
-    imageUrl: null,
-    images: [],
-    imageSource: null,
-    imageAttribution: null,
+    websiteUrl: "https://www.momu.be",
+    bookingUrl: "https://www.momu.be",
+    imageUrl:
+      "https://d4r8ypmqnkoz0.cloudfront.net/visits/_1200x630_crop_center-center_82_none/schools_main_image_3.jpg",
+    images: [
+      "https://d4r8ypmqnkoz0.cloudfront.net/visits/_1200x630_crop_center-center_82_none/schools_main_image_3.jpg",
+    ],
+    imageSource: "Official website (momu.be)",
     tags: [],
-    sourceUrl: "https://www.cinemangiare.be/",
+    sourceUrl: "https://www.momu.be",
   };
 }

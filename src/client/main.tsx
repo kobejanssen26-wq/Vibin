@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./lib/auth";
 import { ConfirmProvider } from "./components/Confirm";
+import { LangProvider } from "./lib/i18n";
 import { App } from "./App";
 import { installErrorTracking } from "./lib/track";
 import "./index.css";
@@ -24,11 +25,13 @@ function dismissBootShell() {
 ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
     <BrowserRouter>
-      <AuthProvider>
-        <ConfirmProvider>
-          <App onReady={dismissBootShell} />
-        </ConfirmProvider>
-      </AuthProvider>
+      <LangProvider>
+        <AuthProvider>
+          <ConfirmProvider>
+            <App onReady={dismissBootShell} />
+          </ConfirmProvider>
+        </AuthProvider>
+      </LangProvider>
     </BrowserRouter>
   </React.StrictMode>,
 );

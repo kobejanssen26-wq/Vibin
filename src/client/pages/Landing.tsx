@@ -1,10 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { LogoMark, Wordmark } from "../components/Logo";
+import { Wordmark } from "../components/Logo";
+import { SiteFooter } from "../components/SiteFooter";
 import { LinkButton } from "../components/ui";
 import { Reveal } from "../components/Reveal";
 import { SwipeCard } from "../components/SwipeCard";
-import { IconCheck } from "../components/icons";
+import { AvatarStack } from "../components/ui";
+import {
+  IconCalendar,
+  IconCheck,
+  IconClock,
+  IconExternal,
+  IconMapPin,
+} from "../components/icons";
 import { demoActivity, demoNextActivity } from "../lib/demo";
 import { ACTIVITY_CATEGORIES } from "@shared/constants";
 
@@ -96,14 +104,7 @@ export function Landing() {
         <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-5 pb-16 pt-8 md:grid-cols-[1.12fr_0.88fr] md:gap-14 md:pb-24 md:pt-12">
           <div>
             <Reveal>
-              <span className="inline-flex items-center gap-2 rounded-full border border-navy/10 bg-white px-3 py-1.5 text-sm font-semibold shadow-sm">
-                <LogoMark className="h-4 w-4" />
-                Swipe together. Agree in minutes.
-              </span>
-            </Reveal>
-
-            <Reveal delay={80}>
-              <h1 className="mt-6 text-5xl font-extrabold leading-[0.95] tracking-[-0.035em] [text-wrap:balance] sm:text-[3.4rem] md:text-[3.6rem] lg:text-[4.4rem]">
+              <h1 className="text-5xl font-extrabold leading-[0.95] tracking-[-0.035em] [text-wrap:balance] sm:text-[3.4rem] md:text-[3.6rem] lg:text-[4.4rem]">
                 <span className="block">Find your vibe.</span>
                 <span className="block text-brand-500">Make a plan.</span>
               </h1>
@@ -157,7 +158,7 @@ export function Landing() {
       </section>
 
       {/* ---------- how it works (editorial 3-beat) ---------- */}
-      <section className="mx-auto max-w-6xl px-5 py-20 md:py-28">
+      <section id="how-it-works" className="mx-auto max-w-6xl px-5 py-20 md:py-28 scroll-mt-20">
         <Reveal>
           <h2 className="text-2xl font-extrabold md:text-4xl">Three steps, no chat chaos</h2>
         </Reveal>
@@ -172,6 +173,71 @@ export function Landing() {
             </Reveal>
           ))}
         </ol>
+      </section>
+
+      {/* ---------- from match to plan (the beat right after "everyone's in") ---------- */}
+      <section className="mx-auto max-w-6xl px-5 py-20 md:py-28">
+        <div className="grid items-center gap-10 md:grid-cols-[0.85fr_1.15fr] md:gap-16">
+          <Reveal>
+            <h2 className="text-2xl font-extrabold leading-tight md:text-4xl">
+              A match becomes a plan, on its own.
+            </h2>
+            <p className="mt-4 text-navy-500">
+              The moment your group agrees, VIBIN turns it into something you can
+              actually show up to: a place, a time, and a way to book it.
+            </p>
+          </Reveal>
+
+          <Reveal delay={100}>
+            <div className="overflow-hidden rounded-3xl border border-paper-line bg-paper-card shadow-sm">
+              <div className="relative h-40 w-full sm:h-48">
+                <img
+                  src="https://museumofillusions.be/wp-content/uploads/2024/08/moi-home-carousel5-Brussels-Belgium-1200x900-1.png"
+                  alt="Museum of Illusions, Brussels"
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                />
+                <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-xl bg-lime-400 px-2.5 py-1 text-xs font-extrabold text-navy shadow-lime">
+                  <IconCheck size={13} /> Everyone's in
+                </span>
+              </div>
+              <div className="p-6">
+                <p className="text-xs font-bold uppercase tracking-wide text-brand-500">
+                  Museum · Brussels
+                </p>
+                <h3 className="mt-1 text-xl font-extrabold">Museum of Illusions</h3>
+
+                <div className="mt-4 space-y-2 text-sm text-navy-500">
+                  <p className="flex items-center gap-2">
+                    <IconCalendar size={16} className="shrink-0 text-navy-400" />
+                    Sat 18 Oct
+                    <IconClock size={16} className="ml-2 shrink-0 text-navy-400" />
+                    14:30
+                  </p>
+                  <p className="flex items-center gap-2">
+                    <IconMapPin size={16} className="shrink-0 text-navy-400" />
+                    Rue du Lombard 27, Brussels · €17.50 / person
+                  </p>
+                </div>
+
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
+                  <AvatarStack
+                    people={[
+                      { displayName: "Kobe", avatarUrl: null },
+                      { displayName: "Lina", avatarUrl: null },
+                      { displayName: "Sam", avatarUrl: null },
+                      { displayName: "Emma", avatarUrl: null },
+                    ]}
+                    size={32}
+                  />
+                  <span className="inline-flex items-center gap-1.5 text-sm font-bold text-navy">
+                    Book now <IconExternal size={14} />
+                  </span>
+                </div>
+              </div>
+            </div>
+          </Reveal>
+        </div>
       </section>
 
       {/* ---------- category strip (horizontal scroll, not a grid) ---------- */}
@@ -242,7 +308,7 @@ export function Landing() {
       </section>
 
       {/* ---------- FAQ ---------- */}
-      <section className="mx-auto max-w-3xl px-5 py-16">
+      <section id="faq" className="mx-auto max-w-3xl px-5 py-16 scroll-mt-20">
         <Reveal>
           <h2 className="text-2xl font-extrabold md:text-4xl">Good to know</h2>
         </Reveal>
@@ -278,19 +344,7 @@ export function Landing() {
         </Reveal>
       </section>
 
-      {/* ---------- footer ---------- */}
-      <footer className="border-t border-paper-line px-5 py-10">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 text-sm text-navy-400 md:flex-row">
-          <Wordmark />
-          <div className="flex gap-5">
-            <Link to="/contact" className="hover:text-navy">Contact</Link>
-            <Link to="/privacy" className="hover:text-navy">Privacy</Link>
-            <Link to="/terms" className="hover:text-navy">Terms</Link>
-            <Link to="/login" className="hover:text-navy">Log in</Link>
-          </div>
-          <p>© {new Date().getFullYear()} VIBIN</p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

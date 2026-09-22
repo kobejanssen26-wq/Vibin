@@ -13,10 +13,12 @@ import { MatchCelebration } from "../components/MatchCelebration";
 import { EmptyState, ErrorState } from "../components/ui";
 import { SwipeSkeleton } from "../components/SwipeSkeleton";
 import { track } from "../lib/track";
+import { useConfirm } from "../components/Confirm";
 import {
   IconArrowLeft,
   IconClose,
   IconHeart,
+  IconRestart,
   IconStar,
   IconUndo,
 } from "../components/icons";
@@ -35,6 +37,7 @@ type Meta = Omit<SwipeStateDTO, "queue">;
 export function Swipe() {
   const { id = "" } = useParams();
   const nav = useNavigate();
+  const confirm = useConfirm();
 
   const [meta, setMeta] = useState<Meta | null>(null);
   const [queue, setQueue] = useState<SwipeCardDTO[]>([]);
@@ -190,6 +193,32 @@ export function Swipe() {
     }
   };
 
+  const swipeAgain = async () => {
+    const ok = await confirm({
+      title: "Start over?",
+      message:
+        "Everyone in the group gets a fresh set of cards to swipe — your group, its members and the chat all stay exactly as they are.",
+      confirmLabel: "Start over",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      votedLocally.current.clear();
+      seenMatchIds.current.clear();
+      const s = await api<SwipeStateDTO>(`/groups/${id}/swipe/reset`, {
+        method: "POST",
+        body: {},
+      });
+      applyServer(s, true);
+      setErr(null);
+    } catch (e) {
+      setErr(e instanceof ApiRequestError ? e.message : "Could not restart swiping.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading && !meta) return <SwipeSkeleton />;
   if (err && !meta) return <ErrorState message={err} onRetry={() => load(true)} />;
   if (!meta) return null;
@@ -224,24 +253,40 @@ export function Swipe() {
         >
           <IconArrowLeft size={18} /> Group
         </Link>
-        {meta.currentProgress && meta.currentProgress.total > 1 && (
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full bg-paper-soft px-3 py-1.5 text-xs font-bold text-navy"
-            aria-label={`${meta.currentProgress.voted} of ${meta.currentProgress.total} members voted on this card`}
-          >
-            <span className="flex gap-1">
-              {Array.from({ length: meta.currentProgress.total }).map((_, i) => (
-                <span
-                  key={i}
-                  className={`h-1.5 w-1.5 rounded-full ${
-                    i < meta.currentProgress!.voted ? "bg-brand-500" : "bg-navy/15"
-                  }`}
-                />
-              ))}
+        <div className="flex items-center gap-2">
+          {meta.canChangeFilters &&
+            (meta.status === "swiping" || meta.status === "date_matching") && (
+              <button
+                type="button"
+                onClick={swipeAgain}
+                disabled={busy}
+                aria-label="Start swiping over from scratch"
+                title="Start over"
+                className="inline-flex h-10 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-navy-400 hover:bg-navy/5 hover:text-navy disabled:pointer-events-none disabled:opacity-40"
+              >
+                <IconRestart size={16} />
+                <span className="hidden sm:inline">Start over</span>
+              </button>
+            )}
+          {meta.currentProgress && meta.currentProgress.total > 1 && (
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full bg-paper-soft px-3 py-1.5 text-xs font-bold text-navy"
+              aria-label={`${meta.currentProgress.voted} of ${meta.currentProgress.total} members voted on this card`}
+            >
+              <span className="flex gap-1">
+                {Array.from({ length: meta.currentProgress.total }).map((_, i) => (
+                  <span
+                    key={i}
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      i < meta.currentProgress!.voted ? "bg-brand-500" : "bg-navy/15"
+                    }`}
+                  />
+                ))}
+              </span>
+              {meta.currentProgress.voted}/{meta.currentProgress.total} in
             </span>
-            {meta.currentProgress.voted}/{meta.currentProgress.total} in
-          </span>
-        )}
+          )}
+        </div>
       </div>
 
       {meta.filters && (
@@ -287,9 +332,14 @@ export function Swipe() {
                 View the plan
               </Link>
             ) : meta.canChangeFilters ? (
-              <Link to={`/groups/${id}/configure`} className="btn-primary">
-                Change filters
-              </Link>
+              <div className="flex flex-col items-center gap-2">
+                <Link to={`/groups/${id}/configure`} className="btn-primary">
+                  Change filters
+                </Link>
+                <button type="button" onClick={swipeAgain} className="btn-ghost text-sm">
+                  Start over instead
+                </button>
+              </div>
             ) : (
               <Link to={`/groups/${id}`} className="btn-outline">
                 Back to group

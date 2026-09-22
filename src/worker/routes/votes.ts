@@ -9,6 +9,7 @@ import {
   activityVotes,
   groupActivityPool,
   groupSettings,
+  groups,
   matches,
   type Group,
 } from "../db/schema";
@@ -17,7 +18,13 @@ import { badRequest, conflict } from "../lib/errors";
 import { newId } from "../lib/id";
 import { track } from "../lib/analytics";
 import { chunk, rowsPerInsert } from "../lib/chunk";
-import { requireActiveMember, requireGroupMember, activeMemberIds } from "../lib/access";
+import {
+  requireActiveMember,
+  requireGroupCreator,
+  requireGroupMember,
+  activeMemberIds,
+} from "../lib/access";
+import { systemMessage } from "../lib/notify";
 import { activityVoteProgress } from "../engine/match";
 import { buildDeckBatch, countEligibleActivities, haversineKm } from "../engine/deck";
 import { loadRankContext, rankingWorthwhile } from "../engine/rank-context";
@@ -490,6 +497,48 @@ app.post("/:id/swipe/undo", async (c) => {
   }
 
   return c.json({ ok: true, undoneActivityId: last[0]!.activityId });
+});
+
+/**
+ * "Swipe Again" (§11/§12 of the redesign brief): start a fresh swiping round
+ * for THIS group without touching the group itself — members, name and chat
+ * are untouched, only what's been shown/voted on resets. Creator-only, like
+ * every other group-shaping action.
+ *
+ * Deliberately a hard reset, not a new "session" column layered on the old
+ * rows: the brief asks to restart the current round, not preserve a replayable
+ * history of abandoned ones, and a clean slate is what actually rules out the
+ * "duplicate vote from a stale session" class of bug it warns about. A match
+ * still short of a locked-in plan is reset away with everything else; once a
+ * plan exists there is something real to protect, so that's refused instead.
+ */
+app.post("/:id/swipe/reset", async (c) => {
+  const db = createDb(c.env);
+  const groupId = c.req.param("id");
+  const { group } = await requireGroupCreator(db, groupId, uid(c));
+  if (group.status === "configuring") {
+    throw conflict("Set up the group before swiping.");
+  }
+  if (group.status === "planned" || group.status === "archived") {
+    throw conflict("This group already has a plan — restarting would lose it.");
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  await db.delete(activityVotes).where(eq(activityVotes.groupId, groupId));
+  await db.delete(groupActivityPool).where(eq(groupActivityPool.groupId, groupId));
+  // Only an in-progress match is cleared this way — activity_matched, never
+  // complete (unreachable here: `planned`/`archived` groups are refused above).
+  await db.delete(matches).where(and(eq(matches.groupId, groupId), eq(matches.status, "activity_matched")));
+  await db
+    .update(groupSettings)
+    .set({ filterGeneration: sql`${groupSettings.filterGeneration} + 1` })
+    .where(eq(groupSettings.groupId, groupId));
+  await db.update(groups).set({ status: "swiping", updatedAt: now }).where(eq(groups.id, groupId));
+
+  await systemMessage(db, groupId, "The swipe session was restarted — everyone can vote again.", { kind: "swipe_reset" });
+  track(c, "swipe_session_reset", { userId: uid(c), groupId });
+
+  return c.json(await buildSwipeState(db, { ...group, status: "swiping", updatedAt: now }, uid(c)));
 });
 
 export { buildSwipeState };
