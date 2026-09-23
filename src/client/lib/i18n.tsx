@@ -641,6 +641,30 @@ const EN = {
   "format.price.perPerson": "/ person",
   "format.price.perGroup": "/ group",
   "format.availabilityNote": "Activity information is provided for planning. Prices and availability can change — check with the provider before you book.",
+
+  // lib/server-text.ts — mirrors of worker-built chat/notification templates
+  "srv.groupCreated": "Group \"{name}\" created. Invite your crew!",
+  "srv.swipingStarted": "Swiping has started — {n} activities in the deck. Everyone needs to like the same one for it to match. 🔥",
+  "srv.someoneLeft": "Someone left the group.",
+  "srv.joined": "{name} joined the group. 👋",
+  "srv.matched": "🔥 Everyone matched on {title}!",
+  "srv.planLocked": "🎉 It's a plan! {title} is locked in.",
+  "srv.closedUsual": "📅 {title} is closed at your usual time — pick a real time below.",
+  "srv.findDate": "📅 Now let's find a date for {title} — vote on the options.",
+  "srv.dateAgreed": "📅 Everyone agreed on {label}! It's a plan. 🎉",
+  "srv.dateOptionAdded": "A new date option was added: {label}",
+  "srv.swipeReset": "The swipe session was restarted — everyone can vote again.",
+  "srv.n.planTitle": "It's a plan — {title}!",
+  "srv.n.planBody": "Everyone's going. Open the plan for details.",
+  "srv.n.dateVotingTitle": "Date voting started for {title}",
+  "srv.n.dateVotingBody": "Say which times work for you.",
+  "srv.n.dateLockedTitle": "Date locked: {label}",
+  "srv.n.fullyPlanned": "{title} is fully planned.",
+  "srv.n.supportReplied": "VIBIN support replied",
+  "srv.n.swipingStartedTitle": "Swiping started in {name}",
+  "srv.n.swipingStartedBody": "Open VIBIN and start swiping.",
+  "srv.n.memberJoined": "{name} joined {group}",
+  "srv.n.chatMessage": "{name} in the group chat",
 } satisfies Record<string, string>;
 
 export type Key = keyof typeof EN;
@@ -1253,6 +1277,30 @@ const NL: Partial<Record<Key, string>> = {
   "format.price.perPerson": "/ persoon",
   "format.price.perGroup": "/ groep",
   "format.availabilityNote": "Activiteitsinformatie is bedoeld om te plannen. Prijzen en beschikbaarheid kunnen wijzigen — check bij de aanbieder voor je boekt.",
+
+  // lib/server-text.ts — mirrors of worker-built chat/notification templates
+  "srv.groupCreated": "Groep “{name}” aangemaakt. Nodig je bende uit!",
+  "srv.swipingStarted": "Het swipen is gestart — {n} activiteiten in de stapel. Iedereen moet dezelfde leuk vinden voor een match. 🔥",
+  "srv.someoneLeft": "Iemand heeft de groep verlaten.",
+  "srv.joined": "{name} is bij de groep gekomen. 👋",
+  "srv.matched": "🔥 Iedereen matchte op {title}!",
+  "srv.planLocked": "🎉 Het is een plan! {title} ligt vast.",
+  "srv.closedUsual": "📅 {title} is gesloten op jullie gebruikelijke tijdstip — kies hieronder een echt tijdstip.",
+  "srv.findDate": "📅 Tijd om een datum te vinden voor {title} — stem op de opties.",
+  "srv.dateAgreed": "📅 Iedereen is akkoord met {label}! Het is een plan. 🎉",
+  "srv.dateOptionAdded": "Er is een nieuwe datumoptie toegevoegd: {label}",
+  "srv.swipeReset": "De swipesessie is opnieuw gestart — iedereen kan weer stemmen.",
+  "srv.n.planTitle": "Het is een plan — {title}!",
+  "srv.n.planBody": "Iedereen gaat mee. Open het plan voor de details.",
+  "srv.n.dateVotingTitle": "Datumstemming gestart voor {title}",
+  "srv.n.dateVotingBody": "Geef aan welke tijdstippen voor jou werken.",
+  "srv.n.dateLockedTitle": "Datum vastgelegd: {label}",
+  "srv.n.fullyPlanned": "{title} is volledig gepland.",
+  "srv.n.supportReplied": "VIBIN-support heeft geantwoord",
+  "srv.n.swipingStartedTitle": "Het swipen is gestart in {name}",
+  "srv.n.swipingStartedBody": "Open VIBIN en begin met swipen.",
+  "srv.n.memberJoined": "{name} is bij {group} gekomen",
+  "srv.n.chatMessage": "{name} in de groepschat",
 };
 
 const FR: Partial<Record<Key, string>> = {
@@ -1271,7 +1319,7 @@ const FR: Partial<Record<Key, string>> = {
   "footer.rights": "Tous droits réservés.",
 };
 
-const DICTIONARIES: Record<LangCode, Partial<Record<Key, string>>> = { en: EN, nl: NL, fr: FR };
+export const DICTIONARIES: Record<LangCode, Partial<Record<Key, string>>> = { en: EN, nl: NL, fr: FR };
 const STORAGE_KEY = "vibin_lang";
 const INTL_LOCALE: Record<LangCode, string> = { en: "en-GB", nl: "nl-BE", fr: "fr-BE" };
 
@@ -1292,6 +1340,9 @@ export function labelFor(
 
 /** Non-hook access for plain helpers (date/time formatting) that render outside React's tree. */
 let activeLang: LangCode = "en";
+export const setActiveLang = (l: LangCode) => {
+  activeLang = l;
+};
 export const intlLocale = () => INTL_LOCALE[activeLang];
 export const translate = (k: Key, vars?: Vars) =>
   interpolate(DICTIONARIES[activeLang]?.[k] ?? EN[k], vars);
@@ -1307,7 +1358,7 @@ export function LangProvider({ children }: { children: ReactNode }) {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved && LANGUAGES.some((l) => l.code === saved)) {
-        activeLang = saved as LangCode;
+        setActiveLang(saved as LangCode);
         return saved as LangCode;
       }
     } catch {
@@ -1317,7 +1368,7 @@ export function LangProvider({ children }: { children: ReactNode }) {
   });
 
   const setLang = (l: LangCode) => {
-    activeLang = l;
+    setActiveLang(l);
     setLangState(l);
     try {
       localStorage.setItem(STORAGE_KEY, l);

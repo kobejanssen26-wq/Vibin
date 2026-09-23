@@ -10,6 +10,7 @@ import { notificationHref } from "../lib/notificationRoute";
 import type { NotificationDTO } from "@shared/types";
 import { api } from "../lib/api";
 import { useLang } from "../lib/i18n";
+import { localizeServerText } from "../lib/server-text";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { t } = useLang();
@@ -121,9 +122,15 @@ export function AppShell({ children }: { children: ReactNode }) {
                               />
                             )}
                             <p className={`pl-2.5 font-semibold text-navy ${n.read ? "" : "pr-1"}`}>
-                              {n.title}
+                              {localizeServerText(n.title)}
                             </p>
-                            {n.body && <p className="pl-2.5 text-navy-400">{n.body}</p>}
+                            {n.body && (
+                              <p className="pl-2.5 text-navy-400">
+                                {n.kind === "message" || n.kind === "support_reply"
+                                  ? n.body
+                                  : localizeServerText(n.body)}
+                              </p>
+                            )}
                             <p className="mt-0.5 pl-2.5 text-[11px] text-navy-300">
                               {relativeTime(n.createdAt)}
                             </p>

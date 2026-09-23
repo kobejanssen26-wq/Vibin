@@ -5,6 +5,7 @@ import { Avatar } from "./ui";
 import { IconSend } from "./icons";
 import { relativeTime } from "../lib/format";
 import { useLang } from "../lib/i18n";
+import { localizeServerText } from "../lib/server-text";
 import type { MessageDTO } from "@shared/types";
 import { LIMITS } from "@shared/constants";
 
@@ -74,7 +75,7 @@ export function GroupChat({
                 key={m.id}
                 className="mx-auto w-fit rounded-full border border-paper-line bg-paper-soft px-3 py-1 text-center text-xs font-medium text-navy-500"
               >
-                {m.body}
+                {localizeServerText(m.body)}
               </p>
             ) : (
               <div
