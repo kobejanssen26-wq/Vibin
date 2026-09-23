@@ -12,6 +12,7 @@ import {
   RADIUS_OPTIONS_KM,
   TIME_BANDS,
 } from "@shared/constants";
+import { useLang } from "../lib/i18n";
 
 type Draft = GroupSettingsDTO;
 
@@ -31,6 +32,7 @@ const DEFAULT_DRAFT: Draft = {
 };
 
 export function GroupConfig() {
+  const { t } = useLang();
   const { id = "" } = useParams();
   const nav = useNavigate();
   const [group, setGroup] = useState<GroupDTO | null>(null);
@@ -48,7 +50,7 @@ export function GroupConfig() {
         setGroup(group);
         if (group.settings) setDraft({ ...DEFAULT_DRAFT, ...group.settings });
       } catch (e) {
-        setErr(e instanceof ApiRequestError ? e.message : "Could not load group.");
+        setErr(e instanceof ApiRequestError ? e.message : t("config.loadError"));
       } finally {
         setLoading(false);
       }
@@ -83,7 +85,7 @@ export function GroupConfig() {
       setGroup(group);
       return true;
     } catch (e) {
-      setErr(e instanceof ApiRequestError ? e.message : "Could not save.");
+      setErr(e instanceof ApiRequestError ? e.message : t("config.saveError"));
       return false;
     } finally {
       setSaving(false);
@@ -107,7 +109,7 @@ export function GroupConfig() {
       await api(`/groups/${id}/start`, { method: "POST", body: {} });
       nav(`/groups/${id}/swipe`, { replace: true });
     } catch (e) {
-      setErr(e instanceof ApiRequestError ? e.message : "Could not start.");
+      setErr(e instanceof ApiRequestError ? e.message : t("config.startError"));
       setStarting(false);
     }
   };
@@ -145,12 +147,12 @@ export function GroupConfig() {
   }, [draft.locationLabel]);
 
   if (loading) return <LoadingScreen />;
-  if (!group) return <ErrorState message={err ?? "Group not found."} />;
+  if (!group) return <ErrorState message={err ?? t("config.notFound")} />;
   if (!group.isCreator)
     return (
       <ErrorState
-        title="Creator only"
-        message="Only the group creator can change the setup. Ask them to start the swipe."
+        title={t("config.creatorOnlyTitle")}
+        message={t("config.creatorOnlyBody")}
       />
     );
 
@@ -159,14 +161,14 @@ export function GroupConfig() {
       <PageHeader
         back={
           midSwipe
-            ? { to: `/groups/${id}/swipe`, label: "Swiping" }
+            ? { to: `/groups/${id}/swipe`, label: t("config.backSwiping") }
             : { to: `/groups/${id}`, label: group.name }
         }
-        title={midSwipe ? "Change filters" : "Set the vibe"}
+        title={midSwipe ? t("config.titleMidSwipe") : t("config.titleFresh")}
         subtitle={
           midSwipe
-            ? "New filters rebuild the deck. Your likes and passes so far are kept."
-            : "What, where and when. You can change this before you start swiping."
+            ? t("config.subtitleMidSwipe")
+            : t("config.subtitleFresh")
         }
       />
 
@@ -174,7 +176,7 @@ export function GroupConfig() {
 
       {/* categories */}
       <section>
-        <h2 className="mb-2 font-bold">What kind of activities?</h2>
+        <h2 className="mb-2 font-bold">{t("config.categoriesTitle")}</h2>
         <label className="mb-3 flex items-center gap-3 rounded-2xl bg-paper-soft p-3">
           <input
             type="checkbox"
@@ -184,8 +186,8 @@ export function GroupConfig() {
               setDraft((d) => ({ ...d, allActivities: e.target.checked }))
             }
           />
-          <span className="font-semibold">All activities</span>
-          <span className="text-sm text-navy-400">— don’t restrict by category</span>
+          <span className="font-semibold">{t("config.allActivities")}</span>
+          <span className="text-sm text-navy-400">{t("config.allActivitiesHint")}</span>
         </label>
         <div
           className={`flex flex-wrap gap-2 ${draft.allActivities ? "pointer-events-none opacity-40" : ""}`}
@@ -205,9 +207,9 @@ export function GroupConfig() {
 
       {/* location */}
       <section className="space-y-3">
-        <h2 className="font-bold">Where?</h2>
+        <h2 className="font-bold">{t("config.whereTitle")}</h2>
         <Field
-          label="City or postcode"
+          label={t("config.cityLabel")}
           placeholder="Antwerpen"
           value={draft.locationLabel ?? ""}
           onChange={(e) =>
@@ -216,13 +218,12 @@ export function GroupConfig() {
         />
         {placeResolved === false && (
           <p className="text-xs text-navy-400">
-            We don’t recognise that place, so the radius won’t be applied — the
-            group will see the whole catalogue. Try a Belgian city or postcode.
+            {t("config.placeUnresolved")}
           </p>
         )}
         <div className={placeResolved === false ? "opacity-50" : ""}>
           <span className="mb-1.5 block text-sm font-semibold text-navy-700">
-            Radius
+            {t("config.radius")}
           </span>
           <div className="flex flex-wrap gap-2">
             {RADIUS_OPTIONS_KM.map((r) => (
@@ -232,7 +233,7 @@ export function GroupConfig() {
                 className={draft.radiusKm === r ? "chip-on" : "chip"}
                 onClick={() => setDraft((d) => ({ ...d, radiusKm: r }))}
               >
-                Within {r} km
+                {t("config.within", { km: r })}
               </button>
             ))}
           </div>
@@ -241,7 +242,7 @@ export function GroupConfig() {
 
       {/* budget */}
       <section>
-        <h2 className="mb-2 font-bold">Budget per person</h2>
+        <h2 className="mb-2 font-bold">{t("config.budgetTitle")}</h2>
         <div className="flex flex-wrap gap-2">
           {BUDGET_BANDS.map((b) => (
             <button
@@ -258,7 +259,7 @@ export function GroupConfig() {
 
       {/* date */}
       <section>
-        <h2 className="mb-2 font-bold">When?</h2>
+        <h2 className="mb-2 font-bold">{t("config.whenTitle")}</h2>
         <button
           type="button"
           onClick={() =>
@@ -270,9 +271,9 @@ export function GroupConfig() {
               : "border-paper-line hover:border-brand-300"
           }`}
         >
-          🤷 We don’t know when yet
+          {t("config.dontKnowYet")}
           <span className="block text-sm font-normal text-navy-400">
-            VIBIN runs a quick date vote after you match an activity.
+            {t("config.dontKnowYetHint")}
           </span>
         </button>
         <div className="flex flex-wrap gap-2">
@@ -306,7 +307,7 @@ export function GroupConfig() {
       {/* time */}
       {draft.dateMode !== "unknown" && (
         <section>
-          <h2 className="mb-2 font-bold">Time of day (optional)</h2>
+          <h2 className="mb-2 font-bold">{t("config.timeTitle")}</h2>
           <div className="flex flex-wrap gap-2">
             {TIME_BANDS.map((t) => (
               <button
@@ -345,7 +346,7 @@ export function GroupConfig() {
           disabled={!canStart}
           onClick={startSwiping}
         >
-          {midSwipe ? "Apply filters →" : "Save & start swiping →"}
+          {midSwipe ? t("config.applyFilters") : t("config.saveAndStart")}
         </Button>
         <button
           type="button"
@@ -358,11 +359,11 @@ export function GroupConfig() {
             if (await save()) nav(`/groups/${id}`);
           }}
         >
-          {midSwipe ? "Cancel" : "Save and come back later"}
+          {midSwipe ? t("config.cancel") : t("config.saveForLater")}
         </button>
         {!canStart && (
           <p className="mt-1 text-center text-xs text-navy-400">
-            Pick at least one category, or choose “All activities”.
+            {t("config.pickCategoryHint")}
           </p>
         )}
       </div>
