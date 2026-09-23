@@ -24,9 +24,11 @@ import {
 import { formatDay, formatDuration, formatWhen } from "../lib/format";
 import { track } from "../lib/track";
 import { AvailabilityNote } from "../components/AvailabilityNote";
+import { useLang } from "../lib/i18n";
 import type { PlanDTO } from "@shared/types";
 
 export function PlanView() {
+  const { t } = useLang();
   const { id, planId } = useParams();
   const [plan, setPlan] = useState<PlanDTO | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -45,7 +47,7 @@ export function PlanView() {
           setPlan(plans[0] ?? null);
         }
       } catch (e) {
-        setErr(e instanceof ApiRequestError ? e.message : "Could not load plan.");
+        setErr(e instanceof ApiRequestError ? e.message : t("plan.loadError"));
       } finally {
         setLoading(false);
       }
@@ -57,8 +59,8 @@ export function PlanView() {
   if (!plan)
     return (
       <ErrorState
-        title="No plan yet"
-        message="This group hasn’t locked in a plan. Keep swiping!"
+        title={t("plan.noneTitle")}
+        message={t("plan.noneBody")}
       />
     );
 
@@ -70,7 +72,7 @@ export function PlanView() {
     const url = `${location.origin}/plans/${plan.id}`;
     if (navigator.share) {
       try {
-        await navigator.share({ title: `VIBIN plan: ${a.title}`, url });
+        await navigator.share({ title: t("plan.shareTitle", { title: a.title }), url });
       } catch {
         /* cancelled */
       }
@@ -83,7 +85,7 @@ export function PlanView() {
     <div className="mx-auto w-full max-w-4xl space-y-5">
       <PageHeader
         back={{ to: `/groups/${plan.groupId}`, label: plan.groupName }}
-        title="It's a plan"
+        title={t("plan.title")}
         action={
           <span className="grid h-9 w-9 place-items-center rounded-xl bg-lime-400 text-navy">
             <IconCheck size={22} />
@@ -124,7 +126,7 @@ export function PlanView() {
               {a.title}
             </h2>
             {a.provider && (
-              <p className="text-sm text-white/85">at {a.provider}</p>
+              <p className="text-sm text-white/85">{t("activity.at")} {a.provider}</p>
             )}
           </div>
         </div>
@@ -150,7 +152,7 @@ export function PlanView() {
               <Row icon={<IconClock size={16} />} text={formatDuration(a.durationMin)} />
             ) : null}
             {a.minAge ? (
-              <Row icon={<IconInfo size={16} />} text={`Minimum age ${a.minAge}`} />
+              <Row icon={<IconInfo size={16} />} text={t("plan.minAge", { n: a.minAge })} />
             ) : null}
           </div>
         </div>
@@ -158,7 +160,7 @@ export function PlanView() {
 
       <div className="mt-5 space-y-5 lg:mt-0">
       <div className="card p-4">
-        <p className="mb-2 text-sm font-bold">Everyone's going</p>
+        <p className="mb-2 text-sm font-bold">{t("plan.everyoneGoing")}</p>
         <AvatarStack people={plan.members} size={40} max={10} />
       </div>
 
@@ -171,11 +173,11 @@ export function PlanView() {
             className="btn-primary col-span-2"
           >
             <IconExternal size={18} />
-            {a.ticketUrl ? "Get tickets" : "Book with the provider"}
+            {a.ticketUrl ? t("plan.getTickets") : t("plan.book")}
           </a>
         ) : (
           <div className="col-span-2 rounded-2xl bg-paper-soft px-4 py-3 text-center text-sm text-navy-400">
-            No online booking — {a.websiteUrl ? "check the provider's site" : "contact the venue directly"}.
+            {a.websiteUrl ? t("plan.noBookingSite") : t("plan.noBookingContact")}
           </div>
         )}
         {a.websiteUrl && (
@@ -185,7 +187,7 @@ export function PlanView() {
             rel="noreferrer"
             className="btn-outline"
           >
-            <IconExternal size={16} /> Website
+            <IconExternal size={16} /> {t("plan.website")}
           </a>
         )}
         {plan.startsAt && (
@@ -203,26 +205,26 @@ export function PlanView() {
               })
             }
           >
-            <IconCalendar size={16} /> Calendar
+            <IconCalendar size={16} /> {t("plan.calendar")}
           </a>
         )}
         {plan.startsAt && (
           <a href={plan.calendar.icsUrl} className="btn-outline" download>
-            .ics file
+            {t("plan.ics")}
           </a>
         )}
         <button className="btn-outline" onClick={share}>
-          <IconShare size={16} /> Share
+          <IconShare size={16} /> {t("plan.share")}
         </button>
         <Link to={`/groups/${plan.groupId}?tab=chat`} className="btn-dark col-span-2">
-          <IconChat size={16} /> Open group chat
+          <IconChat size={16} /> {t("plan.openChat")}
         </Link>
       </div>
 
       <p className="rounded-2xl bg-paper-soft px-4 py-3 text-xs text-navy-400">
         {a.availabilityNote}
         {a.lastVerifiedAt && (
-          <> Last checked {formatDay(a.lastVerifiedAt)}.</>
+          <> {t("plan.lastChecked", { date: formatDay(a.lastVerifiedAt) })}</>
         )}
       </p>
 
@@ -230,8 +232,8 @@ export function PlanView() {
         <ReportButton
           targetType="activity"
           targetId={a.id}
-          label="Report a problem with this activity"
-          modalTitle="Report this activity"
+          label={t("plan.reportLabel")}
+          modalTitle={t("plan.reportTitle")}
         />
       </div>
       </div>

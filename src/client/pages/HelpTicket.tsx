@@ -5,6 +5,7 @@ import { api, ApiRequestError } from "../lib/api";
 import { Button, ErrorState, LoadingScreen } from "../components/ui";
 import { PageHeader } from "../components/PageHeader";
 import { relativeTime } from "../lib/format";
+import { useLang, type Key } from "../lib/i18n";
 
 interface TicketMessage {
   id: string;
@@ -17,14 +18,8 @@ interface TicketDetail {
   messages: TicketMessage[];
 }
 
-const AUTHOR_LABEL: Record<TicketMessage["authorType"], string> = {
-  user: "You",
-  ai: "VIBIN assistant",
-  admin: "VIBIN support",
-  system: "System",
-};
-
 export function HelpTicket() {
+  const { t } = useLang();
   const { id = "" } = useParams();
   const { data, loading, error, refetch } = usePoll<TicketDetail>(`/support/${id}`, 8000);
   const [text, setText] = useState("");
@@ -42,7 +37,7 @@ export function HelpTicket() {
       setText("");
       await refetch();
     } catch (e) {
-      setErr(e instanceof ApiRequestError ? e.message : "Could not send.");
+      setErr(e instanceof ApiRequestError ? e.message : t("ticket.sendError"));
     } finally {
       setBusy(false);
     }
@@ -56,7 +51,7 @@ export function HelpTicket() {
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-4">
-      <PageHeader back={{ to: "/help", label: "Help" }} title={data.ticket.subject} />
+      <PageHeader back={{ to: "/help", label: t("ticket.back") }} title={data.ticket.subject} />
 
       <div className="space-y-3">
         {data.messages.map((m) => (
@@ -66,7 +61,7 @@ export function HelpTicket() {
           >
             <div className={`max-w-[85%] ${m.authorType === "user" ? "items-end text-right" : ""} flex flex-col`}>
               <p className="mb-0.5 px-1 text-xs font-semibold text-navy-400">
-                {AUTHOR_LABEL[m.authorType]}
+                {t(`ticket.author.${m.authorType}` as Key)}
               </p>
               <p
                 className={`inline-block whitespace-pre-wrap px-3.5 py-2 text-sm leading-relaxed ${
@@ -85,19 +80,19 @@ export function HelpTicket() {
 
       {closed ? (
         <p className="rounded-xl bg-paper-soft px-4 py-3 text-center text-sm text-navy-400">
-          This conversation is closed.
+          {t("ticket.closed")}
         </p>
       ) : (
         <form onSubmit={send} className="flex items-center gap-2 border-t border-paper-line pt-3">
           <input
             className="field flex-1"
-            placeholder="Reply…"
+            placeholder={t("ticket.reply")}
             maxLength={4000}
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
           <Button type="submit" loading={busy} disabled={!text.trim()}>
-            Send
+            {t("help.send")}
           </Button>
         </form>
       )}

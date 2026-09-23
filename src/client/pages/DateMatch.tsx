@@ -8,15 +8,17 @@ import { ActivityExpanded } from "../components/ActivityExpanded";
 import { IconCheck, IconPlus } from "../components/icons";
 import { formatDay, formatTime } from "../lib/format";
 import { AvailabilityNote } from "../components/AvailabilityNote";
+import { useLang, type Key } from "../lib/i18n";
 import type { DateMatchStateDTO } from "@shared/types";
 
-const VOTES = [
-  { v: "yes", label: "Yes", cls: "bg-lime-400 text-navy" },
-  { v: "maybe", label: "Maybe", cls: "bg-amber-400 text-navy" },
-  { v: "no", label: "No", cls: "bg-danger-500 text-white" },
-] as const;
+const VOTES: { v: "yes" | "maybe" | "no"; key: Key; cls: string }[] = [
+  { v: "yes", key: "date.voteYes", cls: "bg-lime-400 text-navy" },
+  { v: "maybe", key: "date.voteMaybe", cls: "bg-amber-400 text-navy" },
+  { v: "no", key: "date.voteNo", cls: "bg-danger-500 text-white" },
+];
 
 export function DateMatch() {
+  const { t } = useLang();
   const { id = "" } = useParams();
   const nav = useNavigate();
   const [state, setState] = useState<DateMatchStateDTO | null>(null);
@@ -33,7 +35,7 @@ export function DateMatch() {
       const s = await api<DateMatchStateDTO>(`/groups/${id}/date-match`);
       setState(s);
     } catch (e) {
-      setErr(e instanceof ApiRequestError ? e.message : "Could not load.");
+      setErr(e instanceof ApiRequestError ? e.message : t("date.loadError"));
     } finally {
       setLoading(false);
     }
@@ -60,7 +62,7 @@ export function DateMatch() {
         setTimeout(() => nav(`/groups/${id}/plan`), 2200);
       }
     } catch (e) {
-      setErr(e instanceof ApiRequestError ? e.message : "Vote failed.");
+      setErr(e instanceof ApiRequestError ? e.message : t("date.voteError"));
     } finally {
       setBusy(false);
     }
@@ -84,13 +86,13 @@ export function DateMatch() {
       setNewSlot("");
       setErr(null);
     } catch (e) {
-      setErr(e instanceof ApiRequestError ? e.message : "Could not add option.");
+      setErr(e instanceof ApiRequestError ? e.message : t("date.addError"));
     } finally {
       setBusy(false);
     }
   };
 
-  if (loading && !state) return <LoadingScreen label="Loading date vote…" />;
+  if (loading && !state) return <LoadingScreen label={t("date.loading")} />;
   if (err && !state) return <ErrorState message={err} onRetry={load} />;
   if (!state) return null;
 
@@ -101,10 +103,10 @@ export function DateMatch() {
         <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-lime-400 text-navy">
           <IconCheck size={30} />
         </span>
-        <h1 className="mt-3 text-2xl font-extrabold">A time everyone can make</h1>
-        <p className="mt-1 text-sm text-navy-400">Locking in your plan…</p>
+        <h1 className="mt-3 text-2xl font-extrabold">{t("date.matchedTitle")}</h1>
+        <p className="mt-1 text-sm text-navy-400">{t("date.locking")}</p>
         <Link to={`/groups/${id}/plan`} className="btn-primary mt-6">
-          See the plan
+          {t("date.seePlan")}
         </Link>
       </div>
     );
@@ -113,9 +115,9 @@ export function DateMatch() {
   return (
     <div className="mx-auto w-full max-w-2xl space-y-5">
       <PageHeader
-        back={{ to: `/groups/${id}`, label: "Group" }}
-        title="When should we go?"
-        subtitle="VIBIN picks the first slot everyone can make."
+        back={{ to: `/groups/${id}`, label: t("date.back") }}
+        title={t("date.title")}
+        subtitle={t("date.subtitle")}
       />
 
       <button
@@ -143,23 +145,22 @@ export function DateMatch() {
           </p>
         </div>
         <span className="shrink-0 text-xs font-semibold text-brand-600">
-          Details
+          {t("date.details")}
         </span>
       </button>
 
       <div className="flex items-center gap-3">
         <AvatarStack people={state.members} />
         <span className="text-xs font-medium text-navy-400">
-          {state.members.length} deciding
+          {t("date.deciding", { n: state.members.length })}
         </span>
       </div>
 
       {state.status === "no_consensus" && (
         <div className="flex gap-3 rounded-2xl border border-amber-400/40 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-          <span className="mt-0.5 shrink-0 font-bold">Heads up</span>
+          <span className="mt-0.5 shrink-0 font-bold">{t("date.headsUp")}</span>
           <p>
-            No slot works for everyone yet. Add another option or change a vote.
-            VIBIN won't pick a time that leaves someone out.
+            {t("date.noConsensus")}
           </p>
         </div>
       )}
@@ -182,7 +183,7 @@ export function DateMatch() {
               </div>
               {o.unanimous && (
                 <span className="chip-lime px-2.5 py-1 text-xs font-bold">
-                  <IconCheck size={13} /> Works for all
+                  <IconCheck size={13} /> {t("date.worksForAll")}
                 </span>
               )}
             </div>
@@ -199,18 +200,18 @@ export function DateMatch() {
                       : "bg-paper-soft text-navy-400 hover:text-navy"
                   }`}
                 >
-                  {btn.label}
+                  {t(btn.key)}
                 </button>
               ))}
             </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-paper-line px-4 py-2.5 text-xs font-medium text-navy-400">
-              <Tally n={o.tally.yes} label="yes" dot="bg-lime-500" />
-              <Tally n={o.tally.maybe} label="maybe" dot="bg-amber-400" />
-              <Tally n={o.tally.no} label="no" dot="bg-danger-500" />
+              <Tally text={t("date.tallyYes", { n: o.tally.yes })} dot="bg-lime-500" />
+              <Tally text={t("date.tallyMaybe", { n: o.tally.maybe })} dot="bg-amber-400" />
+              <Tally text={t("date.tallyNo", { n: o.tally.no })} dot="bg-danger-500" />
               {o.tally.notVoted > 0 && (
                 <span className="text-navy-300">
-                  {o.tally.notVoted} still to vote
+                  {t("date.stillToVote", { n: o.tally.notVoted })}
                 </span>
               )}
             </div>
@@ -221,7 +222,7 @@ export function DateMatch() {
       {adding ? (
         <div className="card p-4">
           <label className="mb-1.5 block text-sm font-semibold">
-            Suggest another time
+            {t("date.suggest")}
           </label>
           <input
             type="datetime-local"
@@ -235,7 +236,7 @@ export function DateMatch() {
           )}
           <div className="mt-2.5 flex gap-2">
             <Button loading={busy} onClick={addOption} className="flex-1">
-              Add option
+              {t("date.addOption")}
             </Button>
             <button
               type="button"
@@ -245,7 +246,7 @@ export function DateMatch() {
                 setErr(null);
               }}
             >
-              Cancel
+              {t("confirm.cancel")}
             </button>
           </div>
         </div>
@@ -257,7 +258,7 @@ export function DateMatch() {
             setAdding(true);
           }}
         >
-          <IconPlus size={16} /> Suggest another time
+          <IconPlus size={16} /> {t("date.suggest")}
         </button>
       )}
 
@@ -279,11 +280,11 @@ function minSlotValue(): string {
   return d.toISOString().slice(0, 16);
 }
 
-function Tally({ n, label, dot }: { n: number; label: string; dot: string }) {
+function Tally({ text, dot }: { text: string; dot: string }) {
   return (
     <span className="inline-flex items-center gap-1">
       <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-      {n} {label}
+      {text}
     </span>
   );
 }
