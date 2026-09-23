@@ -1,10 +1,11 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { beforeEach, afterEach, describe, expect, it } from "vitest";
 import { DICTIONARIES, setActiveLang, translate } from "./i18n";
 import { localizeServerText } from "./server-text";
 import { formatDuration, localizeNote, localizePrice, relativeTime } from "./format";
 
 const placeholders = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!).sort();
 
+beforeEach(() => setActiveLang("en"));
 afterEach(() => setActiveLang("en"));
 
 describe("dictionaries", () => {

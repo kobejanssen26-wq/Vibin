@@ -21,6 +21,8 @@ export const LANGUAGES = [
   { code: "fr", label: "Français" },
 ] as const;
 export type LangCode = (typeof LANGUAGES)[number]["code"];
+/** Launch language: Belgium-first product, so Dutch unless the visitor has chosen otherwise. */
+export const DEFAULT_LANG: LangCode = "nl";
 
 const EN = {
   "footer.vibin": "VIBIN",
@@ -379,6 +381,10 @@ const EN = {
   // Confirm.tsx
   "confirm.cancel": "Cancel",
   "confirm.confirm": "Confirm",
+
+  // Page metadata (index.html carries the Dutch copy statically for crawlers)
+  "meta.title": "VIBIN — Find your vibe. Make a plan.",
+  "meta.description": "VIBIN helps groups decide what to do together. Swipe on activities, match on what everyone wants, find a time that works, and make the plan.",
 
   // lib/format.ts
   "format.dateTbd": "Date to be decided",
@@ -1016,6 +1022,10 @@ const NL: Partial<Record<Key, string>> = {
   "confirm.cancel": "Annuleren",
   "confirm.confirm": "Bevestigen",
 
+  // Page metadata (index.html carries the Dutch copy statically for crawlers)
+  "meta.title": "VIBIN — Vind je vibe. Maak een plan.",
+  "meta.description": "VIBIN helpt groepen beslissen wat ze samen doen. Swipe op activiteiten, match op wat iedereen wil, vind een moment dat past en maak het plan.",
+
   // lib/format.ts
   "format.dateTbd": "Datum nog te bepalen",
   "format.justNow": "zonet",
@@ -1339,7 +1349,7 @@ export function labelFor(
 }
 
 /** Non-hook access for plain helpers (date/time formatting) that render outside React's tree. */
-let activeLang: LangCode = "en";
+let activeLang: LangCode = DEFAULT_LANG;
 export const setActiveLang = (l: LangCode) => {
   activeLang = l;
 };
@@ -1362,9 +1372,9 @@ export function LangProvider({ children }: { children: ReactNode }) {
         return saved as LangCode;
       }
     } catch {
-      /* private mode / blocked storage — English default is fine */
+      /* private mode / blocked storage — the default language is fine */
     }
-    return "en";
+    return DEFAULT_LANG;
   });
 
   const setLang = (l: LangCode) => {
@@ -1379,6 +1389,10 @@ export function LangProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.lang = lang;
+    document.title = translate("meta.title");
+    document
+      .querySelector('meta[name="description"]')
+      ?.setAttribute("content", translate("meta.description"));
   }, [lang]);
 
   const value = useMemo(
