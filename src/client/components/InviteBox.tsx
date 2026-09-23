@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { IconCheck, IconShare } from "./icons";
+import { useLang } from "../lib/i18n";
 
 export function InviteBox({
   code,
@@ -8,6 +9,7 @@ export function InviteBox({
   code: string | null;
   url: string | null;
 }) {
+  const { t } = useLang();
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
   if (!code || !url) return null;
 
@@ -24,7 +26,7 @@ export function InviteBox({
   const share = async () => {
     if (navigator.share) {
       try {
-        await navigator.share({ title: "Join my VIBIN group", url });
+        await navigator.share({ title: t("invite.shareTitle"), url });
       } catch {
         /* user cancelled */
       }
@@ -36,7 +38,7 @@ export function InviteBox({
   return (
     <div className="card overflow-hidden">
       <div className="flex items-center justify-between px-4 pt-3.5">
-        <p className="eyebrow">Invite your crew</p>
+        <p className="eyebrow">{t("invite.title")}</p>
       </div>
 
       <div className="px-4 py-3">
@@ -51,10 +53,10 @@ export function InviteBox({
           <span className="text-xs font-bold text-navy-400 group-hover:text-brand-600">
             {copied === "code" ? (
               <span className="inline-flex items-center gap-1 text-lime-600">
-                <IconCheck size={14} /> Copied
+                <IconCheck size={14} /> {t("invite.copied")}
               </span>
             ) : (
-              "Tap to copy"
+              t("invite.tapToCopy")
             )}
           </span>
         </button>
@@ -71,13 +73,13 @@ export function InviteBox({
           className="btn-outline shrink-0 px-3 py-2.5 text-sm"
           onClick={() => copy("link", url)}
         >
-          {copied === "link" ? "Copied" : "Copy"}
+          {copied === "link" ? t("invite.copied") : t("invite.copy")}
         </button>
       </div>
 
       <div className="border-t border-paper-line p-3">
         <button className="btn-primary w-full" onClick={share}>
-          <IconShare size={16} /> Share invite link
+          <IconShare size={16} /> {t("invite.share")}
         </button>
       </div>
     </div>

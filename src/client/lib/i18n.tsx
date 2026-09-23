@@ -8,10 +8,10 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
  * but silently isn't (§13: "als een taal nog niet volledig vertaald is,
  * niet doen alsof alles vertaald is").
  *
- * Scope, honestly: only the surfaces listed in DICTIONARIES below are
- * actually translated per language right now (the marketing footer and the
- * switcher itself). Every other string in the app is still English literals
- * in place, same as before this file existed — t() falls back to the key's
+ * Scope, honestly: Dutch (NL) covers the app's UI chrome; French is a stub
+ * (footer only). Server-supplied text (activity content, price labels, the
+ * availability note, group system messages) and the shared category/budget
+ * label constants are NOT translated yet. t() falls back to the key's
  * English copy for anything not in the active language's table, so nothing
  * ever renders blank or as a raw key.
  */
@@ -379,9 +379,69 @@ const EN = {
   // Confirm.tsx
   "confirm.cancel": "Cancel",
   "confirm.confirm": "Confirm",
+
+  // lib/format.ts
+  "format.dateTbd": "Date to be decided",
+  "format.justNow": "just now",
+  "format.minutesAgo": "{n}m ago",
+  "format.hoursAgo": "{n}h ago",
+  "format.daysAgo": "{n}d ago",
+  "format.durationMin": "{min} min",
+  "format.durationH": "{h} h",
+  "format.durationHM": "{h} h {m} min",
+
+  // AvailabilityNote.tsx
+  "availability.confirmed_available": "Available",
+  "availability.confirmed_unavailable": "Unavailable",
+  "availability.alternative_available": "Alternative times available",
+  "availability.opening_hours_only": "Open at this time — not a confirmed booking",
+  "availability.unknown": "Availability not confirmed with the provider",
+  "availability.booking_not_supported": "Booking online isn't supported here",
+  "availability.sold_out": "Sold out",
+
+  // DescriptionCredit.tsx
+  "descCredit.source": "Source:",
+
+  // InviteBox.tsx
+  "invite.title": "Invite your crew",
+  "invite.copied": "Copied",
+  "invite.tapToCopy": "Tap to copy",
+  "invite.copy": "Copy",
+  "invite.share": "Share invite link",
+  "invite.shareTitle": "Join my VIBIN group",
+
+  // ReportButton.tsx
+  "report.content.incorrect_info": "Details are wrong",
+  "report.content.inappropriate": "Inappropriate or unsafe",
+  "report.content.spam": "Spam or not real",
+  "report.behavior.harassment": "Harassment or bullying",
+  "report.behavior.inappropriate": "Inappropriate behavior",
+  "report.behavior.spam": "Spam",
+  "report.other": "Something else",
+  "report.thanks": "Thanks — our team will take a look.",
+  "report.error": "Could not send the report.",
+  "report.whatIssue": "What's the issue?",
+  "report.placeholder": "Add any detail that helps (optional)",
+  "report.send": "Send report",
+
+  // NearbyEvents.tsx
+  "nearby.title": "What's on nearby",
+  "nearby.live": "Live",
+  "nearby.disclaimer": "Event info comes from third-party sources and can change — check the organiser before you go.",
+
+  // NotFound.tsx
+  "notFound.title": "Nothing here",
+  "notFound.body": "This page doesn't exist, or the link has expired.",
+  "notFound.back": "Back to VIBIN",
+
+  // GroupChat.tsx
+  "chat.emptyTitle": "No messages yet",
+  "chat.emptyBody": "Match updates land here automatically. Say hi.",
+  "chat.placeholder": "Message the group…",
+  "chat.send": "Send message",
 } satisfies Record<string, string>;
 
-type Key = keyof typeof EN;
+export type Key = keyof typeof EN;
 
 const NL: Partial<Record<Key, string>> = {
   "footer.about": "Over VIBIN",
@@ -729,6 +789,66 @@ const NL: Partial<Record<Key, string>> = {
   // Confirm.tsx
   "confirm.cancel": "Annuleren",
   "confirm.confirm": "Bevestigen",
+
+  // lib/format.ts
+  "format.dateTbd": "Datum nog te bepalen",
+  "format.justNow": "zonet",
+  "format.minutesAgo": "{n} min geleden",
+  "format.hoursAgo": "{n} u geleden",
+  "format.daysAgo": "{n} d geleden",
+  "format.durationMin": "{min} min",
+  "format.durationH": "{h} u",
+  "format.durationHM": "{h} u {m} min",
+
+  // AvailabilityNote.tsx
+  "availability.confirmed_available": "Beschikbaar",
+  "availability.confirmed_unavailable": "Niet beschikbaar",
+  "availability.alternative_available": "Andere tijdstippen beschikbaar",
+  "availability.opening_hours_only": "Open op dit tijdstip — geen bevestigde boeking",
+  "availability.unknown": "Beschikbaarheid niet bevestigd bij de aanbieder",
+  "availability.booking_not_supported": "Online boeken wordt hier niet ondersteund",
+  "availability.sold_out": "Uitverkocht",
+
+  // DescriptionCredit.tsx
+  "descCredit.source": "Bron:",
+
+  // InviteBox.tsx
+  "invite.title": "Nodig je bende uit",
+  "invite.copied": "Gekopieerd",
+  "invite.tapToCopy": "Tik om te kopiëren",
+  "invite.copy": "Kopieer",
+  "invite.share": "Deel uitnodigingslink",
+  "invite.shareTitle": "Sluit je aan bij mijn VIBIN-groep",
+
+  // ReportButton.tsx
+  "report.content.incorrect_info": "De gegevens kloppen niet",
+  "report.content.inappropriate": "Ongepast of onveilig",
+  "report.content.spam": "Spam of niet echt",
+  "report.behavior.harassment": "Pesten of intimidatie",
+  "report.behavior.inappropriate": "Ongepast gedrag",
+  "report.behavior.spam": "Spam",
+  "report.other": "Iets anders",
+  "report.thanks": "Bedankt — ons team kijkt ernaar.",
+  "report.error": "Kon de melding niet versturen.",
+  "report.whatIssue": "Wat is het probleem?",
+  "report.placeholder": "Voeg details toe die helpen (optioneel)",
+  "report.send": "Melding versturen",
+
+  // NearbyEvents.tsx
+  "nearby.title": "In de buurt",
+  "nearby.live": "Live",
+  "nearby.disclaimer": "Info over evenementen komt van externe bronnen en kan wijzigen — check bij de organisator voor je gaat.",
+
+  // NotFound.tsx
+  "notFound.title": "Hier is niets",
+  "notFound.body": "Deze pagina bestaat niet, of de link is verlopen.",
+  "notFound.back": "Terug naar VIBIN",
+
+  // GroupChat.tsx
+  "chat.emptyTitle": "Nog geen berichten",
+  "chat.emptyBody": "Match-updates verschijnen hier automatisch. Zeg hallo.",
+  "chat.placeholder": "Stuur de groep een bericht…",
+  "chat.send": "Bericht versturen",
 };
 
 const FR: Partial<Record<Key, string>> = {
@@ -749,10 +869,17 @@ const FR: Partial<Record<Key, string>> = {
 
 const DICTIONARIES: Record<LangCode, Partial<Record<Key, string>>> = { en: EN, nl: NL, fr: FR };
 const STORAGE_KEY = "vibin_lang";
+const INTL_LOCALE: Record<LangCode, string> = { en: "en-GB", nl: "nl-BE", fr: "fr-BE" };
 
 type Vars = Record<string, string | number>;
 const interpolate = (s: string, vars?: Vars) =>
   vars ? s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m)) : s;
+
+/** Non-hook access for plain helpers (date/time formatting) that render outside React's tree. */
+let activeLang: LangCode = "en";
+export const intlLocale = () => INTL_LOCALE[activeLang];
+export const translate = (k: Key, vars?: Vars) =>
+  interpolate(DICTIONARIES[activeLang]?.[k] ?? EN[k], vars);
 
 const Ctx = createContext<{ lang: LangCode; setLang: (l: LangCode) => void; t: (k: Key, vars?: Vars) => string }>({
   lang: "en",
@@ -764,7 +891,10 @@ export function LangProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<LangCode>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved && LANGUAGES.some((l) => l.code === saved)) return saved as LangCode;
+      if (saved && LANGUAGES.some((l) => l.code === saved)) {
+        activeLang = saved as LangCode;
+        return saved as LangCode;
+      }
     } catch {
       /* private mode / blocked storage — English default is fine */
     }
@@ -772,6 +902,7 @@ export function LangProvider({ children }: { children: ReactNode }) {
   });
 
   const setLang = (l: LangCode) => {
+    activeLang = l;
     setLangState(l);
     try {
       localStorage.setItem(STORAGE_KEY, l);

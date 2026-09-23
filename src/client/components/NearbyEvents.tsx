@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { SectionHead } from "./ui";
+import { useLang } from "../lib/i18n";
 import { EVENT_KIND_ICON } from "@shared/constants";
 import type { EventDTO, GroupSettingsDTO } from "@shared/types";
 
@@ -11,6 +12,7 @@ import type { EventDTO, GroupSettingsDTO } from "@shared/types";
  * so it never shows an empty shell.
  */
 export function NearbyEvents({ settings }: { settings: GroupSettingsDTO | null }) {
+  const { t } = useLang();
   const [events, setEvents] = useState<EventDTO[] | null>(null);
   const lat = settings?.lat ?? null;
   const lng = settings?.lng ?? null;
@@ -36,7 +38,7 @@ export function NearbyEvents({ settings }: { settings: GroupSettingsDTO | null }
 
   return (
     <section>
-      <SectionHead label="What's on nearby" count={`${events.length}`} />
+      <SectionHead label={t("nearby.title")} count={`${events.length}`} />
       <div className="hairline">
         {events.slice(0, 8).map((e) => {
           const body = (
@@ -55,7 +57,7 @@ export function NearbyEvents({ settings }: { settings: GroupSettingsDTO | null }
               </div>
               {e.status === "live" && (
                 <span className="shrink-0 rounded-full bg-lime-100 px-2 py-0.5 text-[11px] font-semibold text-lime-800">
-                  Live
+                  {t("nearby.live")}
                 </span>
               )}
             </div>
@@ -76,8 +78,7 @@ export function NearbyEvents({ settings }: { settings: GroupSettingsDTO | null }
         })}
       </div>
       <p className="mt-1.5 px-1 text-[11px] text-navy-400">
-        Event info comes from third-party sources and can change — check the
-        organiser before you go.
+        {t("nearby.disclaimer")}
       </p>
     </section>
   );

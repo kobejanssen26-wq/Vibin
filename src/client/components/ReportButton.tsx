@@ -1,22 +1,23 @@
 import { useState } from "react";
 import { api, ApiRequestError } from "../lib/api";
 import { Button, Modal } from "./ui";
+import { useLang, type Key } from "../lib/i18n";
 
-const CONTENT_REASONS = [
-  { id: "incorrect_info", label: "Details are wrong" },
-  { id: "inappropriate", label: "Inappropriate or unsafe" },
-  { id: "spam", label: "Spam or not real" },
-  { id: "other", label: "Something else" },
-] as const;
+const CONTENT_REASONS: { id: string; key: Key }[] = [
+  { id: "incorrect_info", key: "report.content.incorrect_info" },
+  { id: "inappropriate", key: "report.content.inappropriate" },
+  { id: "spam", key: "report.content.spam" },
+  { id: "other", key: "report.other" },
+];
 
 /** Behavior reports (a person, or something someone said) skip the
  *  content-accuracy reason and lead with harassment instead. */
-const BEHAVIOR_REASONS = [
-  { id: "harassment", label: "Harassment or bullying" },
-  { id: "inappropriate", label: "Inappropriate behavior" },
-  { id: "spam", label: "Spam" },
-  { id: "other", label: "Something else" },
-] as const;
+const BEHAVIOR_REASONS: { id: string; key: Key }[] = [
+  { id: "harassment", key: "report.behavior.harassment" },
+  { id: "inappropriate", key: "report.behavior.inappropriate" },
+  { id: "spam", key: "report.behavior.spam" },
+  { id: "other", key: "report.other" },
+];
 
 /** Shared report-a-problem flow — used for activities, groups, and (once a
  *  screen exists for them) members/messages. One report system, one UI. */
@@ -31,6 +32,7 @@ export function ReportButton({
   label: string;
   modalTitle: string;
 }) {
+  const { t } = useLang();
   const reasons = targetType === "member" || targetType === "message"
     ? BEHAVIOR_REASONS
     : CONTENT_REASONS;
@@ -44,7 +46,7 @@ export function ReportButton({
   if (sent) {
     return (
       <p className="animate-float-up text-center text-xs text-navy-400">
-        Thanks — our team will take a look.
+        {t("report.thanks")}
       </p>
     );
   }
@@ -60,7 +62,7 @@ export function ReportButton({
       setSent(true);
       setOpen(false);
     } catch (e) {
-      setErr(e instanceof ApiRequestError ? e.message : "Could not send the report.");
+      setErr(e instanceof ApiRequestError ? e.message : t("report.error"));
     } finally {
       setBusy(false);
     }
@@ -78,7 +80,7 @@ export function ReportButton({
         <Modal title={modalTitle} onClose={() => setOpen(false)}>
           <fieldset className="space-y-2">
             <legend className="mb-1 text-sm font-semibold text-navy-700">
-              What's the issue?
+              {t("report.whatIssue")}
             </legend>
             {reasons.map((r) => (
               <label
@@ -92,20 +94,20 @@ export function ReportButton({
                   checked={reason === r.id}
                   onChange={() => setReason(r.id)}
                 />
-                {r.label}
+                {t(r.key)}
               </label>
             ))}
           </fieldset>
           <textarea
             className="field mt-3 min-h-[80px] resize-none"
-            placeholder="Add any detail that helps (optional)"
+            placeholder={t("report.placeholder")}
             maxLength={1000}
             value={detail}
             onChange={(e) => setDetail(e.target.value)}
           />
           {err && <p className="mt-2 text-sm font-medium text-danger-600">{err}</p>}
           <Button className="mt-3 w-full" loading={busy} onClick={submit}>
-            Send report
+            {t("report.send")}
           </Button>
         </Modal>
       )}

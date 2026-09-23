@@ -1,7 +1,9 @@
 import { Link } from "react-router-dom";
 import { LogoMark } from "../components/Logo";
+import { useLang } from "../lib/i18n";
 
 export function NotFound() {
+  const { t } = useLang();
   return (
     <div className="relative min-h-full overflow-x-clip bg-paper">
       <div className="pointer-events-none absolute inset-0 bg-vibin-hero" />
@@ -10,13 +12,13 @@ export function NotFound() {
           <LogoMark className="h-9 w-9" />
         </span>
         <h1 className="mt-5 text-3xl font-extrabold tracking-[-0.02em]">
-          Nothing here
+          {t("notFound.title")}
         </h1>
         <p className="mt-2 max-w-xs text-sm text-navy-400">
-          This page doesn't exist, or the link has expired.
+          {t("notFound.body")}
         </p>
         <Link to="/" className="btn-primary mt-6">
-          Back to VIBIN
+          {t("notFound.back")}
         </Link>
       </div>
     </div>

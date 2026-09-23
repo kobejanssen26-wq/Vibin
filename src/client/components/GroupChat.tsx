@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { Avatar } from "./ui";
 import { IconSend } from "./icons";
 import { relativeTime } from "../lib/format";
+import { useLang } from "../lib/i18n";
 import type { MessageDTO } from "@shared/types";
 import { LIMITS } from "@shared/constants";
 
@@ -14,6 +15,7 @@ export function GroupChat({
   groupId: string;
   highlightId?: string | null;
 }) {
+  const { t } = useLang();
   const { data, refetch } = usePoll<{ messages: MessageDTO[] }>(
     `/groups/${groupId}/messages`,
     4000,
@@ -59,9 +61,9 @@ export function GroupChat({
         ) : data.messages.length === 0 ? (
           <div className="grid h-full place-items-center px-6 text-center">
             <div>
-              <p className="text-sm font-semibold text-navy">No messages yet</p>
+              <p className="text-sm font-semibold text-navy">{t("chat.emptyTitle")}</p>
               <p className="mt-1 text-xs text-navy-400">
-                Match updates land here automatically. Say hi.
+                {t("chat.emptyBody")}
               </p>
             </div>
           </div>
@@ -122,7 +124,7 @@ export function GroupChat({
       >
         <input
           className="field flex-1"
-          placeholder="Message the group…"
+          placeholder={t("chat.placeholder")}
           maxLength={LIMITS.message.max}
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -130,7 +132,7 @@ export function GroupChat({
         <button
           className="btn-primary grid h-12 w-12 shrink-0 place-items-center !px-0"
           disabled={busy || !text.trim()}
-          aria-label="Send message"
+          aria-label={t("chat.send")}
         >
           <IconSend size={18} />
         </button>
