@@ -9,8 +9,10 @@ import { relativeTime } from "../lib/format";
 import { notificationHref } from "../lib/notificationRoute";
 import type { NotificationDTO } from "@shared/types";
 import { api } from "../lib/api";
+import { useLang } from "../lib/i18n";
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const { t } = useLang();
   const { user, logout } = useAuth();
   const nav = useNavigate();
   const location = useLocation();
@@ -65,7 +67,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <NavLink
             to="/"
-            aria-label="VIBIN home"
+            aria-label={t("shell.home")}
             className="rounded-lg transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <Wordmark />
@@ -73,7 +75,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-1">
             <NavLink
               to="/help"
-              aria-label="Help & support"
+              aria-label={t("shell.help")}
               className="grid h-10 w-10 place-items-center rounded-full text-navy-500 transition hover:bg-navy/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
             >
               <IconHelp />
@@ -84,8 +86,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                 onClick={openBell}
                 aria-label={
                   data?.unread
-                    ? `Notifications, ${data.unread} unread`
-                    : "Notifications"
+                    ? t("shell.notificationsUnread", { n: data.unread })
+                    : t("shell.notifications")
                 }
                 aria-expanded={panel === "bell"}
                 className="relative grid h-10 w-10 place-items-center rounded-full text-navy-500 transition hover:bg-navy/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
@@ -100,7 +102,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
               {panel === "bell" && (
                 <div className="animate-float-up absolute right-0 top-full z-50 mt-2 w-[calc(100vw-2rem)] rounded-2xl border border-paper-line bg-paper-card p-3 shadow-lg sm:w-96">
-                  <p className="eyebrow mb-2">Notifications</p>
+                  <p className="eyebrow mb-2">{t("shell.notifications")}</p>
                   {data?.notifications.length ? (
                     <ul className="-mx-2 max-h-72 space-y-1 overflow-auto">
                       {data.notifications.slice(0, 15).map((n) => (
@@ -131,7 +133,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     </ul>
                   ) : (
                     <p className="py-3 text-sm text-navy-400">
-                      Nothing yet. You'll hear about matches, invites and messages here.
+                      {t("shell.noNotifications")}
                     </p>
                   )}
                 </div>
@@ -142,7 +144,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <button
                 type="button"
                 onClick={() => setPanel(panel === "menu" ? "none" : "menu")}
-                aria-label="Account menu"
+                aria-label={t("shell.accountMenu")}
                 aria-expanded={panel === "menu"}
                 className="rounded-full transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
               >
@@ -152,7 +154,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               {panel === "menu" && (
                 <div className="animate-float-up absolute right-0 top-full z-50 mt-2 w-56 rounded-2xl border border-paper-line bg-paper-card p-2 text-sm shadow-lg">
                   <MenuLink to="/settings" onClick={() => setPanel("none")}>
-                    Profile &amp; settings
+                    {t("shell.profileSettings")}
                   </MenuLink>
                   <button
                     type="button"
@@ -162,7 +164,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                       nav("/");
                     }}
                   >
-                    <IconLogout size={18} /> Log out
+                    <IconLogout size={18} /> {t("shell.logout")}
                   </button>
                 </div>
               )}

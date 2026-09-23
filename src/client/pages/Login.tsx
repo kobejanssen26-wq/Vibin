@@ -4,8 +4,10 @@ import { AuthLayout } from "./authLayout";
 import { Button, Field } from "../components/ui";
 import { useAuth } from "../lib/auth";
 import { ApiRequestError } from "../lib/api";
+import { useLang } from "../lib/i18n";
 
 export function Login() {
+  const { t } = useLang();
   const { login } = useAuth();
   const nav = useNavigate();
   const loc = useLocation() as { state?: { from?: string } };
@@ -21,7 +23,7 @@ export function Login() {
       await login(form);
       nav(loc.state?.from ?? "/app", { replace: true });
     } catch (e) {
-      setErr(e instanceof ApiRequestError ? e.message : "Could not sign in.");
+      setErr(e instanceof ApiRequestError ? e.message : t("auth.login.error"));
     } finally {
       setBusy(false);
     }
@@ -29,24 +31,24 @@ export function Login() {
 
   return (
     <AuthLayout
-      title="Welcome back"
-      subtitle="Log in to keep planning with your group."
+      title={t("auth.login.title")}
+      subtitle={t("auth.login.subtitle")}
       footer={
         <>
-          New here?{" "}
+          {t("auth.login.newHere")}{" "}
           <Link
             to="/signup"
             state={loc.state}
             className="font-semibold text-brand-600"
           >
-            Create an account
+            {t("auth.login.createAccount")}
           </Link>
         </>
       }
     >
       <form onSubmit={submit} className="space-y-4">
         <Field
-          label="Email"
+          label={t("auth.email")}
           type="email"
           autoComplete="email"
           required
@@ -54,7 +56,7 @@ export function Login() {
           onChange={(e) => setForm({ ...form, email: e.target.value })}
         />
         <Field
-          label="Password"
+          label={t("auth.password")}
           type="password"
           autoComplete="current-password"
           required
@@ -63,13 +65,13 @@ export function Login() {
         />
         {err && <p className="text-sm font-medium text-danger-600">{err}</p>}
         <Button type="submit" loading={busy} className="w-full">
-          Log in
+          {t("auth.login.submit")}
         </Button>
         <Link
           to="/forgot-password"
           className="block text-center text-sm text-navy-400"
         >
-          Forgot your password?
+          {t("auth.login.forgot")}
         </Link>
       </form>
     </AuthLayout>

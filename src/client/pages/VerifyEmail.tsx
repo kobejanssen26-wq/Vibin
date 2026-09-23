@@ -3,8 +3,10 @@ import { Link, useSearchParams } from "react-router-dom";
 import { AuthLayout } from "./authLayout";
 import { api, ApiRequestError } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { useLang } from "../lib/i18n";
 
 export function VerifyEmail() {
+  const { t } = useLang();
   const [params] = useSearchParams();
   const token = params.get("token") ?? "";
   const { refresh } = useAuth();
@@ -14,7 +16,7 @@ export function VerifyEmail() {
   useEffect(() => {
     if (!token) {
       setState("error");
-      setMsg("This verification link is missing its token.");
+      setMsg(t("auth.verify.missingToken"));
       return;
     }
     (async () => {
@@ -25,35 +27,34 @@ export function VerifyEmail() {
       } catch (e) {
         setState("error");
         setMsg(
-          e instanceof ApiRequestError
-            ? e.message
-            : "Could not verify this link.",
+          e instanceof ApiRequestError ? e.message : t("auth.verify.error"),
         );
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t() is stable enough for this one-shot effect
   }, [token, refresh]);
 
   return (
     <AuthLayout
       title={
         state === "ok"
-          ? "Email verified 🎉"
+          ? t("auth.verify.ok")
           : state === "error"
-            ? "Verification failed"
-            : "Verifying…"
+            ? t("auth.verify.failed")
+            : t("auth.verify.working")
       }
       footer={
         <Link to="/app" className="font-semibold text-brand-600">
-          Go to VIBIN
+          {t("auth.verify.goToVibin")}
         </Link>
       }
     >
       <p className="text-sm text-navy-400">
         {state === "ok"
-          ? "Your email address is confirmed. You're all set."
+          ? t("auth.verify.okBody")
           : state === "error"
             ? msg
-            : "One moment while we confirm your email address."}
+            : t("auth.verify.workingBody")}
       </p>
     </AuthLayout>
   );

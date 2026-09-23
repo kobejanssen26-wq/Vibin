@@ -5,8 +5,10 @@ import { Button, Field } from "../components/ui";
 import { useAuth } from "../lib/auth";
 import { ApiRequestError } from "../lib/api";
 import { LIMITS } from "@shared/constants";
+import { useLang } from "../lib/i18n";
 
 export function Signup() {
+  const { t } = useLang();
   const { signup } = useAuth();
   const nav = useNavigate();
   const loc = useLocation() as { state?: { from?: string } };
@@ -23,7 +25,7 @@ export function Signup() {
       nav(loc.state?.from ?? "/app", { replace: true });
     } catch (e) {
       setErr(
-        e instanceof ApiRequestError ? e.message : "Could not create account.",
+        e instanceof ApiRequestError ? e.message : t("auth.signup.error"),
       );
     } finally {
       setBusy(false);
@@ -32,20 +34,20 @@ export function Signup() {
 
   return (
     <AuthLayout
-      title="Create your account"
-      subtitle="One account, unlimited groups."
+      title={t("auth.signup.title")}
+      subtitle={t("auth.signup.subtitle")}
       footer={
         <>
-          Already have one?{" "}
+          {t("auth.signup.haveOne")}{" "}
           <Link to="/login" state={loc.state} className="font-semibold text-brand-600">
-            Log in
+            {t("auth.login.submit")}
           </Link>
         </>
       }
     >
       <form onSubmit={submit} className="space-y-4">
         <Field
-          label="Your name"
+          label={t("auth.signup.yourName")}
           autoComplete="name"
           required
           minLength={LIMITS.displayName.min}
@@ -53,7 +55,7 @@ export function Signup() {
           onChange={(e) => setForm({ ...form, displayName: e.target.value })}
         />
         <Field
-          label="Email"
+          label={t("auth.email")}
           type="email"
           autoComplete="email"
           required
@@ -61,27 +63,27 @@ export function Signup() {
           onChange={(e) => setForm({ ...form, email: e.target.value })}
         />
         <Field
-          label="Password"
+          label={t("auth.password")}
           type="password"
           autoComplete="new-password"
           required
           minLength={LIMITS.password.min}
-          hint={`At least ${LIMITS.password.min} characters.`}
+          hint={t("auth.signup.passwordHint", { min: LIMITS.password.min })}
           value={form.password}
           onChange={(e) => setForm({ ...form, password: e.target.value })}
         />
         {err && <p className="text-sm font-medium text-danger-600">{err}</p>}
         <Button type="submit" loading={busy} className="w-full">
-          Create account
+          {t("auth.signup.submit")}
         </Button>
         <p className="text-center text-xs text-navy-400">
-          By continuing you agree to our{" "}
+          {t("auth.signup.terms")}{" "}
           <Link to="/terms" className="underline">
-            Terms
+            {t("auth.signup.termsLink")}
           </Link>{" "}
-          and{" "}
+          {t("auth.signup.and")}{" "}
           <Link to="/privacy" className="underline">
-            Privacy Policy
+            {t("auth.signup.privacyLink")}
           </Link>
           .
         </p>

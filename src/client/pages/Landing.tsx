@@ -15,6 +15,7 @@ import {
 } from "../components/icons";
 import { demoActivity, demoNextActivity } from "../lib/demo";
 import { ACTIVITY_CATEGORIES } from "@shared/constants";
+import { useLang } from "../lib/i18n";
 
 const CREW = [
   { initials: "KJ", tone: "bg-brand-500" },
@@ -24,63 +25,12 @@ const CREW = [
   { initials: "EW", tone: "bg-navy-800" },
 ];
 
-const STEPS = [
-  {
-    k: "01",
-    t: "Set the vibe",
-    d: "Categories, area, budget, and a date if you have one. Two taps if you don't care.",
-  },
-  {
-    k: "02",
-    t: "Everyone swipes",
-    d: "Each person swipes on their own phone. No group chat, no one dominating the plan.",
-  },
-  {
-    k: "03",
-    t: "It becomes a plan",
-    d: "A match needs everyone. Then VIBIN finds a time that works and hands you the booking link.",
-  },
-];
-
-const WHY = [
-  {
-    t: "Unanimous by design",
-    d: "Majority rules is how someone always ends up bailing. One pass and it's not a match, so the plan is one everyone actually chose.",
-  },
-  {
-    t: "Nobody sees who passed",
-    d: "VIBIN shows the group result, never the individual votes. So people swipe honestly instead of politely.",
-  },
-  {
-    t: "Real places, real prices",
-    d: "A curated Belgian catalogue with real providers, honest pricing and booking links. Nothing invented to fill a card.",
-  },
-];
-
-const FAQ = [
-  {
-    q: "Is this a dating app?",
-    a: "No. VIBIN matches activities and dates for a group you already have. It never matches people.",
-  },
-  {
-    q: "Do we need to pick a date first?",
-    a: "No. Choose “we don't know yet” and VIBIN runs a quick second round to find a time once you've matched an activity.",
-  },
-  {
-    q: "What if we can't agree on anything?",
-    a: "You keep swiping, and you can widen the filters any time: more categories, bigger radius, higher budget. VIBIN never forces a match.",
-  },
-  {
-    q: "Can one person block the whole group?",
-    a: "A match needs every active member. If someone is genuinely flexible, the creator can mark them inactive so they don't hold things up. It's a deliberate choice, never automatic.",
-  },
-  {
-    q: "Where does it work?",
-    a: "The first catalogue covers Belgium: Antwerp, Brussels, Ghent, Leuven, Bruges and around. It's built to add more places and providers.",
-  },
-];
+const STEPS = ["1", "2", "3"] as const;
+const WHY = ["1", "2", "3"] as const;
+const FAQ = ["1", "2", "3", "4", "5"] as const;
 
 export function Landing() {
+  const { t } = useLang();
   return (
     <div className="min-h-full overflow-x-clip bg-paper text-navy">
       {/* ---------- nav ---------- */}
@@ -88,10 +38,10 @@ export function Landing() {
         <Wordmark />
         <nav className="flex items-center gap-2 text-sm font-semibold">
           <Link to="/login" className="rounded-xl px-3 py-2 text-navy-500 hover:text-navy">
-            Log in
+            {t("landing.nav.login")}
           </Link>
           <Link to="/signup" className="btn-primary px-4 py-2">
-            Get started
+            {t("landing.nav.getStarted")}
           </Link>
         </nav>
       </header>
@@ -105,30 +55,29 @@ export function Landing() {
           <div>
             <Reveal>
               <h1 className="text-5xl font-extrabold leading-[0.95] tracking-[-0.035em] [text-wrap:balance] sm:text-[3.4rem] md:text-[3.6rem] lg:text-[4.4rem]">
-                <span className="block">Find your vibe.</span>
-                <span className="block text-brand-500">Make a plan.</span>
+                <span className="block">{t("landing.hero.title1")}</span>
+                <span className="block text-brand-500">{t("landing.hero.title2")}</span>
               </h1>
             </Reveal>
 
             <Reveal delay={160}>
               <p className="mt-5 max-w-md text-[17px] leading-relaxed text-navy-500">
-                Your group swipes on real activities. It only matches when everyone's
-                in. Then VIBIN locks the time and the booking.
+                {t("landing.hero.subhead")}
               </p>
             </Reveal>
 
             <Reveal delay={240}>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <LinkButton to="/signup" className="px-6 text-base">
-                  Create a group
+                  {t("landing.hero.cta.create")}
                 </LinkButton>
                 <LinkButton to="/login" variant="outline" className="px-6 text-base">
-                  Join a group
+                  {t("landing.hero.cta.join")}
                 </LinkButton>
               </div>
 
               <p className="mt-4 text-xs font-medium text-navy-400">
-                Free to use. No card. Built in the EU.
+                {t("landing.hero.disclaimer")}
               </p>
             </Reveal>
           </div>
@@ -144,12 +93,11 @@ export function Landing() {
         <div className="mx-auto max-w-4xl text-center">
           <Reveal>
             <h2 className="mx-auto max-w-2xl text-3xl font-extrabold leading-tight md:text-5xl">
-              It doesn't count until{" "}
-              <span className="text-lime-400">everyone's in.</span>
+              {t("landing.mechanism.title1")}{" "}
+              <span className="text-lime-400">{t("landing.mechanism.title2")}</span>
             </h2>
             <p className="mx-auto mt-4 max-w-lg text-white/70">
-              No majority vote. No loudest voice. An activity matches only when
-              every person in the group liked it, so nobody gets talked into it.
+              {t("landing.mechanism.body")}
             </p>
           </Reveal>
 
@@ -160,16 +108,16 @@ export function Landing() {
       {/* ---------- how it works (editorial 3-beat) ---------- */}
       <section id="how-it-works" className="mx-auto max-w-6xl px-5 py-20 md:py-28 scroll-mt-20">
         <Reveal>
-          <h2 className="text-2xl font-extrabold md:text-4xl">Three steps, no chat chaos</h2>
+          <h2 className="text-2xl font-extrabold md:text-4xl">{t("landing.steps.title")}</h2>
         </Reveal>
         <ol className="mt-12 grid gap-px overflow-hidden rounded-3xl border border-paper-line bg-paper-line md:grid-cols-3">
-          {STEPS.map((s, i) => (
-            <Reveal as="li" key={s.k} delay={i * 90} className="bg-paper-card p-7">
+          {STEPS.map((k, i) => (
+            <Reveal as="li" key={k} delay={i * 90} className="bg-paper-card p-7">
               <span className="text-sm font-black tracking-widest text-brand-300">
-                {s.k}
+                0{i + 1}
               </span>
-              <h3 className="mt-3 text-lg font-extrabold">{s.t}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-navy-500">{s.d}</p>
+              <h3 className="mt-3 text-lg font-extrabold">{t(`landing.steps.${k}.title` as never)}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-navy-500">{t(`landing.steps.${k}.body` as never)}</p>
             </Reveal>
           ))}
         </ol>
@@ -180,11 +128,10 @@ export function Landing() {
         <div className="grid items-center gap-10 md:grid-cols-[0.85fr_1.15fr] md:gap-16">
           <Reveal>
             <h2 className="text-2xl font-extrabold leading-tight md:text-4xl">
-              A match becomes a plan, on its own.
+              {t("landing.plan.title")}
             </h2>
             <p className="mt-4 text-navy-500">
-              The moment your group agrees, VIBIN turns it into something you can
-              actually show up to: a place, a time, and a way to book it.
+              {t("landing.plan.body")}
             </p>
           </Reveal>
 
@@ -198,7 +145,7 @@ export function Landing() {
                   loading="lazy"
                 />
                 <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-xl bg-lime-400 px-2.5 py-1 text-xs font-extrabold text-navy shadow-lime">
-                  <IconCheck size={13} /> Everyone's in
+                  <IconCheck size={13} /> {t("landing.hero.card.match")}
                 </span>
               </div>
               <div className="p-6">
@@ -231,7 +178,7 @@ export function Landing() {
                     size={32}
                   />
                   <span className="inline-flex items-center gap-1.5 text-sm font-bold text-navy">
-                    Book now <IconExternal size={14} />
+                    {t("landing.plan.bookNow")} <IconExternal size={14} />
                   </span>
                 </div>
               </div>
@@ -244,9 +191,9 @@ export function Landing() {
       <section className="py-4">
         <div className="mx-auto max-w-6xl px-5">
           <Reveal>
-            <h2 className="text-2xl font-extrabold md:text-4xl">Plan anything</h2>
+            <h2 className="text-2xl font-extrabold md:text-4xl">{t("landing.category.title")}</h2>
             <p className="mt-2 text-navy-500">
-              Twelve categories, or one tap for the whole catalogue.
+              {t("landing.category.subhead")}
             </p>
           </Reveal>
         </div>
@@ -280,24 +227,23 @@ export function Landing() {
         <div className="grid gap-10 md:grid-cols-[0.8fr_1.2fr] md:gap-16">
           <Reveal>
             <h2 className="text-2xl font-extrabold leading-tight md:text-4xl">
-              Why groups stick with it
+              {t("landing.why.title")}
             </h2>
             <p className="mt-4 text-navy-500">
-              The mechanics are the point. Small choices that change how a group
-              decides.
+              {t("landing.why.subhead")}
             </p>
           </Reveal>
           <div className="space-y-px overflow-hidden rounded-3xl border border-paper-line bg-paper-line">
-            {WHY.map((w, i) => (
-              <Reveal key={w.t} delay={i * 80} className="bg-paper-card p-7">
+            {WHY.map((k, i) => (
+              <Reveal key={k} delay={i * 80} className="bg-paper-card p-7">
                 <div className="flex items-start gap-4">
                   <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-500 text-white">
                     <IconCheck size={16} />
                   </span>
                   <div>
-                    <h3 className="text-base font-extrabold">{w.t}</h3>
+                    <h3 className="text-base font-extrabold">{t(`landing.why.${k}.title` as never)}</h3>
                     <p className="mt-1.5 text-sm leading-relaxed text-navy-500">
-                      {w.d}
+                      {t(`landing.why.${k}.body` as never)}
                     </p>
                   </div>
                 </div>
@@ -310,12 +256,12 @@ export function Landing() {
       {/* ---------- FAQ ---------- */}
       <section id="faq" className="mx-auto max-w-3xl px-5 py-16 scroll-mt-20">
         <Reveal>
-          <h2 className="text-2xl font-extrabold md:text-4xl">Good to know</h2>
+          <h2 className="text-2xl font-extrabold md:text-4xl">{t("landing.faq.title")}</h2>
         </Reveal>
         <div className="mt-8 space-y-3">
-          {FAQ.map((f, i) => (
-            <Reveal key={f.q} delay={i * 50}>
-              <Faq q={f.q} a={f.a} />
+          {FAQ.map((k, i) => (
+            <Reveal key={k} delay={i * 50}>
+              <Faq q={t(`landing.faq.${k}.q` as never)} a={t(`landing.faq.${k}.a` as never)} />
             </Reveal>
           ))}
         </div>
@@ -327,18 +273,17 @@ export function Landing() {
           <div className="relative overflow-hidden rounded-[2rem] bg-vibin-match p-10 text-center text-white md:p-16">
             <div className="dot-grid pointer-events-none absolute inset-0 text-white/[0.06]" />
             <h2 className="relative text-3xl font-extrabold md:text-5xl">
-              Stop planning. Start{" "}
-              <span className="text-lime-400">doing.</span>
+              {t("landing.cta.title1")}{" "}
+              <span className="text-lime-400">{t("landing.cta.title2")}</span>
             </h2>
             <p className="relative mx-auto mt-4 max-w-md text-white/85">
-              A group takes thirty seconds. Send the link, and your first match is
-              a few swipes away.
+              {t("landing.cta.body")}
             </p>
             <Link
               to="/signup"
               className="relative mt-8 inline-flex bg-lime-400 text-navy shadow-lime hover:bg-lime-300 btn px-7 text-base"
             >
-              Create a group
+              {t("landing.cta.button")}
             </Link>
           </div>
         </Reveal>
@@ -413,6 +358,7 @@ function HeroCard() {
 }
 
 function CrewStrip() {
+  const { t } = useLang();
   const [lit, setLit] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -465,7 +411,7 @@ function CrewStrip() {
           lit >= CREW.length ? "text-lime-400 opacity-100" : "opacity-0"
         }`}
       >
-        Match.
+        {t("landing.mechanism.matchLabel")}
       </span>
     </div>
   );
