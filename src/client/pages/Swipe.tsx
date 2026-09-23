@@ -14,7 +14,7 @@ import { EmptyState, ErrorState } from "../components/ui";
 import { SwipeSkeleton } from "../components/SwipeSkeleton";
 import { track } from "../lib/track";
 import { useConfirm } from "../components/Confirm";
-import { useLang } from "../lib/i18n";
+import { labelFor, useLang } from "../lib/i18n";
 import {
   IconArrowLeft,
   IconClose,
@@ -455,13 +455,15 @@ function FilterBar({
     filters.allActivities
       ? t("swipe.filterAllActivities")
       : filters.categories.length === 1
-        ? cap(filters.categories[0]!)
+        ? labelFor(t, "cat", filters.categories[0]!, cap(filters.categories[0]!))
         : t("swipe.filterCategoriesCount", { n: filters.categories.length }),
   );
   if (filters.locationLabel)
     chips.push(`${filters.locationLabel} · ${filters.radiusKm} km`);
   if (filters.budgetBand !== "any")
-    chips.push(BUDGET_BANDS.find((b) => b.id === filters.budgetBand)?.label ?? "");
+    chips.push(
+      labelFor(t, "budget", filters.budgetBand, BUDGET_BANDS.find((b) => b.id === filters.budgetBand)?.label ?? ""),
+    );
   if (filters.dateKnown) chips.push(t("swipe.filterDateSet"));
 
   const inner = (

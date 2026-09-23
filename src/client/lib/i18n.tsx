@@ -600,6 +600,36 @@ const EN = {
   // Legal.tsx / SwipeSkeleton.tsx
   "legal.englishOnly": "The full text below is currently available in English only.",
   "swipe.skeletonLabel": "Loading activities",
+
+  // Filter option labels (ids from @shared/constants — client-side display only)
+  "cat.sport": "Sport",
+  "cat.adventure": "Adventure",
+  "cat.food_drinks": "Food & Drinks",
+  "cat.nightlife": "Nightlife",
+  "cat.creative": "Creative",
+  "cat.relaxation": "Relaxation",
+  "cat.culture": "Culture",
+  "cat.nature": "Nature",
+  "cat.gaming": "Gaming",
+  "cat.entertainment": "Entertainment",
+  "cat.learning": "Learning",
+  "cat.other": "Other",
+  "budget.any": "Any budget",
+  "budget.free": "Free",
+  "dateMode.tonight": "Tonight",
+  "dateMode.tomorrow": "Tomorrow",
+  "dateMode.this_weekend": "This weekend",
+  "dateMode.this_week": "This week",
+  "dateMode.this_month": "This month",
+  "dateMode.vacation": "During vacation",
+  "dateMode.specific": "Specific date",
+  "dateMode.unknown": "We don't know yet",
+  "timeBand.morning": "Morning",
+  "timeBand.afternoon": "Afternoon",
+  "timeBand.evening": "Evening",
+  "timeBand.night": "Night",
+  "timeBand.specific": "Specific time",
+  "timeBand.unknown": "Not sure yet",
 } satisfies Record<string, string>;
 
 export type Key = keyof typeof EN;
@@ -1171,6 +1201,36 @@ const NL: Partial<Record<Key, string>> = {
   // Legal.tsx / SwipeSkeleton.tsx
   "legal.englishOnly": "De volledige tekst hieronder is voorlopig alleen in het Engels beschikbaar.",
   "swipe.skeletonLabel": "Activiteiten laden",
+
+  // Filter option labels (ids from @shared/constants — client-side display only)
+  "cat.sport": "Sport",
+  "cat.adventure": "Avontuur",
+  "cat.food_drinks": "Eten & drinken",
+  "cat.nightlife": "Uitgaan",
+  "cat.creative": "Creatief",
+  "cat.relaxation": "Ontspanning",
+  "cat.culture": "Cultuur",
+  "cat.nature": "Natuur",
+  "cat.gaming": "Gaming",
+  "cat.entertainment": "Entertainment",
+  "cat.learning": "Leren",
+  "cat.other": "Overig",
+  "budget.any": "Elk budget",
+  "budget.free": "Gratis",
+  "dateMode.tonight": "Vanavond",
+  "dateMode.tomorrow": "Morgen",
+  "dateMode.this_weekend": "Dit weekend",
+  "dateMode.this_week": "Deze week",
+  "dateMode.this_month": "Deze maand",
+  "dateMode.vacation": "Tijdens de vakantie",
+  "dateMode.specific": "Specifieke datum",
+  "dateMode.unknown": "We weten het nog niet",
+  "timeBand.morning": "Ochtend",
+  "timeBand.afternoon": "Namiddag",
+  "timeBand.evening": "Avond",
+  "timeBand.night": "Nacht",
+  "timeBand.specific": "Specifiek uur",
+  "timeBand.unknown": "Nog niet zeker",
 };
 
 const FR: Partial<Record<Key, string>> = {
@@ -1196,6 +1256,17 @@ const INTL_LOCALE: Record<LangCode, string> = { en: "en-GB", nl: "nl-BE", fr: "f
 type Vars = Record<string, string | number>;
 const interpolate = (s: string, vars?: Vars) =>
   vars ? s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m)) : s;
+
+/** Display label for a shared-constant id (category, budget band, ...) — falls back to the given default when no translation key exists, so admin-added categories still render. */
+export function labelFor(
+  t: (k: Key) => string,
+  prefix: "cat" | "budget" | "dateMode" | "timeBand",
+  id: string,
+  fallback: string,
+): string {
+  const k = `${prefix}.${id}`;
+  return k in EN ? t(k as Key) : fallback;
+}
 
 /** Non-hook access for plain helpers (date/time formatting) that render outside React's tree. */
 let activeLang: LangCode = "en";

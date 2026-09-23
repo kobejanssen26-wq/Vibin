@@ -12,7 +12,7 @@ import {
   RADIUS_OPTIONS_KM,
   TIME_BANDS,
 } from "@shared/constants";
-import { useLang } from "../lib/i18n";
+import { labelFor, useLang } from "../lib/i18n";
 
 type Draft = GroupSettingsDTO;
 
@@ -199,7 +199,7 @@ export function GroupConfig() {
               className={draft.categories.includes(c.id as never) ? "chip-on" : "chip"}
               onClick={() => toggleCat(c.id)}
             >
-              {c.icon} {c.label}
+              {c.icon} {labelFor(t, "cat", c.id, c.label)}
             </button>
           ))}
         </div>
@@ -251,7 +251,7 @@ export function GroupConfig() {
               className={draft.budgetBand === b.id ? "chip-on" : "chip"}
               onClick={() => setDraft((d) => ({ ...d, budgetBand: b.id }))}
             >
-              {b.label}
+              {labelFor(t, "budget", b.id, b.label)}
             </button>
           ))}
         </div>
@@ -284,7 +284,7 @@ export function GroupConfig() {
               className={draft.dateMode === d.id ? "chip-on" : "chip"}
               onClick={() => setDraft((s) => ({ ...s, dateMode: d.id }))}
             >
-              {d.label}
+              {labelFor(t, "dateMode", d.id, d.label)}
             </button>
           ))}
         </div>
@@ -309,14 +309,14 @@ export function GroupConfig() {
         <section>
           <h2 className="mb-2 font-bold">{t("config.timeTitle")}</h2>
           <div className="flex flex-wrap gap-2">
-            {TIME_BANDS.map((t) => (
+            {TIME_BANDS.map((tb) => (
               <button
-                key={t.id}
+                key={tb.id}
                 type="button"
-                className={draft.timeBand === t.id ? "chip-on" : "chip"}
-                onClick={() => setDraft((d) => ({ ...d, timeBand: t.id }))}
+                className={draft.timeBand === tb.id ? "chip-on" : "chip"}
+                onClick={() => setDraft((d) => ({ ...d, timeBand: tb.id }))}
               >
-                {t.label}
+                {labelFor(t, "timeBand", tb.id, tb.label)}
               </button>
             ))}
           </div>

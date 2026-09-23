@@ -15,7 +15,7 @@ import {
 } from "../components/icons";
 import { demoActivity, demoNextActivity } from "../lib/demo";
 import { ACTIVITY_CATEGORIES } from "@shared/constants";
-import { useLang } from "../lib/i18n";
+import { labelFor, useLang } from "../lib/i18n";
 
 const CREW = [
   { initials: "KJ", tone: "bg-brand-500" },
@@ -215,7 +215,7 @@ export function Landing() {
               }`}
             >
               <span className="text-3xl">{c.icon}</span>
-              <span className="mt-8 font-bold leading-tight">{c.label}</span>
+              <span className="mt-8 font-bold leading-tight">{labelFor(t, "cat", c.id, c.label)}</span>
             </div>
           ))}
           <div className="shrink-0" style={{ width: "max(1.25rem, calc((100vw - 72rem) / 2))" }} />
