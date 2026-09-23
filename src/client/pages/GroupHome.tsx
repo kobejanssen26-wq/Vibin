@@ -19,9 +19,11 @@ import { useConfirm } from "../components/Confirm";
 import { IconChevronRight } from "../components/icons";
 import { ActivityExpanded } from "../components/ActivityExpanded";
 import { formatWhen } from "../lib/format";
+import { useLang } from "../lib/i18n";
 import type { GroupDTO, MatchDTO, PlanDTO } from "@shared/types";
 
 export function GroupHome() {
+  const { t } = useLang();
   const { id = "" } = useParams();
   const nav = useNavigate();
   const confirm = useConfirm();
@@ -40,18 +42,18 @@ export function GroupHome() {
   if (loading && !data) return <LoadingScreen />;
   if (error) return <ErrorState message={error.message} onRetry={refetch} />;
   const group = data?.group;
-  if (!group) return <ErrorState message="Group not found." />;
+  if (!group) return <ErrorState message={t("group.notFound")} />;
 
-  const cta = primaryCta(group);
+  const cta = primaryCta(group, t);
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-5">
       <PageHeader
-        back={{ to: "/app", label: "Groups" }}
+        back={{ to: "/app", label: t("group.back") }}
         title={group.name}
-        subtitle={`${group.activeMemberCount} active member${
-          group.activeMemberCount === 1 ? "" : "s"
-        } · ${group.settings?.dateKnown ? "date set" : "date to decide"}`}
+        subtitle={`${t(group.activeMemberCount === 1 ? "group.activeMemberOne" : "group.activeMemberOther", { n: group.activeMemberCount })} · ${
+          group.settings?.dateKnown ? t("group.dateSet") : t("group.dateToDecide")
+        }`}
       />
 
       {actionErr && (
@@ -61,17 +63,17 @@ export function GroupHome() {
       )}
 
       <div className="flex gap-1 rounded-2xl border border-paper-line bg-paper-soft p-1 text-sm font-semibold">
-        {(["plan", "chat"] as const).map((t) => (
+        {(["plan", "chat"] as const).map((tb) => (
           <button
-            key={t}
+            key={tb}
             className={`flex-1 rounded-xl py-2 capitalize transition-[background-color,color] ${
-              tab === t
+              tab === tb
                 ? "bg-paper-card text-navy shadow-sm"
                 : "text-navy-400 hover:text-navy"
             }`}
-            onClick={() => setTab(t)}
+            onClick={() => setTab(tb)}
           >
-            {t}
+            {t(`group.tab.${tb}` as never)}
           </button>
         ))}
       </div>
@@ -83,7 +85,7 @@ export function GroupHome() {
           {cta && (
             <Reveal className="relative overflow-hidden rounded-3xl bg-vibin-match p-5 text-white">
               <div className="dot-grid pointer-events-none absolute inset-0 text-white/60 opacity-[0.06]" />
-              <p className="relative eyebrow text-lime-400">Next step</p>
+              <p className="relative eyebrow text-lime-400">{t("group.nextStep")}</p>
               <p className="relative mt-1 text-lg font-extrabold">{cta.title}</p>
               <p className="relative mt-0.5 text-sm text-white/80">{cta.sub}</p>
               <button
@@ -101,7 +103,7 @@ export function GroupHome() {
               variant="outline"
               className="w-full"
             >
-              Edit group setup
+              {t("group.editSetup")}
             </LinkButton>
           )}
 
@@ -110,7 +112,7 @@ export function GroupHome() {
           {/* members */}
           <Reveal as="section" delay={60}>
             <SectionHead
-              label="Crew"
+              label={t("group.crew")}
               count={`${group.members.length}`}
             />
             <div className="hairline">
@@ -120,10 +122,10 @@ export function GroupHome() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">
                       {m.displayName}
-                      {m.isYou && " (you)"}
+                      {m.isYou && t("group.you")}
                     </p>
                     <p className="text-xs text-navy-400">
-                      {m.role === "creator" ? "Creator" : "Member"}
+                      {m.role === "creator" ? t("group.roleCreator") : t("group.roleMember")}
                       {m.status !== "active" && ` · ${m.status}`}
                     </p>
                   </div>
@@ -132,8 +134,8 @@ export function GroupHome() {
                       <ReportButton
                         targetType="member"
                         targetId={m.id}
-                        label="Report"
-                        modalTitle={`Report ${m.displayName}`}
+                        label={t("group.report")}
+                        modalTitle={t("group.reportMember", { name: m.displayName })}
                       />
                       {group.isCreator && (
                         <MemberActions
@@ -154,7 +156,7 @@ export function GroupHome() {
           {/* upcoming plans */}
           {plans.data && plans.data.plans.length > 0 && (
             <Reveal as="section" delay={120}>
-              <SectionHead label="Upcoming" count={`${plans.data.plans.length}`} />
+              <SectionHead label={t("group.upcoming")} count={`${plans.data.plans.length}`} />
               <div className="hairline">
                 {plans.data.plans.map((p) => (
                   <Link
@@ -183,7 +185,7 @@ export function GroupHome() {
           {/* matches */}
           <Reveal as="section" delay={180}>
             <SectionHead
-              label="Matches"
+              label={t("group.matches")}
               count={matches.data ? `${matches.data.matches.length}` : undefined}
             />
             {matches.data?.matches.length ? (
@@ -204,10 +206,10 @@ export function GroupHome() {
                       </p>
                       <p className="text-xs text-navy-400">
                         {m.status === "complete"
-                          ? `Planned · ${formatWhen(m.startsAt)}`
+                          ? t("group.plannedAt", { when: formatWhen(m.startsAt) })
                           : m.needsDateMatch
-                            ? "Needs a date"
-                            : "Matched"}
+                            ? t("group.needsDate")
+                            : t("group.matched")}
                       </p>
                     </div>
                     {m.needsDateMatch && (
@@ -216,7 +218,7 @@ export function GroupHome() {
                         onClick={(e) => e.stopPropagation()}
                         className="btn-outline shrink-0 px-3 py-1.5 text-xs"
                       >
-                        Vote
+                        {t("group.vote")}
                       </Link>
                     )}
                   </button>
@@ -224,9 +226,9 @@ export function GroupHome() {
               </div>
             ) : (
               <div className="card p-6 text-center">
-                <p className="text-sm font-semibold text-navy">No matches yet</p>
+                <p className="text-sm font-semibold text-navy">{t("group.noMatchesTitle")}</p>
                 <p className="mt-1 text-xs text-navy-400">
-                  Keep swiping. It only counts when everyone likes the same thing.
+                  {t("group.noMatchesBody")}
                 </p>
               </div>
             )}
@@ -241,10 +243,9 @@ export function GroupHome() {
               className="w-full rounded-xl py-3 text-center text-sm font-semibold text-danger-600 transition-colors hover:bg-danger-50"
               onClick={async () => {
                 const ok = await confirm({
-                  title: "Archive this group?",
-                  message:
-                    "It disappears for everyone. Plans and chat history stay saved but the group can't be used again.",
-                  confirmLabel: "Archive",
+                  title: t("group.archiveConfirmTitle"),
+                  message: t("group.archiveConfirmBody"),
+                  confirmLabel: t("group.archiveConfirmAction"),
                   tone: "danger",
                 });
                 if (!ok) return;
@@ -253,12 +254,12 @@ export function GroupHome() {
                   nav("/app");
                 } catch (e) {
                   setActionErr(
-                    e instanceof ApiRequestError ? e.message : "Could not archive the group.",
+                    e instanceof ApiRequestError ? e.message : t("group.archiveError"),
                   );
                 }
               }}
             >
-              Archive group
+              {t("group.archiveGroup")}
             </button>
           )}
           {!group.isCreator && (
@@ -266,9 +267,9 @@ export function GroupHome() {
               className="w-full rounded-xl py-3 text-center text-sm font-medium text-navy-500 hover:bg-navy/5"
               onClick={async () => {
                 const ok = await confirm({
-                  title: "Leave this group?",
-                  message: "You'll stop counting toward matches and lose access to the plan.",
-                  confirmLabel: "Leave",
+                  title: t("group.leaveConfirmTitle"),
+                  message: t("group.leaveConfirmBody"),
+                  confirmLabel: t("group.leaveConfirmAction"),
                   tone: "danger",
                 });
                 if (!ok) return;
@@ -277,20 +278,20 @@ export function GroupHome() {
                   nav("/app");
                 } catch (e) {
                   setActionErr(
-                    e instanceof ApiRequestError ? e.message : "Could not leave the group.",
+                    e instanceof ApiRequestError ? e.message : t("group.leaveError"),
                   );
                 }
               }}
             >
-              Leave group
+              {t("group.leaveGroup")}
             </button>
           )}
           <div className="text-center">
             <ReportButton
               targetType="group"
               targetId={id}
-              label="Report a problem with this group"
-              modalTitle="Report this group"
+              label={t("group.reportGroup")}
+              modalTitle={t("group.reportGroupTitle")}
             />
           </div>
         </>
@@ -307,41 +308,41 @@ export function GroupHome() {
   );
 }
 
-function primaryCta(g: GroupDTO) {
+function primaryCta(g: GroupDTO, t: ReturnType<typeof useLang>["t"]) {
   switch (g.status) {
     case "configuring":
       return g.isCreator
         ? {
-            title: "Finish setup",
-            sub: "Pick categories, place and date, then start swiping.",
-            label: "Configure group",
+            title: t("group.cta.configuring.title"),
+            sub: t("group.cta.configuring.body"),
+            label: t("group.cta.configuring.action"),
             to: `/groups/${g.id}/configure`,
           }
         : {
-            title: "Waiting on the creator",
-            sub: "They’re still setting things up. Hang tight.",
-            label: "Refresh",
+            title: t("group.cta.waiting.title"),
+            sub: t("group.cta.waiting.body"),
+            label: t("group.cta.waiting.action"),
             to: `/groups/${g.id}`,
           };
     case "swiping":
       return {
-        title: "Swiping is on",
-        sub: "Everyone needs to like the same activity for it to match.",
-        label: "Continue swiping",
+        title: t("group.cta.swiping.title"),
+        sub: t("group.cta.swiping.body"),
+        label: t("group.cta.swiping.action"),
         to: `/groups/${g.id}/swipe`,
       };
     case "date_matching":
       return {
-        title: "Pick a date",
-        sub: "You matched an activity — now vote on when.",
-        label: "Vote on dates",
+        title: t("group.cta.dateMatching.title"),
+        sub: t("group.cta.dateMatching.body"),
+        label: t("group.cta.dateMatching.action"),
         to: `/groups/${g.id}/date`,
       };
     case "planned":
       return {
-        title: "It’s a plan 🎉",
-        sub: "Everything’s locked in.",
-        label: "View the plan",
+        title: t("group.cta.planned.title"),
+        sub: t("group.cta.planned.body"),
+        label: t("group.cta.planned.action"),
         to: `/groups/${g.id}/plan`,
       };
     default:
@@ -362,6 +363,7 @@ function MemberActions({
   status: string;
   onDone: () => void;
 }) {
+  const { t } = useLang();
   const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
   const set = async (s: "active" | "inactive" | "removed") => {
@@ -384,26 +386,26 @@ function MemberActions({
         onClick={() => set(status === "active" ? "inactive" : "active")}
         title={
           status === "active"
-            ? "Inactive members don't hold up a match"
-            : "Count this member toward matches again"
+            ? t("group.member.inactiveHint")
+            : t("group.member.activeHint")
         }
       >
-        {status === "active" ? "Set inactive" : "Set active"}
+        {status === "active" ? t("group.member.setInactive") : t("group.member.setActive")}
       </button>
       <button
         className="btn-ghost px-2.5 py-1.5 text-xs text-danger-600"
         disabled={busy}
         onClick={async () => {
           const ok = await confirm({
-            title: `Remove ${memberName}?`,
-            message: "They lose access to this group and stop counting toward matches.",
-            confirmLabel: "Remove",
+            title: t("group.member.removeConfirmTitle", { name: memberName }),
+            message: t("group.member.removeConfirmBody"),
+            confirmLabel: t("group.member.remove"),
             tone: "danger",
           });
           if (ok) void set("removed");
         }}
       >
-        Remove
+        {t("group.member.remove")}
       </button>
     </div>
   );

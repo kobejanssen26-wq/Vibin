@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "./ui";
 import { api, ApiRequestError } from "../lib/api";
+import { useLang } from "../lib/i18n";
 import type { GroupDTO } from "@shared/types";
 
 /**
@@ -17,6 +18,7 @@ function extractCode(input: string): string {
 }
 
 export function JoinGroupBox() {
+  const { t } = useLang();
   const nav = useNavigate();
   const [code, setCode] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -36,7 +38,7 @@ export function JoinGroupBox() {
       nav(`/groups/${group.id}`);
     } catch (e) {
       setErr(
-        e instanceof ApiRequestError ? e.message : "Couldn't join that group.",
+        e instanceof ApiRequestError ? e.message : t("joinBox.error"),
       );
       setBusy(false);
     }
@@ -44,20 +46,20 @@ export function JoinGroupBox() {
 
   return (
     <div className="rounded-2xl border border-dashed border-paper-line px-4 py-4">
-      <h2 className="text-sm font-bold text-navy-700">Join a group</h2>
+      <h2 className="text-sm font-bold text-navy-700">{t("joinBox.title")}</h2>
       <p className="mt-0.5 text-xs text-navy-400">
-        Got an invite? Paste the code or the whole link.
+        {t("joinBox.subtitle")}
       </p>
       <form onSubmit={submit} className="mt-3 flex flex-wrap items-start gap-2">
         <input
-          aria-label="Invite code"
+          aria-label={t("joinBox.inviteCode")}
           placeholder="ABC123 or vibin.be/join/ABC123"
           value={code}
           onChange={(e) => setCode(e.target.value)}
           className="field min-w-0 flex-1"
         />
         <Button type="submit" variant="outline" loading={busy} disabled={!code.trim()}>
-          Join group
+          {t("joinBox.submit")}
         </Button>
       </form>
       {err && (

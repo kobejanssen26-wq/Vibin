@@ -7,45 +7,24 @@ import { Reveal } from "../components/Reveal";
 import { IconPlus } from "../components/icons";
 import type { GroupSummaryDTO } from "@shared/types";
 import { formatWhen } from "../lib/format";
+import { useLang } from "../lib/i18n";
 
-const STATUS: Record<
-  string,
-  { label: string; tone: string; edge: string }
-> = {
-  configuring: {
-    label: "Setting up",
-    tone: "bg-amber-400/15 text-amber-600",
-    edge: "bg-amber-400",
-  },
-  swiping: {
-    label: "Swiping",
-    tone: "bg-brand-500/10 text-brand-600",
-    edge: "bg-brand-500",
-  },
-  date_matching: {
-    label: "Picking a date",
-    tone: "bg-brand-500/10 text-brand-600",
-    edge: "bg-brand-500",
-  },
-  planned: {
-    label: "Planned",
-    tone: "bg-lime-400/25 text-lime-700",
-    edge: "bg-lime-400",
-  },
-  archived: {
-    label: "Archived",
-    tone: "bg-navy/10 text-navy-400",
-    edge: "bg-navy-300",
-  },
+const STATUS_TONE: Record<string, { tone: string; edge: string }> = {
+  configuring: { tone: "bg-amber-400/15 text-amber-600", edge: "bg-amber-400" },
+  swiping: { tone: "bg-brand-500/10 text-brand-600", edge: "bg-brand-500" },
+  date_matching: { tone: "bg-brand-500/10 text-brand-600", edge: "bg-brand-500" },
+  planned: { tone: "bg-lime-400/25 text-lime-700", edge: "bg-lime-400" },
+  archived: { tone: "bg-navy/10 text-navy-400", edge: "bg-navy-300" },
 };
 
 export function Dashboard() {
+  const { t } = useLang();
   const { data, loading, error, refetch } = usePoll<{ groups: GroupSummaryDTO[] }>(
     "/groups",
     8000,
   );
 
-  if (loading && !data) return <LoadingScreen label="Loading your groups…" />;
+  if (loading && !data) return <LoadingScreen label={t("dashboard.loading")} />;
   if (error) return <ErrorState message={error.message} onRetry={refetch} />;
 
   const groups = data?.groups ?? [];
@@ -53,15 +32,15 @@ export function Dashboard() {
   return (
     <div className="mx-auto w-full max-w-5xl">
       <PageHeader
-        title="Your groups"
+        title={t("dashboard.title")}
         subtitle={
           groups.length
-            ? `${groups.length} group${groups.length === 1 ? "" : "s"}`
+            ? t(groups.length === 1 ? "dashboard.groupsOne" : "dashboard.groupsOther", { n: groups.length })
             : undefined
         }
         action={
           <LinkButton to="/groups/new" className="px-4 py-2 text-sm">
-            <IconPlus size={16} /> New group
+            <IconPlus size={16} /> {t("dashboard.newGroup")}
           </LinkButton>
         }
       />
@@ -69,14 +48,15 @@ export function Dashboard() {
       {groups.length === 0 ? (
         <EmptyState
           emoji="👋"
-          title="Nothing planned yet"
-          message="Start a group, add your friends, and swipe on what to do together."
-          action={<LinkButton to="/groups/new">Create your first group</LinkButton>}
+          title={t("dashboard.emptyTitle")}
+          message={t("dashboard.emptyMessage")}
+          action={<LinkButton to="/groups/new">{t("dashboard.createFirst")}</LinkButton>}
         />
       ) : (
         <ul className="space-y-3 sm:grid sm:grid-cols-2 sm:gap-3 sm:space-y-0 lg:grid-cols-3">
           {groups.map((g, i) => {
-            const s = STATUS[g.status] ?? STATUS.configuring!;
+            const s = STATUS_TONE[g.status] ?? STATUS_TONE.configuring!;
+            const statusLabel = t(`dashboard.status.${g.status}` as never);
             const pct =
               g.progress && g.progress.total > 1
                 ? Math.round((g.progress.voted / g.progress.total) * 100)
@@ -98,13 +78,13 @@ export function Dashboard() {
                     <span
                       className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${s.tone}`}
                     >
-                      {s.label}
+                      {statusLabel}
                     </span>
                   </div>
                   <p className="mt-1 text-sm text-navy-400">
-                    {g.activeMemberCount} member{g.activeMemberCount === 1 ? "" : "s"}
+                    {t(g.activeMemberCount === 1 ? "dashboard.memberOne" : "dashboard.memberOther", { n: g.activeMemberCount })}
                     {g.matchCount > 0 &&
-                      ` · ${g.matchCount} match${g.matchCount === 1 ? "" : "es"}`}
+                      t(g.matchCount === 1 ? "dashboard.matchOne" : "dashboard.matchOther", { n: g.matchCount })}
                   </p>
 
                   {pct != null && (
@@ -116,15 +96,14 @@ export function Dashboard() {
                         />
                       </div>
                       <p className="mt-1.5 text-xs text-navy-400">
-                        {g.progress!.voted} of {g.progress!.total} voted on the
-                        current card
+                        {t("dashboard.votedOfTotal", { voted: g.progress!.voted, total: g.progress!.total })}
                       </p>
                     </div>
                   )}
 
                   {g.status === "swiping" && pct == null && (
                     <p className="mt-2 text-xs font-semibold text-brand-600">
-                      Ready to swipe →
+                      {t("dashboard.readyToSwipe")}
                     </p>
                   )}
 
