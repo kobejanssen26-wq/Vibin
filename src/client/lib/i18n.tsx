@@ -630,6 +630,17 @@ const EN = {
   "timeBand.night": "Night",
   "timeBand.specific": "Specific time",
   "timeBand.unknown": "Not sure yet",
+
+  // Server-built price label / note vocabulary (localized client-side in lib/format.ts)
+  "format.price.free": "Free",
+  "format.price.unavailable": "Price information unavailable",
+  "format.price.group": "Group price",
+  "format.price.ticketed": "Ticketed",
+  "format.price.approx": "Approx.",
+  "format.price.from": "From",
+  "format.price.perPerson": "/ person",
+  "format.price.perGroup": "/ group",
+  "format.availabilityNote": "Activity information is provided for planning. Prices and availability can change — check with the provider before you book.",
 } satisfies Record<string, string>;
 
 export type Key = keyof typeof EN;
@@ -1231,6 +1242,17 @@ const NL: Partial<Record<Key, string>> = {
   "timeBand.night": "Nacht",
   "timeBand.specific": "Specifiek uur",
   "timeBand.unknown": "Nog niet zeker",
+
+  // Server-built price label / note vocabulary (localized client-side in lib/format.ts)
+  "format.price.free": "Gratis",
+  "format.price.unavailable": "Prijs niet beschikbaar",
+  "format.price.group": "Groepsprijs",
+  "format.price.ticketed": "Met ticket",
+  "format.price.approx": "Ca.",
+  "format.price.from": "Vanaf",
+  "format.price.perPerson": "/ persoon",
+  "format.price.perGroup": "/ groep",
+  "format.availabilityNote": "Activiteitsinformatie is bedoeld om te plannen. Prijzen en beschikbaarheid kunnen wijzigen — check bij de aanbieder voor je boekt.",
 };
 
 const FR: Partial<Record<Key, string>> = {

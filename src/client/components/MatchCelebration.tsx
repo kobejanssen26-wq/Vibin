@@ -1,7 +1,7 @@
 import { useEffect, useReducer } from "react";
 import { Confetti } from "./Confetti";
 import { AvatarStack, Button } from "./ui";
-import { formatWhen } from "../lib/format";
+import { formatWhen, localizePrice } from "../lib/format";
 import { useLang } from "../lib/i18n";
 import type { MatchDTO } from "@shared/types";
 
@@ -116,7 +116,7 @@ export function MatchCelebration({
           </div>
           <div className="flex flex-wrap justify-center gap-2 text-sm text-white/80">
             <span className="rounded-full bg-white/10 px-3 py-1">
-              💶 {match.activity.priceLabel}
+              💶 {localizePrice(match.activity.priceLabel)}
             </span>
             {complete && match.startsAt && (
               <span className="rounded-full bg-lime-400/20 px-3 py-1 font-semibold text-lime-300">

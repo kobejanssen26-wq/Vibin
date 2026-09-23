@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import type { ActivityDTO } from "@shared/types";
 import { CATEGORY_ICON } from "@shared/constants";
 import { track } from "../lib/track";
-import { formatDuration } from "../lib/format";
+import { formatDuration, localizeNote, localizePrice } from "../lib/format";
 import { useLang } from "../lib/i18n";
 import {
   IconClose,
@@ -150,7 +150,7 @@ export function ActivityExpanded({
 
           <div className="mt-3 flex flex-wrap gap-1.5 text-[13px] font-semibold">
             <span className="rounded-full bg-brand-50 px-2.5 py-1 text-brand-700">
-              {a.priceLabel}
+              {localizePrice(a.priceLabel)}
             </span>
             {a.durationMin ? (
               <span className="rounded-full bg-paper-soft px-2.5 py-1 text-navy-600">
@@ -210,7 +210,7 @@ export function ActivityExpanded({
             )}
           </div>
 
-          <p className="mt-4 text-xs text-navy-400">{a.availabilityNote}</p>
+          <p className="mt-4 text-xs text-navy-400">{localizeNote(a.availabilityNote)}</p>
         </div>
 
         <div className="flex shrink-0 gap-2 border-t border-paper-line p-3">

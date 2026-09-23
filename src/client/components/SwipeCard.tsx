@@ -3,7 +3,7 @@ import { useCallback, useRef, useState } from "react";
 import type { ActivityDTO } from "@shared/types";
 import { CATEGORY_ICON } from "@shared/constants";
 import { IconMapPin, IconInfo } from "./icons";
-import { formatDuration } from "../lib/format";
+import { formatDuration, localizePrice } from "../lib/format";
 import { useLang } from "../lib/i18n";
 
 export type SwipeDir = "like" | "nope" | "superlike";
@@ -230,7 +230,7 @@ export function SwipeCard({
         <div className="flex h-[44%] flex-col gap-2.5 p-4">
           <div className="flex flex-wrap gap-1.5 text-[13px] font-semibold">
             <span className="rounded-full bg-brand-50 px-2.5 py-1 text-brand-700">
-              {activity.priceLabel}
+              {localizePrice(activity.priceLabel)}
             </span>
             {activity.durationMin ? (
               <span className="rounded-full bg-paper-soft px-2.5 py-1 text-navy-600">

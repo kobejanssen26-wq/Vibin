@@ -47,6 +47,32 @@ export function formatDuration(min: number): string {
   return m ? translate("format.durationHM", { h, m }) : translate("format.durationH", { h });
 }
 
+/**
+ * The worker builds price labels from a small fixed set of English templates
+ * (Free, "€13 / person", "From €10 / person", "Approx. …", "Group price"…).
+ * Rewrite those known fragments for the active language; anything else — a
+ * provider's own unit note such as "p.p." — passes through untouched.
+ */
+export function localizePrice(label: string): string {
+  if (label === "Free") return translate("format.price.free");
+  if (label === "Price information unavailable") return translate("format.price.unavailable");
+  if (label === "Group price") return translate("format.price.group");
+  if (label === "Ticketed") return translate("format.price.ticketed");
+  return label
+    .replace(/^Approx\. /, translate("format.price.approx") + " ")
+    .replace(/^From /, translate("format.price.from") + " ")
+    .replace(/ \/ person$/, " " + translate("format.price.perPerson"))
+    .replace(/ \/ group$/, " " + translate("format.price.perGroup"));
+}
+
+const KNOWN_AVAILABILITY_NOTE =
+  "Activity information is provided for planning. Prices and availability can change — check with the provider before you book.";
+
+/** The worker sends one fixed English disclaimer; translate it, leave any other note as-is. */
+export function localizeNote(note: string): string {
+  return note === KNOWN_AVAILABILITY_NOTE ? translate("format.availabilityNote") : note;
+}
+
 export function initials(name: string): string {
   const p = name.trim().split(/\s+/).filter(Boolean);
   if (!p.length) return "?";

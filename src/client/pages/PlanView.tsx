@@ -21,7 +21,7 @@ import {
   IconShare,
   IconTag,
 } from "../components/icons";
-import { formatDay, formatDuration, formatWhen } from "../lib/format";
+import { formatDay, formatDuration, formatWhen, localizeNote, localizePrice } from "../lib/format";
 import { track } from "../lib/track";
 import { AvailabilityNote } from "../components/AvailabilityNote";
 import { useLang } from "../lib/i18n";
@@ -147,7 +147,7 @@ export function PlanView() {
             <Row icon={<IconMapPin size={16} />} text={plan.locationLabel} />
             <Row icon={<IconCalendar size={16} />} text={formatWhen(plan.startsAt)} />
             <AvailabilityNote status={plan.availabilityStatus} className="-mt-1.5 pl-[26px]" />
-            <Row icon={<IconTag size={16} />} text={a.priceLabel} />
+            <Row icon={<IconTag size={16} />} text={localizePrice(a.priceLabel)} />
             {a.durationMin ? (
               <Row icon={<IconClock size={16} />} text={formatDuration(a.durationMin)} />
             ) : null}
@@ -222,7 +222,7 @@ export function PlanView() {
       </div>
 
       <p className="rounded-2xl bg-paper-soft px-4 py-3 text-xs text-navy-400">
-        {a.availabilityNote}
+        {localizeNote(a.availabilityNote)}
         {a.lastVerifiedAt && (
           <> {t("plan.lastChecked", { date: formatDay(a.lastVerifiedAt) })}</>
         )}

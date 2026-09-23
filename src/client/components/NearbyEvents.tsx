@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { SectionHead } from "./ui";
 import { useLang } from "../lib/i18n";
+import { localizePrice } from "../lib/format";
 import { EVENT_KIND_ICON } from "@shared/constants";
 import type { EventDTO, GroupSettingsDTO } from "@shared/types";
 
@@ -52,7 +53,7 @@ export function NearbyEvents({ settings }: { settings: GroupSettingsDTO | null }
                   {e.whenLabel}
                   {e.venueName || e.city ? ` · ${e.venueName ?? e.city}` : ""}
                   {e.distanceKm != null ? ` · ${e.distanceKm} km` : ""}
-                  {e.priceLabel ? ` · ${e.priceLabel}` : ""}
+                  {e.priceLabel ? ` · ${localizePrice(e.priceLabel)}` : ""}
                 </p>
               </div>
               {e.status === "live" && (
