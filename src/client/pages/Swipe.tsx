@@ -14,6 +14,7 @@ import { EmptyState, ErrorState } from "../components/ui";
 import { SwipeSkeleton } from "../components/SwipeSkeleton";
 import { track } from "../lib/track";
 import { useConfirm } from "../components/Confirm";
+import { useLang } from "../lib/i18n";
 import {
   IconArrowLeft,
   IconClose,
@@ -35,6 +36,7 @@ const PREFETCH_AT = 8;
 type Meta = Omit<SwipeStateDTO, "queue">;
 
 export function Swipe() {
+  const { t } = useLang();
   const { id = "" } = useParams();
   const nav = useNavigate();
   const confirm = useConfirm();
@@ -92,7 +94,7 @@ export function Swipe() {
         applyServer(s, replace);
         setErr(null);
       } catch (e) {
-        setErr(e instanceof ApiRequestError ? e.message : "Could not load swipe.");
+        setErr(e instanceof ApiRequestError ? e.message : t("swipe.loadError"));
       } finally {
         setLoading(false);
       }
@@ -170,7 +172,7 @@ export function Swipe() {
       );
     } catch (e) {
       votedLocally.current.delete(card.activity.id);
-      setErr(e instanceof ApiRequestError ? e.message : "Vote failed.");
+      setErr(e instanceof ApiRequestError ? e.message : t("swipe.voteError"));
       await load(true);
     } finally {
       setBusy(false);
@@ -187,7 +189,7 @@ export function Swipe() {
       votedLocally.current.delete(res.undoneActivityId);
       await load(true); // undo re-orders the deck — take the server's queue wholesale
     } catch (e) {
-      setErr(e instanceof ApiRequestError ? e.message : "Nothing to undo.");
+      setErr(e instanceof ApiRequestError ? e.message : t("swipe.undoError"));
     } finally {
       setBusy(false);
     }
@@ -195,10 +197,9 @@ export function Swipe() {
 
   const swipeAgain = async () => {
     const ok = await confirm({
-      title: "Start over?",
-      message:
-        "Everyone in the group gets a fresh set of cards to swipe — your group, its members and the chat all stay exactly as they are.",
-      confirmLabel: "Start over",
+      title: t("swipe.startOverConfirmTitle"),
+      message: t("swipe.startOverConfirmMessage"),
+      confirmLabel: t("swipe.startOverConfirmLabel"),
       tone: "danger",
     });
     if (!ok) return;
@@ -213,7 +214,7 @@ export function Swipe() {
       applyServer(s, true);
       setErr(null);
     } catch (e) {
-      setErr(e instanceof ApiRequestError ? e.message : "Could not restart swiping.");
+      setErr(e instanceof ApiRequestError ? e.message : t("swipe.restartError"));
     } finally {
       setBusy(false);
     }
@@ -227,11 +228,11 @@ export function Swipe() {
     return (
       <EmptyState
         emoji="⚙️"
-        title="Not swiping yet"
-        message="The group setup isn’t finished."
+        title={t("swipe.notSwipingTitle")}
+        message={t("swipe.notSwipingMessage")}
         action={
           <Link to={`/groups/${id}`} className="btn-ghost">
-            Back to group
+            {t("swipe.backToGroup")}
           </Link>
         }
       />
@@ -251,7 +252,7 @@ export function Swipe() {
           to={`/groups/${id}`}
           className="-ml-2 inline-flex h-10 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-navy-500 hover:bg-navy/5"
         >
-          <IconArrowLeft size={18} /> Group
+          <IconArrowLeft size={18} /> {t("swipe.back")}
         </Link>
         <div className="flex items-center gap-2">
           {meta.canChangeFilters &&
@@ -260,18 +261,21 @@ export function Swipe() {
                 type="button"
                 onClick={swipeAgain}
                 disabled={busy}
-                aria-label="Start swiping over from scratch"
-                title="Start over"
+                aria-label={t("swipe.startOverAria")}
+                title={t("swipe.startOver")}
                 className="inline-flex h-10 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-navy-400 hover:bg-navy/5 hover:text-navy disabled:pointer-events-none disabled:opacity-40"
               >
                 <IconRestart size={16} />
-                <span className="hidden sm:inline">Start over</span>
+                <span className="hidden sm:inline">{t("swipe.startOver")}</span>
               </button>
             )}
           {meta.currentProgress && meta.currentProgress.total > 1 && (
             <span
               className="inline-flex items-center gap-1.5 rounded-full bg-paper-soft px-3 py-1.5 text-xs font-bold text-navy"
-              aria-label={`${meta.currentProgress.voted} of ${meta.currentProgress.total} members voted on this card`}
+              aria-label={t("swipe.progressAria", {
+                voted: meta.currentProgress.voted,
+                total: meta.currentProgress.total,
+              })}
             >
               <span className="flex gap-1">
                 {Array.from({ length: meta.currentProgress.total }).map((_, i) => (
@@ -283,7 +287,10 @@ export function Swipe() {
                   />
                 ))}
               </span>
-              {meta.currentProgress.voted}/{meta.currentProgress.total} in
+              {t("swipe.progressLabel", {
+                voted: meta.currentProgress.voted,
+                total: meta.currentProgress.total,
+              })}
             </span>
           )}
         </div>
@@ -308,41 +315,41 @@ export function Swipe() {
           }
           title={
             meta.status === "planned"
-              ? "You've got a plan"
+              ? t("swipe.planTitle")
               : meta.status === "date_matching"
-                ? "Time to pick a date"
-                : "That's everything for now"
+                ? t("swipe.dateMatchingTitle")
+                : t("swipe.doneTitle")
           }
           message={
             meta.status === "date_matching"
-              ? "Everyone matched an activity. Now vote on when to go."
+              ? t("swipe.dateMatchingMessage")
               : meta.status === "planned"
-                ? "The plan has everything: place, time, price and the booking link."
+                ? t("swipe.planMessage")
                 : meta.canChangeFilters
-                  ? "You've seen every activity that fits. Widen the radius or change the category for more."
-                  : "You've seen every activity that fits these filters."
+                  ? t("swipe.doneMessageCanChange")
+                  : t("swipe.doneMessage")
           }
           action={
             meta.status === "date_matching" ? (
               <Link to={`/groups/${id}/date`} className="btn-primary">
-                Vote on dates
+                {t("swipe.voteOnDates")}
               </Link>
             ) : meta.status === "planned" ? (
               <Link to={`/groups/${id}/plan`} className="btn-primary">
-                View the plan
+                {t("swipe.viewPlan")}
               </Link>
             ) : meta.canChangeFilters ? (
               <div className="flex flex-col items-center gap-2">
                 <Link to={`/groups/${id}/configure`} className="btn-primary">
-                  Change filters
+                  {t("swipe.changeFilters")}
                 </Link>
                 <button type="button" onClick={swipeAgain} className="btn-ghost text-sm">
-                  Start over instead
+                  {t("swipe.startOverInstead")}
                 </button>
               </div>
             ) : (
               <Link to={`/groups/${id}`} className="btn-outline">
-                Back to group
+                {t("swipe.backToGroup")}
               </Link>
             )
           }
@@ -350,7 +357,7 @@ export function Swipe() {
       ) : waitingForMore ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-navy-400">
           <span className="h-8 w-8 animate-spin rounded-full border-2 border-navy/15 border-t-brand-500" />
-          <p className="text-sm font-medium">Loading more…</p>
+          <p className="text-sm font-medium">{t("swipe.loadingMore")}</p>
         </div>
       ) : (
         <>
@@ -376,11 +383,11 @@ export function Swipe() {
           </div>
 
           <div className="mt-5 flex items-center justify-center gap-4">
-            <CircleBtn label="Pass" tone="pass" onClick={() => vote("nope")} disabled={busy}>
+            <CircleBtn label={t("swipe.pass")} tone="pass" onClick={() => vote("nope")} disabled={busy}>
               <IconClose size={26} />
             </CircleBtn>
             <CircleBtn
-              label="Undo last swipe"
+              label={t("swipe.undo")}
               small
               tone="plain"
               onClick={undo}
@@ -389,7 +396,7 @@ export function Swipe() {
               <IconUndo size={18} />
             </CircleBtn>
             <CircleBtn
-              label="Love it"
+              label={t("swipe.loveIt")}
               small
               tone="lime"
               onClick={() => vote("superlike")}
@@ -397,14 +404,13 @@ export function Swipe() {
             >
               <IconStar size={18} />
             </CircleBtn>
-            <CircleBtn label="Yes" tone="like" onClick={() => vote("like")} disabled={busy}>
+            <CircleBtn label={t("swipe.yes")} tone="like" onClick={() => vote("like")} disabled={busy}>
               <IconHeart size={24} />
             </CircleBtn>
           </div>
           <p className="mt-3 text-center text-xs text-navy-400">
-            {meta.swipedByYou > 0 && `${meta.swipedByYou} swiped · `}
-            {queue.length}
-            {meta.hasMore ? "+" : ""} to go · drag the card or tap a button
+            {meta.swipedByYou > 0 && t("swipe.swipedCount", { n: meta.swipedByYou })}
+            {t("swipe.toGo", { n: `${queue.length}${meta.hasMore ? "+" : ""}` })}
           </p>
         </>
       )}
@@ -443,19 +449,20 @@ function FilterBar({
   filters: NonNullable<SwipeStateDTO["filters"]>;
   canChange: boolean;
 }) {
+  const { t } = useLang();
   const chips: string[] = [];
   chips.push(
     filters.allActivities
-      ? "All activities"
+      ? t("swipe.filterAllActivities")
       : filters.categories.length === 1
         ? cap(filters.categories[0]!)
-        : `${filters.categories.length} categories`,
+        : t("swipe.filterCategoriesCount", { n: filters.categories.length }),
   );
   if (filters.locationLabel)
     chips.push(`${filters.locationLabel} · ${filters.radiusKm} km`);
   if (filters.budgetBand !== "any")
     chips.push(BUDGET_BANDS.find((b) => b.id === filters.budgetBand)?.label ?? "");
-  if (filters.dateKnown) chips.push("Date set");
+  if (filters.dateKnown) chips.push(t("swipe.filterDateSet"));
 
   const inner = (
     <div className="flex flex-wrap items-center gap-1.5">
@@ -469,7 +476,7 @@ function FilterBar({
       ))}
       {canChange && (
         <span className="rounded-full bg-brand-500 px-2.5 py-1 text-xs font-semibold text-white">
-          Change ›
+          {t("swipe.filterChange")}
         </span>
       )}
     </div>
@@ -478,7 +485,7 @@ function FilterBar({
   return (
     <div className="mb-3">
       {canChange ? (
-        <Link to={`/groups/${groupId}/configure`} aria-label="Change filters">
+        <Link to={`/groups/${groupId}/configure`} aria-label={t("swipe.filterChangeAria")}>
           {inner}
         </Link>
       ) : (

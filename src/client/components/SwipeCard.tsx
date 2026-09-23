@@ -4,6 +4,7 @@ import type { ActivityDTO } from "@shared/types";
 import { CATEGORY_ICON } from "@shared/constants";
 import { IconMapPin, IconInfo } from "./icons";
 import { formatDuration } from "../lib/format";
+import { useLang } from "../lib/i18n";
 
 export type SwipeDir = "like" | "nope" | "superlike";
 
@@ -46,6 +47,7 @@ export function SwipeCard({
   z?: number;
   offset?: number;
 }) {
+  const { t } = useLang();
   const [drag, setDrag] = useState({ x: 0, y: 0, active: false });
   const [imgOk, setImgOk] = useState(true);
   const [exit, setExit] = useState<{ x: number; y: number; r: number } | null>(
@@ -185,7 +187,7 @@ export function SwipeCard({
           {onExpand && (
             <button
               type="button"
-              aria-label={`Open more information about ${activity.title}`}
+              aria-label={t("swipeCard.openInfoAria", { title: activity.title })}
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
@@ -207,9 +209,9 @@ export function SwipeCard({
             </span>
           )}
 
-          <Stamp text="YES" cls="text-brand-500 border-brand-500" op={likeOp} rotate={-13} pos="left-4 top-6" />
-          <Stamp text="PASS" cls="text-navy border-navy" op={nopeOp} rotate={13} pos="right-4 top-6" />
-          <Stamp text="LOVE IT" cls="text-lime-500 border-lime-500" op={superOp} rotate={-7} pos="left-1/2 -translate-x-1/2 bottom-6" />
+          <Stamp text={t("swipeCard.stampYes")} cls="text-brand-500 border-brand-500" op={likeOp} rotate={-13} pos="left-4 top-6" />
+          <Stamp text={t("swipeCard.stampPass")} cls="text-navy border-navy" op={nopeOp} rotate={13} pos="right-4 top-6" />
+          <Stamp text={t("swipeCard.stampLoveIt")} cls="text-lime-500 border-lime-500" op={superOp} rotate={-7} pos="left-1/2 -translate-x-1/2 bottom-6" />
 
           <div className="absolute bottom-3 left-3 right-3 text-white">
             <h2 className="text-[22px] font-extrabold leading-tight drop-shadow-sm">
@@ -238,10 +240,10 @@ export function SwipeCard({
             {activity.indoorOutdoor ? (
               <span className="rounded-full bg-paper-soft px-2.5 py-1 text-navy-600">
                 {activity.indoorOutdoor === "indoor"
-                  ? "Indoor"
+                  ? t("activity.indoor")
                   : activity.indoorOutdoor === "outdoor"
-                    ? "Outdoor"
-                    : "Indoor & outdoor"}
+                    ? t("activity.outdoor")
+                    : t("activity.indoorOutdoor")}
               </span>
             ) : null}
             {activity.minAge ? (
@@ -271,7 +273,7 @@ export function SwipeCard({
           <div className="mt-auto flex items-center justify-between gap-2 pt-1">
             {activity.provider ? (
               <p className="min-w-0 truncate text-xs text-navy-400">
-                at{" "}
+                {t("activity.at")}{" "}
                 <span className="font-semibold text-navy-600">
                   {activity.provider}
                 </span>
@@ -281,7 +283,7 @@ export function SwipeCard({
             )}
             {onExpand && (
               <span className="shrink-0 text-xs font-bold text-brand-600 transition-transform group-active:translate-x-0.5">
-                More info →
+                {t("swipeCard.moreInfo")}
               </span>
             )}
           </div>

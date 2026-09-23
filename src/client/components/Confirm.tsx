@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { Button } from "./ui";
+import { useLang } from "../lib/i18n";
 
 /**
  * App-wide confirmation dialog — replaces window.confirm so destructive actions
@@ -28,6 +29,7 @@ type Resolver = (ok: boolean) => void;
 const Ctx = createContext<(o: ConfirmOptions) => Promise<boolean>>(async () => false);
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const { t } = useLang();
   const [state, setState] = useState<ConfirmOptions | null>(null);
   const resolver = useRef<Resolver | null>(null);
   const confirmBtn = useRef<HTMLButtonElement>(null);
@@ -81,7 +83,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 className="flex-1"
                 onClick={() => close(false)}
               >
-                {state.cancelLabel ?? "Cancel"}
+                {state.cancelLabel ?? t("confirm.cancel")}
               </Button>
               <Button
                 ref={confirmBtn}
@@ -91,7 +93,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 }`}
                 onClick={() => close(true)}
               >
-                {state.confirmLabel ?? "Confirm"}
+                {state.confirmLabel ?? t("confirm.confirm")}
               </Button>
             </div>
           </div>

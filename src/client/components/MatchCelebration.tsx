@@ -2,6 +2,7 @@ import { useEffect, useReducer } from "react";
 import { Confetti } from "./Confetti";
 import { AvatarStack, Button } from "./ui";
 import { formatWhen } from "../lib/format";
+import { useLang } from "../lib/i18n";
 import type { MatchDTO } from "@shared/types";
 
 /**
@@ -26,6 +27,7 @@ export function MatchCelebration({
   match: MatchDTO;
   onContinue: () => void;
 }) {
+  const { t } = useLang();
   const reduce =
     typeof window !== "undefined" &&
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -50,7 +52,7 @@ export function MatchCelebration({
       }}
       role="dialog"
       aria-modal="true"
-      aria-label={complete ? "It's a plan" : "It's a match"}
+      aria-label={complete ? t("matchCelebration.planLabel") : t("matchCelebration.matchLabel")}
     >
       <Confetti fire={stage >= 3} />
 
@@ -63,17 +65,17 @@ export function MatchCelebration({
         <p
           className={`text-sm font-extrabold uppercase tracking-[0.2em] text-lime-400 ${stage >= 3 ? "animate-float-up" : "opacity-0"}`}
         >
-          {complete ? "It's a plan" : "It's a match"}
+          {complete ? t("matchCelebration.planLabel") : t("matchCelebration.matchLabel")}
         </p>
         <h2
           className={`mt-2 text-4xl font-extrabold leading-tight ${stage >= 3 ? "animate-slide-up" : "opacity-0"}`}
         >
-          Everyone's in.
+          {t("matchCelebration.headline")}
         </h2>
         <p
           className={`mt-1 text-white/70 ${stage >= 3 ? "animate-float-up" : "opacity-0"}`}
         >
-          The whole group wants to do this.
+          {t("matchCelebration.subtext")}
         </p>
 
         <div
@@ -132,10 +134,10 @@ export function MatchCelebration({
             autoFocus
           >
             {complete
-              ? "See the plan"
+              ? t("matchCelebration.seePlan")
               : match.needsDateMatch
-                ? "Now find a time →"
-                : "Keep swiping"}
+                ? t("matchCelebration.findTime")
+                : t("matchCelebration.keepSwiping")}
           </Button>
         </div>
       </div>
@@ -144,6 +146,7 @@ export function MatchCelebration({
 }
 
 function MemberBubble({ name, url }: { name: string; url: string | null }) {
+  const { t } = useLang();
   const ini = name
     .trim()
     .split(/\s+/)
@@ -155,7 +158,7 @@ function MemberBubble({ name, url }: { name: string; url: string | null }) {
     <div className="relative">
       <span
         className="grid h-11 w-11 place-items-center rounded-full bg-brand-500 text-sm font-bold text-white ring-2 ring-white"
-        aria-label={`${name} is in`}
+        aria-label={t("matchCelebration.memberInAria", { name })}
       >
         {url ? (
           <img src={url} alt={name} className="h-full w-full rounded-full object-cover" />

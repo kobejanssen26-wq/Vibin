@@ -4,6 +4,7 @@ import type { ActivityDTO } from "@shared/types";
 import { CATEGORY_ICON } from "@shared/constants";
 import { track } from "../lib/track";
 import { formatDuration } from "../lib/format";
+import { useLang } from "../lib/i18n";
 import {
   IconClose,
   IconMapPin,
@@ -33,6 +34,7 @@ export function ActivityExpanded({
   groupId?: string;
   onClose: () => void;
 }) {
+  const { t } = useLang();
   useEffect(() => {
     track({
       name: "activity_expanded",
@@ -59,11 +61,11 @@ export function ActivityExpanded({
     }`;
 
   const primary = a.ticketUrl
-    ? { kind: "ticket" as const, label: "Tickets" }
+    ? { kind: "ticket" as const, label: t("activityExpanded.tickets") }
     : a.bookingUrl
-      ? { kind: "booking" as const, label: "Book now" }
+      ? { kind: "booking" as const, label: t("activityExpanded.bookNow") }
       : a.websiteUrl
-        ? { kind: "website" as const, label: "Visit website" }
+        ? { kind: "website" as const, label: t("activityExpanded.visitWebsite") }
         : null;
   const secondaryWebsite =
     primary?.kind !== "website" && a.websiteUrl ? true : false;
@@ -118,7 +120,7 @@ export function ActivityExpanded({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("activityExpanded.close")}
             className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-navy/55 text-white backdrop-blur-sm"
           >
             <IconClose size={18} />
@@ -141,7 +143,9 @@ export function ActivityExpanded({
             {a.title}
           </h2>
           {a.provider && (
-            <p className="mt-0.5 text-sm text-navy-400">at {a.provider}</p>
+            <p className="mt-0.5 text-sm text-navy-400">
+              {t("activity.at")} {a.provider}
+            </p>
           )}
 
           <div className="mt-3 flex flex-wrap gap-1.5 text-[13px] font-semibold">
@@ -156,10 +160,10 @@ export function ActivityExpanded({
             {a.indoorOutdoor ? (
               <span className="rounded-full bg-paper-soft px-2.5 py-1 text-navy-600">
                 {a.indoorOutdoor === "indoor"
-                  ? "Indoor"
+                  ? t("activity.indoor")
                   : a.indoorOutdoor === "outdoor"
-                    ? "Outdoor"
-                    : "Indoor & outdoor"}
+                    ? t("activity.outdoor")
+                    : t("activity.indoorOutdoor")}
               </span>
             ) : null}
             {a.minAge ? (
@@ -184,10 +188,13 @@ export function ActivityExpanded({
             {(a.minParticipants || a.maxParticipants) && (
               <Row icon={<IconUsers size={16} />}>
                 {a.minParticipants && a.maxParticipants
-                  ? `${a.minParticipants}–${a.maxParticipants} people`
+                  ? t("activityExpanded.peopleRange", {
+                      min: a.minParticipants,
+                      max: a.maxParticipants,
+                    })
                   : a.maxParticipants
-                    ? `Up to ${a.maxParticipants} people`
-                    : `From ${a.minParticipants} people`}
+                    ? t("activityExpanded.peopleUpTo", { max: a.maxParticipants })
+                    : t("activityExpanded.peopleFrom", { min: a.minParticipants! })}
               </Row>
             )}
             {a.accessibility && (
@@ -232,7 +239,7 @@ export function ActivityExpanded({
               }
             >
               <IconMapPin size={16} />
-              Find on Google Maps
+              {t("activityExpanded.findOnMaps")}
             </a>
           )}
           {secondaryWebsite && (
@@ -241,7 +248,7 @@ export function ActivityExpanded({
               target="_blank"
               rel="noreferrer"
               className="btn-outline"
-              aria-label={`Visit website of ${a.title}`}
+              aria-label={t("activityExpanded.visitWebsiteAria", { title: a.title })}
             >
               <IconExternal size={16} />
             </a>
@@ -250,7 +257,7 @@ export function ActivityExpanded({
             type="button"
             onClick={share}
             className="btn-outline"
-            aria-label={`Share ${a.title}`}
+            aria-label={t("activityExpanded.shareAria", { title: a.title })}
           >
             <IconShare size={16} />
           </button>
