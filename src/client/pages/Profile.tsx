@@ -5,9 +5,11 @@ import { api, ApiRequestError } from "../lib/api";
 import { Avatar, Button, Field, Modal, SectionHead } from "../components/ui";
 import { PageHeader } from "../components/PageHeader";
 import { Reveal } from "../components/Reveal";
+import { LANGUAGES, useLang, type Key } from "../lib/i18n";
 import type { Me } from "@shared/types";
 
 export function Profile() {
+  const { t, lang, setLang } = useLang();
   const { user, setUser, logout } = useAuth();
   const nav = useNavigate();
   const [form, setForm] = useState({
@@ -41,9 +43,9 @@ export function Profile() {
         },
       });
       setUser(user);
-      setMsg("Saved.");
+      setMsg(t("profile.saved"));
     } catch (e) {
-      setMsg(e instanceof ApiRequestError ? e.message : "Could not save.");
+      setMsg(e instanceof ApiRequestError ? e.message : t("profile.saveError"));
     } finally {
       setBusy(false);
     }
@@ -59,7 +61,7 @@ export function Profile() {
       });
       setUser(user);
     } catch (e) {
-      setMsg(e instanceof ApiRequestError ? e.message : "Upload failed.");
+      setMsg(e instanceof ApiRequestError ? e.message : t("profile.uploadError"));
     }
   };
 
@@ -97,7 +99,7 @@ export function Profile() {
       nav("/");
     } catch (e) {
       setDelErr(
-        e instanceof ApiRequestError ? e.message : "Could not delete your account.",
+        e instanceof ApiRequestError ? e.message : t("profile.deleteError"),
       );
     } finally {
       setDelBusy(false);
@@ -109,8 +111,8 @@ export function Profile() {
   return (
     <div className="mx-auto w-full max-w-2xl space-y-7">
       <PageHeader
-        back={{ to: "/app", label: "Groups" }}
-        title="Profile & settings"
+        back={{ to: "/app", label: t("profile.back") }}
+        title={t("shell.profileSettings")}
       />
 
       <Reveal className="card flex items-center gap-4 p-4">
@@ -120,7 +122,7 @@ export function Profile() {
           <p className="truncate text-xs text-navy-400">{user.email}</p>
         </div>
         <label className="btn-outline shrink-0 cursor-pointer text-sm">
-          Change photo
+          {t("profile.changePhoto")}
           <input
             type="file"
             accept="image/png,image/jpeg,image/webp"
@@ -133,16 +135,16 @@ export function Profile() {
       </Reveal>
 
       <Reveal as="section" delay={60}>
-        <SectionHead label="Your profile" />
+        <SectionHead label={t("profile.yourProfile")} />
         <form onSubmit={save} className="card space-y-4 p-4">
           <Field
-            label="Name"
+            label={t("profile.name")}
             value={form.displayName}
             onChange={(e) => setForm({ ...form, displayName: e.target.value })}
           />
           <div className="grid grid-cols-2 gap-3">
             <Field
-              label="Age (optional)"
+              label={t("profile.age")}
               type="number"
               min={13}
               max={120}
@@ -150,7 +152,7 @@ export function Profile() {
               onChange={(e) => setForm({ ...form, age: e.target.value })}
             />
             <Field
-              label="Location (optional)"
+              label={t("profile.location")}
               value={form.locationLabel}
               onChange={(e) =>
                 setForm({ ...form, locationLabel: e.target.value })
@@ -158,7 +160,7 @@ export function Profile() {
             />
           </div>
           <Field
-            label="Bio (optional)"
+            label={t("profile.bio")}
             value={form.bio}
             onChange={(e) => setForm({ ...form, bio: e.target.value })}
           />
@@ -166,30 +168,22 @@ export function Profile() {
             <p className="text-sm font-medium text-lime-700">{msg}</p>
           )}
           <Button type="submit" loading={busy} className="w-full">
-            Save changes
+            {t("profile.saveChanges")}
           </Button>
         </form>
       </Reveal>
 
       <Reveal as="section" delay={120}>
-        <SectionHead label="Notifications" />
+        <SectionHead label={t("profile.notifications")} />
         <div className="card divide-y divide-paper-line">
           {(
-            [
-              ["invites", "Group invites"],
-              ["joins", "Someone joins your group"],
-              ["activityMatch", "Activity matches"],
-              ["dateVoting", "Date voting starts"],
-              ["dateMatch", "Date is decided"],
-              ["upcoming", "Upcoming activity reminders"],
-              ["messages", "Group messages"],
-            ] as [string, string][]
-          ).map(([key, label]) => (
+            ["invites", "joins", "activityMatch", "dateVoting", "dateMatch", "upcoming", "messages"] as const
+          ).map((key) => (
             <label
               key={key}
               className="flex cursor-pointer items-center justify-between px-4 py-3 text-sm"
             >
-              {label}
+              {t(`profile.notif.${key}` as Key)}
               <input
                 type="checkbox"
                 className="h-5 w-5 accent-brand-500"
@@ -203,46 +197,66 @@ export function Profile() {
         </div>
       </Reveal>
 
+      <Reveal as="section" delay={150}>
+        <SectionHead label={t("profile.language")} />
+        <div className="card p-4">
+          <div className="flex flex-wrap gap-2" role="group" aria-label={t("profile.language")}>
+            {LANGUAGES.map((l) => (
+              <button
+                key={l.code}
+                type="button"
+                aria-pressed={lang === l.code}
+                className={lang === l.code ? "chip-on" : "chip"}
+                onClick={() => setLang(l.code)}
+              >
+                {l.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-navy-400">{t("profile.languageHint")}</p>
+        </div>
+      </Reveal>
+
       <Reveal delay={180}>
         <SecuritySection currentEmail={user.email} />
       </Reveal>
 
       <Reveal as="section" delay={240}>
-        <SectionHead label="Help" />
+        <SectionHead label={t("profile.help")} />
         <div className="card">
           <Link
             to="/help"
             className="flex items-center justify-between px-4 py-3.5 text-sm font-semibold text-navy transition-colors hover:bg-navy/5"
           >
-            Help &amp; support
+            {t("help.title")}
             <span className="text-navy-300">›</span>
           </Link>
         </div>
       </Reveal>
 
       <Reveal as="section" delay={300}>
-        <SectionHead label="Your data" />
+        <SectionHead label={t("profile.yourData")} />
         <div className="card divide-y divide-paper-line">
           <div className="flex items-center justify-between px-4 py-3.5">
             <div>
-              <p className="text-sm font-semibold">Export</p>
+              <p className="text-sm font-semibold">{t("profile.export")}</p>
               <p className="text-xs text-navy-400">
-                Everything we hold on you, as JSON.
+                {t("profile.exportHint")}
               </p>
             </div>
             <button
               className="btn-outline shrink-0 px-3 py-2 text-sm"
               onClick={exportData}
             >
-              Download
+              {t("profile.download")}
             </button>
           </div>
           <div className="flex items-center justify-between px-4 py-3.5">
             <div>
               <p className="text-sm font-semibold text-danger-600">
-                Delete account
+                {t("profile.deleteAccount")}
               </p>
-              <p className="text-xs text-navy-400">Permanent. Can't be undone.</p>
+              <p className="text-xs text-navy-400">{t("profile.deleteHint")}</p>
             </div>
             <button
               className="btn-outline shrink-0 !border-danger-200 px-3 py-2 text-sm text-danger-600 hover:!border-danger-400"
@@ -252,18 +266,16 @@ export function Profile() {
                 setDelOpen(true);
               }}
             >
-              Delete
+              {t("profile.delete")}
             </button>
           </div>
         </div>
       </Reveal>
 
       {delOpen && (
-        <Modal title="Delete your account" onClose={() => setDelOpen(false)}>
+        <Modal title={t("profile.deleteTitle")} onClose={() => setDelOpen(false)}>
           <p className="text-sm text-navy-500">
-            This permanently removes your profile, group memberships, votes and
-            messages. Groups you created are handed to another active member, or
-            archived if there is none. This can't be undone.
+            {t("profile.deleteBody")}
           </p>
           <form
             className="mt-4 space-y-3"
@@ -273,7 +285,7 @@ export function Profile() {
             }}
           >
             <Field
-              label="Confirm your password"
+              label={t("profile.confirmPassword")}
               type="password"
               autoComplete="current-password"
               required
@@ -288,7 +300,7 @@ export function Profile() {
                 className="flex-1"
                 onClick={() => setDelOpen(false)}
               >
-                Keep my account
+                {t("profile.keepAccount")}
               </Button>
               <Button
                 type="submit"
@@ -297,7 +309,7 @@ export function Profile() {
                 disabled={!delPw}
                 className="flex-1 !bg-danger-600 hover:!bg-danger-700"
               >
-                Delete forever
+                {t("profile.deleteForever")}
               </Button>
             </div>
           </form>
@@ -308,6 +320,7 @@ export function Profile() {
 }
 
 function SecuritySection({ currentEmail }: { currentEmail: string }) {
+  const { t } = useLang();
   const { user, setUser } = useAuth();
   const [open, setOpen] = useState<"none" | "email" | "password">("none");
 
@@ -327,11 +340,11 @@ function SecuritySection({ currentEmail }: { currentEmail: string }) {
         body: { newEmail: emailForm.newEmail.trim(), currentPassword: emailForm.password },
       });
       if (user) setUser({ ...user, email: r.email, emailVerified: false });
-      setEmailMsg("Email updated. Check your inbox to verify it.");
+      setEmailMsg(t("profile.emailUpdated"));
       setEmailForm({ newEmail: "", password: "" });
       setOpen("none");
     } catch (e) {
-      setEmailErr(e instanceof ApiRequestError ? e.message : "Could not change email.");
+      setEmailErr(e instanceof ApiRequestError ? e.message : t("profile.emailError"));
     } finally {
       setEmailBusy(false);
     }
@@ -352,11 +365,11 @@ function SecuritySection({ currentEmail }: { currentEmail: string }) {
         method: "PATCH",
         body: { currentPassword: pwForm.current, newPassword: pwForm.next },
       });
-      setPwMsg("Password changed.");
+      setPwMsg(t("profile.passwordChanged"));
       setPwForm({ current: "", next: "" });
       setOpen("none");
     } catch (e) {
-      setPwErr(e instanceof ApiRequestError ? e.message : "Could not change password.");
+      setPwErr(e instanceof ApiRequestError ? e.message : t("profile.passwordError"));
     } finally {
       setPwBusy(false);
     }
@@ -364,7 +377,7 @@ function SecuritySection({ currentEmail }: { currentEmail: string }) {
 
   return (
     <section>
-      <SectionHead label="Security" />
+      <SectionHead label={t("profile.security")} />
       <div className="card divide-y divide-paper-line">
         <button
           type="button"
@@ -372,22 +385,22 @@ function SecuritySection({ currentEmail }: { currentEmail: string }) {
           onClick={() => setOpen(open === "email" ? "none" : "email")}
         >
           <div>
-            <p className="font-semibold">Email</p>
+            <p className="font-semibold">{t("auth.email")}</p>
             <p className="text-xs text-navy-400">{currentEmail}</p>
           </div>
-          <span className="text-xs font-semibold text-brand-600">Change</span>
+          <span className="text-xs font-semibold text-brand-600">{t("profile.change")}</span>
         </button>
         {open === "email" && (
           <form onSubmit={changeEmail} className="space-y-3 px-4 py-4">
             <Field
-              label="New email"
+              label={t("profile.newEmail")}
               type="email"
               required
               value={emailForm.newEmail}
               onChange={(e) => setEmailForm({ ...emailForm, newEmail: e.target.value })}
             />
             <Field
-              label="Current password"
+              label={t("profile.currentPassword")}
               type="password"
               required
               value={emailForm.password}
@@ -395,7 +408,7 @@ function SecuritySection({ currentEmail }: { currentEmail: string }) {
               error={emailErr ?? undefined}
             />
             <Button type="submit" loading={emailBusy} className="w-full">
-              Update email
+              {t("profile.updateEmail")}
             </Button>
           </form>
         )}
@@ -406,15 +419,15 @@ function SecuritySection({ currentEmail }: { currentEmail: string }) {
           onClick={() => setOpen(open === "password" ? "none" : "password")}
         >
           <div>
-            <p className="font-semibold">Password</p>
+            <p className="font-semibold">{t("auth.password")}</p>
             <p className="text-xs text-navy-400">••••••••</p>
           </div>
-          <span className="text-xs font-semibold text-brand-600">Change</span>
+          <span className="text-xs font-semibold text-brand-600">{t("profile.change")}</span>
         </button>
         {open === "password" && (
           <form onSubmit={changePassword} className="space-y-3 px-4 py-4">
             <Field
-              label="Current password"
+              label={t("profile.currentPassword")}
               type="password"
               autoComplete="current-password"
               required
@@ -422,7 +435,7 @@ function SecuritySection({ currentEmail }: { currentEmail: string }) {
               onChange={(e) => setPwForm({ ...pwForm, current: e.target.value })}
             />
             <Field
-              label="New password"
+              label={t("auth.reset.newPassword")}
               type="password"
               autoComplete="new-password"
               required
@@ -432,7 +445,7 @@ function SecuritySection({ currentEmail }: { currentEmail: string }) {
               error={pwErr ?? undefined}
             />
             <Button type="submit" loading={pwBusy} className="w-full">
-              Update password
+              {t("auth.reset.submit")}
             </Button>
           </form>
         )}
