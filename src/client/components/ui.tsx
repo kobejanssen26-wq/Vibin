@@ -3,6 +3,7 @@ import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react
 import { Link } from "react-router-dom";
 import { LogoMark } from "./Logo";
 import { IconClose } from "./icons";
+import { useLang } from "../lib/i18n";
 
 /* ------------------------------- Button ------------------------------- */
 type Variant = "primary" | "lime" | "ghost" | "dark" | "outline";
@@ -115,7 +116,9 @@ export function Spinner({ className = "h-6 w-6" }: { className?: string }) {
 }
 
 /* ---------------------------- Page states --------------------------- */
-export function LoadingScreen({ label = "Loading…" }: { label?: string }) {
+export function LoadingScreen({ label }: { label?: string }) {
+  const { t } = useLang();
+  label ??= t("ui.loading");
   return (
     <div
       className="flex min-h-[55vh] flex-col items-center justify-center gap-3 text-navy-400"
@@ -145,7 +148,7 @@ export function SkeletonCard({ className = "" }: { className?: string }) {
 }
 
 export function ErrorState({
-  title = "Something went wrong",
+  title,
   message,
   onRetry,
 }: {
@@ -153,6 +156,7 @@ export function ErrorState({
   message?: string;
   onRetry?: () => void;
 }) {
+  const { t } = useLang();
   return (
     <div className="mx-auto max-w-sm animate-float-up py-16 text-center">
       <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-danger-50 text-danger-500">
@@ -166,11 +170,11 @@ export function ErrorState({
           />
         </svg>
       </div>
-      <h2 className="text-lg font-bold">{title}</h2>
+      <h2 className="text-lg font-bold">{title ?? t("ui.somethingWrong")}</h2>
       {message && <p className="mt-1.5 text-sm text-navy-400">{message}</p>}
       {onRetry && (
         <Button variant="outline" className="mt-5" onClick={onRetry}>
-          Try again
+          {t("ui.tryAgain")}
         </Button>
       )}
     </div>
@@ -238,6 +242,7 @@ export function Modal({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const { t } = useLang();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", onKey);
@@ -262,7 +267,7 @@ export function Modal({
           <h2 className="text-lg font-bold">{title}</h2>
           <button
             type="button"
-            aria-label="Close"
+            aria-label={t("ui.close")}
             onClick={onClose}
             className="-mr-1 -mt-1 grid h-8 w-8 place-items-center rounded-full text-navy-400 hover:bg-navy/5"
           >

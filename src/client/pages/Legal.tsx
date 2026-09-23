@@ -1,17 +1,19 @@
 import { Link } from "react-router-dom";
 import { IconArrowLeft } from "../components/icons";
+import { useLang } from "../lib/i18n";
 
 /** Date these documents were last revised. Bump when the text below changes. */
 const LAST_UPDATED = "2026-09-09";
 
 export function Legal({ tab }: { tab: "privacy" | "terms" }) {
+  const { t, lang } = useLang();
   return (
     <div className="mx-auto max-w-2xl px-5 py-10">
       <Link
         to="/"
         className="mb-8 inline-flex items-center gap-1 text-sm font-semibold text-navy-500 hover:text-navy"
       >
-        <IconArrowLeft size={16} /> Back to VIBIN
+        <IconArrowLeft size={16} /> {t("contact.back")}
       </Link>
 
       <div className="mb-8 inline-flex gap-1 rounded-2xl border border-paper-line bg-paper-soft p-1 text-sm font-semibold">
@@ -23,7 +25,7 @@ export function Legal({ tab }: { tab: "privacy" | "terms" }) {
               : "text-navy-400 hover:text-navy"
           }`}
         >
-          Privacy
+          {t("footer.privacy")}
         </Link>
         <Link
           to="/terms"
@@ -33,9 +35,15 @@ export function Legal({ tab }: { tab: "privacy" | "terms" }) {
               : "text-navy-400 hover:text-navy"
           }`}
         >
-          Terms
+          {t("footer.terms")}
         </Link>
       </div>
+
+      {lang !== "en" && (
+        <p className="mb-4 rounded-xl bg-paper-soft px-4 py-3 text-sm text-navy-500">
+          {t("legal.englishOnly")}
+        </p>
+      )}
 
       <article className="card p-6 sm:p-8">
         {tab === "privacy" ? <Privacy /> : <Terms />}

@@ -596,6 +596,10 @@ const EN = {
   "profile.emailError": "Could not change email.",
   "profile.passwordChanged": "Password changed.",
   "profile.passwordError": "Could not change password.",
+
+  // Legal.tsx / SwipeSkeleton.tsx
+  "legal.englishOnly": "The full text below is currently available in English only.",
+  "swipe.skeletonLabel": "Loading activities",
 } satisfies Record<string, string>;
 
 export type Key = keyof typeof EN;
@@ -1163,6 +1167,10 @@ const NL: Partial<Record<Key, string>> = {
   "profile.emailError": "Kon het e-mailadres niet wijzigen.",
   "profile.passwordChanged": "Wachtwoord gewijzigd.",
   "profile.passwordError": "Kon het wachtwoord niet wijzigen.",
+
+  // Legal.tsx / SwipeSkeleton.tsx
+  "legal.englishOnly": "De volledige tekst hieronder is voorlopig alleen in het Engels beschikbaar.",
+  "swipe.skeletonLabel": "Activiteiten laden",
 };
 
 const FR: Partial<Record<Key, string>> = {

@@ -1,7 +1,10 @@
+import { useLang } from "../lib/i18n";
+
 /** Skeleton for the swipe screen — mirrors the real layout so nothing jumps. */
 export function SwipeSkeleton() {
+  const { t } = useLang();
   return (
-    <div className="flex min-h-[calc(100vh-8rem)] flex-col" aria-busy="true" aria-label="Loading activities">
+    <div className="flex min-h-[calc(100vh-8rem)] flex-col" aria-busy="true" aria-label={t("swipe.skeletonLabel")}>
       <div className="mb-3 flex items-center justify-between">
         <div className="skeleton h-8 w-20" />
         <div className="skeleton h-7 w-24 rounded-full" />
