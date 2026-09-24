@@ -1,5 +1,7 @@
 import { CSRF_COOKIE, CSRF_HEADER } from "@shared/constants";
 import type { ApiError } from "@shared/types";
+import { localizeApiError } from "./api-errors";
+import { translate } from "./i18n";
 
 export class ApiRequestError extends Error {
   constructor(
@@ -66,7 +68,7 @@ export async function api<T>(path: string, opts: Options = {}): Promise<T> {
     throw new ApiRequestError(
       res.status,
       err.error ?? "error",
-      err.message ?? "Something went wrong.",
+      err.message ? localizeApiError(err.message) : translate("ui.somethingWrong"),
       err.details,
     );
   }

@@ -1353,6 +1353,7 @@ let activeLang: LangCode = DEFAULT_LANG;
 export const setActiveLang = (l: LangCode) => {
   activeLang = l;
 };
+export const getActiveLang = () => activeLang;
 export const intlLocale = () => INTL_LOCALE[activeLang];
 export const translate = (k: Key, vars?: Vars) =>
   interpolate(DICTIONARIES[activeLang]?.[k] ?? EN[k], vars);

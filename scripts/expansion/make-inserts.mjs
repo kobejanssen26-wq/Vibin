@@ -70,7 +70,9 @@ async function place(c) {
   if (Number.isFinite(glat) && Number.isFinite(glng) && glat > 49.4 && glat < 51.6 && glng > 2.5 && glng < 6.5)
     return { lat: glat, lng: glng, how: "site schema.org geo" };
   if (!c.address) return null;
-  const hit = await nominatim(c.address);
+  // the printed address first; if OSM does not know that exact postcode/street form, retry without the postcode
+  let hit = await nominatim(c.address);
+  if (!hit) hit = await nominatim(c.address.replace(/\b\d{4}\b/, "").replace(/\s+,/g, ",").replace(/\s{2,}/g, " ").trim());
   if (!hit || hit.address?.country_code !== "be") return null;
   const pc = hit.address?.postcode;
   if (c.postcode && pc && String(pc).trim() !== String(c.postcode).trim()) return null; // wrong place
