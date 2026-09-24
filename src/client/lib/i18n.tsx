@@ -39,6 +39,7 @@ const EN = {
   "footer.login": "Log in",
   "footer.tagline": "Group plans, minus the group chat chaos.",
   "footer.rights": "All rights reserved.",
+  "footer.closeLanguageMenu": "Close language menu",
 
   // ui.tsx — shared primitives (default prop values; call sites can still override)
   "ui.loading": "Loading…",
@@ -689,6 +690,7 @@ const NL: Partial<Record<Key, string>> = {
   "footer.login": "Inloggen",
   "footer.tagline": "Groepsplannen, zonder de chaos van de groepschat.",
   "footer.rights": "Alle rechten voorbehouden.",
+  "footer.closeLanguageMenu": "Taalmenu sluiten",
 
   "ui.loading": "Bezig met laden…",
   "ui.somethingWrong": "Er ging iets mis",

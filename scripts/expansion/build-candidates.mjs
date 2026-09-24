@@ -18,10 +18,10 @@ import fs from "node:fs";
 import path from "node:path";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
-const CAND_DIR = path.join(ROOT, "data/expansion/candidates");
-const RUN = path.join(ROOT, "data/expansion/run");
+const CAND_DIR = path.join(ROOT, process.env.EXP_CAND_DIR ?? "data/expansion/candidates");
+const RUN = path.join(ROOT, process.env.EXP_RUN ?? "data/expansion/run");
 
-const prod = JSON.parse(fs.readFileSync(path.join(ROOT, "data/enrichment/prod-activities.json"), "utf8"))[0].results;
+const prod = JSON.parse(fs.readFileSync(path.join(ROOT, process.env.EXP_PROD ?? "data/enrichment/prod-activities.json"), "utf8").replace(/^﻿/, ""))[0].results;
 const CATEGORIES = new Set(["sport", "adventure", "food_drinks", "nightlife", "creative", "relaxation", "culture", "nature", "gaming", "entertainment", "learning", "other"]);
 
 const strip = (s) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -118,7 +118,7 @@ fs.mkdirSync(path.join(RUN, "data/enrichment/batches"), { recursive: true });
 fs.mkdirSync(path.join(RUN, "data/enrichment/out"), { recursive: true });
 fs.writeFileSync(path.join(RUN, "data/enrichment/prod-activities.json"), JSON.stringify([{ results: rows }]));
 fs.writeFileSync(path.join(RUN, "candidates.json"), JSON.stringify(cands, null, 1));
-fs.writeFileSync(path.join(ROOT, "data/expansion/build-report.json"), JSON.stringify(report, null, 1));
+fs.writeFileSync(path.join(RUN, "build-report.json"), JSON.stringify(report, null, 1));
 console.log(
   `read ${report.read} | kept ${report.kept} | duplicates ${report.duplicates.length} | eatery ${report.eatery.length} | not-activity ${report.notActivity.length} | invalid ${report.invalid.length}`,
 );

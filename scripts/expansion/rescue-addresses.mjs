@@ -15,7 +15,7 @@ const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const RUN = path.resolve(ROOT, process.argv[2] ?? "data/expansion/run");
 const ENR = path.join(RUN, "data/enrichment");
 const cands = JSON.parse(fs.readFileSync(path.join(RUN, "candidates.json"), "utf8"));
-const report = JSON.parse(fs.readFileSync(path.join(ROOT, "data/expansion/insert-report.json"), "utf8"));
+const report = JSON.parse(fs.readFileSync(path.join(RUN, "insert-report.json"), "utf8"));
 const targets = new Set(report.skipped.filter((s) => /could not place/.test(s.why)).map((s) => s.id));
 
 const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)) : []);

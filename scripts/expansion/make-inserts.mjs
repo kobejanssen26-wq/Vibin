@@ -17,7 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
-const RUN = path.join(ROOT, "data/expansion/run");
+const RUN = path.join(ROOT, process.env.EXP_RUN ?? "data/expansion/run");
 const ENR = path.join(RUN, "data/enrichment");
 const J = (p, d) => (fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, "utf8").replace(/^﻿/, "")) : d);
 const args = process.argv.slice(2);
@@ -38,7 +38,7 @@ const crawl = new Map(
 );
 const accepted = new Map(validated.filter((a) => a.description).map((a) => [a.id, a]));
 
-const GEO_CACHE = path.join(ROOT, "data/expansion/geocode-cache.json");
+const GEO_CACHE = path.join(ROOT, "data/expansion/geocode-cache.json"); // shared across runs
 const geoCache = J(GEO_CACHE, {});
 const UA = "VIBINBot/1.0 (+https://vibin.be; catalogue geocoding, contact via vibin.be/contact)";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -70,13 +70,62 @@ async function place(c) {
   if (Number.isFinite(glat) && Number.isFinite(glng) && glat > 49.4 && glat < 51.6 && glng > 2.5 && glng < 6.5)
     return { lat: glat, lng: glng, how: "site schema.org geo" };
   if (!c.address) return null;
-  // the printed address first; if OSM does not know that exact postcode/street form, retry without the postcode
-  let hit = await nominatim(c.address);
-  if (!hit) hit = await nominatim(c.address.replace(/\b\d{4}\b/, "").replace(/\s+,/g, ",").replace(/\s{2,}/g, " ").trim());
-  if (!hit || hit.address?.country_code !== "be") return null;
-  const pc = hit.address?.postcode;
-  if (c.postcode && pc && String(pc).trim() !== String(c.postcode).trim()) return null; // wrong place
-  return { lat: Number(hit.lat), lng: Number(hit.lon), how: "Nominatim (printed address)" };
+  // The printed address first. If OSM does not know that exact form, retry spelling variants of the SAME
+  // printed address (no "B-" prefix, abbreviations expanded, "SN"/"pavilion" noise dropped, without postcode).
+  // A hit is only accepted in Belgium and, when both are known, with the candidate's postcode.
+  const a = c.address;
+  const clean = a
+    .replace(/\bB-(?=\d{4})/g, "")
+    .replace(/,?\s*\bS\/?N\b/gi, "")
+    .replace(/\bCh\.\s/g, "Chaussée ")
+    .replace(/\bChem\.\s/g, "Chemin ")
+    .replace(/\bAv\.\s/g, "Avenue ")
+    .replace(/^(Pavillon|Bâtiment|Bureau)[^,]*,\s*/i, "")
+    .replace(/,\s*(\d+\s?[a-zA-Z]?)\s*,/, " $1,")
+    .replace(/\s+,/g, ",")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  const noPostcode = (s) => s.replace(/\b\d{4}\b/, "").replace(/\s+,/g, ",").replace(/,\s*,/g, ",").replace(/\s{2,}/g, " ").trim();
+  const okHit = (hit, needPostcode = false) => {
+    if (!hit || hit.address?.country_code !== "be") return false;
+    const pc = hit.address?.postcode;
+    if (needPostcode && !pc) return false;
+    return !(c.postcode && pc && String(pc).trim() !== String(c.postcode).trim()); // wrong place
+  };
+  // second cleaning pass: separators, country suffix, "95/F"-style unit suffixes, quay/building names
+  const clean2 = clean
+    .replace(/\s[-–]\s/g, ", ")
+    .replace(/[,\s]*(\(BE\)|Belgium|Belgique|België)\s*$/i, "")
+    .replace(/(\d+)\s?\/\s?[A-Za-z0-9]+/g, "$1")
+    .replace(/,\s*quai\s*\d+/i, "")
+    .replace(/^[^,\d]+,\s*(?=[^,]+,[^,]*\d{4})/, "")
+    .replace(/\s+,/g, ",")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  const variants = [...new Set([a, noPostcode(a), clean, noPostcode(clean), clean2, noPostcode(clean2)])];
+  for (const v of variants) {
+    const hit = await nominatim(v);
+    if (okHit(hit)) return { lat: Number(hit.lat), lng: Number(hit.lon), how: "Nominatim (printed address)" };
+  }
+  // Last resorts, both still tied to what the venue prints: a named place in OSM with the same postcode,
+  // or the printed street (number dropped) when OSM knows that street as a short stretch (< 3 km) in the same postcode.
+  const byName = await nominatim(`${c.name}, ${c.city}`);
+  if (okHit(byName, true)) return { lat: Number(byName.lat), lng: Number(byName.lon), how: "Nominatim (venue name)" };
+  const street = clean
+    .split(/\s[–—-]\s/)
+    .pop()
+    .replace(/\([^)]*\)/g, "")
+    .replace(/(\D{4,}?)[\s,]+\d{1,4}\s?[a-zA-Z]?(?=\s*,|\s+\d{4}\b)/, "$1")
+    .replace(/\s+,/g, ",")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  if (street && street !== clean) {
+    const hit = await nominatim(street);
+    const bb = hit?.boundingbox?.map(Number);
+    const km = bb ? Math.hypot((bb[1] - bb[0]) * 111, (bb[3] - bb[2]) * 71) : Infinity;
+    if (okHit(hit, true) && km < 3) return { lat: Number(hit.lat), lng: Number(hit.lon), how: "Nominatim (street only)" };
+  }
+  return null;
 }
 
 const q = (v) => (v == null ? "NULL" : typeof v === "number" ? String(v) : `'${String(v).replace(/'/g, "''")}'`);
@@ -187,13 +236,13 @@ for (const c of Object.values(cands)) {
   report.inserted.push({ id: c.id, name: c.name, city: c.city, geo: loc.how, photo: img?.generic === 0 ? "official" : "stock", price: pr ? "exact" : "band-estimate" });
 }
 
-const dir = path.join(ROOT, "data/expansion/inserts");
+const dir = path.join(RUN, "inserts");
 fs.rmSync(dir, { recursive: true, force: true });
 fs.mkdirSync(dir, { recursive: true });
 const CHUNK = 100;
 for (let i = 0; i * CHUNK < stmts.length; i++)
   fs.writeFileSync(path.join(dir, `${String(i).padStart(3, "0")}.sql`), stmts.slice(i * CHUNK, (i + 1) * CHUNK).join("\n") + "\n");
-fs.writeFileSync(path.join(ROOT, "data/expansion/insert-report.json"), JSON.stringify(report, null, 1));
+fs.writeFileSync(path.join(RUN, "insert-report.json"), JSON.stringify(report, null, 1));
 const why = {};
 for (const s of report.skipped) why[s.why] = (why[s.why] || 0) + 1;
 console.log(`candidates ${report.candidates} | insert ${report.inserted.length} | skipped ${report.skipped.length}`, why);

@@ -95,7 +95,7 @@ function LanguageSwitcher() {
         <>
           <button
             type="button"
-            aria-label="Close language menu"
+            aria-label={t("footer.closeLanguageMenu")}
             className="fixed inset-0 z-10 cursor-default"
             onClick={() => setOpen(false)}
           />
