@@ -27,6 +27,8 @@ const cands = J(path.join(RUN, "candidates.json"), {});
 const validated = J(path.join(ENR, "validated.json"), { accepted: [] }).accepted;
 const verdicts = J(path.join(ENR, "verdicts.json"), {});
 const images = J(path.join(ENR, "images.json"), {});
+// Photos are only used after a person has looked at them (logos, posters and stock art are dropped)
+const imgKeep = J(path.join(ROOT, "data/expansion/img-keep.json"), {});
 const priceDefaults = J(path.join(ROOT, "data/expansion/price-defaults.json"), { sub: {}, cat: {} });
 const genericImages = J(path.join(ROOT, "data/expansion/generic-images.json"), { sub: {}, cat: {} });
 const crawl = new Map(
@@ -80,16 +82,36 @@ const bandFor = (cents) => {
   const e = cents / 100;
   return e <= 0 ? "free" : e <= 10 ? "0_10" : e <= 25 ? "10_25" : e <= 50 ? "25_50" : e <= 100 ? "50_100" : "100_plus";
 };
+// Without a researched price a row still needs a band (NOT NULL). Borrow the band of the closest
+// comparable subcategory already in the catalogue, matched by keyword, never by the crude
+// category default (that put a chocolate workshop in "EUR 0-10"). The row is flagged for price review.
+const BAND_RULES = [
+  [/escape|evasion|mystery room|hold up/, "escape room"],
+  [/virtual reality|\bvr\b|free-roam/, "escape room"],
+  [/paintball|airsoft|gellyball|nerf|\bbattle\b/, "paintball"],
+  [/laser/, "laser game"],
+  [/kart/, "karting"],
+  [/trampoline|jump/, "trampoline park"],
+  [/bowling/, "bowling"],
+  [/padel|tennis/, "padel"],
+  [/workshop|class|cooking|pottery|ceramic|atelier|kook|studio/, "pottery workshop"],
+  [/museum|mus[e\u00e9]e|abbey|abbaye|castle|ch[a\u00e2]teau|kasteel|heritage|memorial|battlefield|garden|arboretum|park des/, "museum"],
+  [/\bspa\b|sauna|wellness|thermen|thermal/, "spa & sauna"],
+  [/brewery|brouwerij|brasserie|distill|winery|wijn|vineyard|cheese|fromagerie/, "brewery"],
+  [/karaoke/, "karaoke"],
+  [/climb|ropes|adventure park|klimpark|klimbos|accro|via ferrata|zipline|tree-top/, "climbing"],
+  [/kayak|kajak|canoe|paddle|\bsup\b|boat|cruise|rondvaart|\braft|packraft|pedalo|cable car|rail bike|draisine|scooter|e-step|bike|vtt|science|playground|speelstad|farm|zoo/, "zoo"],
+];
 function priceGuess(c) {
-  const sub = String(c.subcategory ?? "").toLowerCase();
-  const s = priceDefaults.sub[sub];
-  if (s && s.n >= 5 && s.pb !== "free") return { type: s.pt, band: s.pb };
-  const cat = priceDefaults.cat[c.categoryId];
-  if (cat && cat.pb !== "free") return { type: cat.pt === "per_person" ? "varies" : cat.pt, band: cat.pb };
-  return { type: "varies", band: "10_25" };
+  const hay = `${c.subcategory ?? ""} ${c.name}`.toLowerCase();
+  for (const [re, sub] of BAND_RULES) {
+    const d = priceDefaults.sub[sub];
+    if (re.test(hay) && d && d.n >= 5) return { type: d.pt === "per_person" ? "varies" : d.pt, band: d.pb };
+  }
+  return { type: "from_per_person", band: "10_25" };
 }
 function imageFor(c) {
-  const own = images[c.id];
+  const own = imgKeep[c.id] === "keep" ? images[c.id] : null;
   if (own) {
     let host = "website";
     try {
