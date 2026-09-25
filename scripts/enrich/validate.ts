@@ -31,7 +31,7 @@ const BANNED = [
 const ALLOWED_CAPS = new Set(
   "Belgium Belgian Flemish Dutch French English German Italian Spanish Japanese Chinese Thai Indian Greek Mexican Turkish Lebanese Asian European Mediterranean American Brussels Antwerp Ghent Bruges Leuven Liège Namur Mechelen Hasselt Monday Tuesday Wednesday Thursday Friday Saturday Sunday January February March April May June July August September October November December Christmas Easter Halloween Belgian-style America Americas Europe Europe's Flanders Wallonia Zeeland Roman Romans World War The Museum Primitives Great Middle Ages Renaissance Baroque Gothic Art Nouveau Deco Second First Cold Ardennes Meuse Scheldt Rhine North Sea Kempen Campine Limburg".split(" "),
 );
-const SEASONAL = /seizoen|saison|season|zomer|winter|été|hiver|vakantie|vacances|holiday|feestdag|jours f[ée]ri[ée]s|op afspraak|sur rendez-vous|by appointment|afhankelijk|selon|depending|variable|maand/i;
+const SEASONAL = /seizoen|saison|season|zomer|winter|été|hiver|vakantie|vacances|holiday|feestdag|jours f[ée]ri[ée]s|op afspraak|sur rendez-vous|by appointment|afhankelijk|selon|depending|variable|maandelijks|per maand|maanden/i;
 
 const words = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}\s'-]/gu, " ").split(/\s+/).filter(Boolean);
 const sourceText = (p: any) =>

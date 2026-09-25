@@ -35,7 +35,18 @@ const domainOf = (u) => {
   }
 };
 
-const existingDomains = new Set(prod.filter((r) => r.status !== "inactive").map((r) => domainOf(r.site)).filter(Boolean));
+// A shared domain only marks a duplicate when it is the same place (city) or the exact same page:
+// separate branches of one chain (speelmijntje.be/menen vs /lochristi) are different venues.
+const urlKey = (u) => String(u ?? "").toLowerCase().replace(/^https?:\/\/(www\.)?/, "").replace(/[?#].*$/, "").replace(/\/+$/, "");
+const existingDomainCities = new Map();
+const existingUrls = new Set();
+for (const r of prod.filter((x) => x.status !== "inactive")) {
+  const d = domainOf(r.site);
+  if (!d) continue;
+  if (!existingDomainCities.has(d)) existingDomainCities.set(d, new Set());
+  existingDomainCities.get(d).add(norm(r.city));
+  existingUrls.add(urlKey(r.site));
+}
 const existingNameCity = new Set(prod.filter((r) => r.status !== "inactive").map((r) => `${norm(r.title)}|${norm(r.city)}`));
 const existingIds = new Set(prod.map((r) => r.id));
 
@@ -68,11 +79,11 @@ for (const f of files) {
     }
     const dom = domainOf(c.websiteUrl);
     const nc = `${norm(c.name)}|${norm(c.city)}`;
-    if ((dom && existingDomains.has(dom)) || existingNameCity.has(nc)) {
+    if ((dom && existingDomainCities.get(dom)?.has(norm(c.city))) || existingUrls.has(urlKey(c.websiteUrl)) || existingNameCity.has(nc)) {
       report.duplicates.push({ label, reason: "already in catalogue" });
       continue;
     }
-    if ((dom && seenDomain.has(dom)) || seenNameCity.has(nc)) {
+    if ((dom && seenDomain.has(`${dom}|${norm(c.city)}`)) || seenNameCity.has(nc)) {
       report.duplicates.push({ label, reason: "duplicate among candidates" });
       continue;
     }
@@ -85,7 +96,7 @@ for (const f of files) {
       report.eatery.push({ label });
       continue;
     }
-    if (dom) seenDomain.add(dom);
+    if (dom) seenDomain.add(`${dom}|${norm(c.city)}`);
     seenNameCity.add(nc);
 
     let id = `act_${slug(c.name)}-${slug(c.city)}`.slice(0, 90);

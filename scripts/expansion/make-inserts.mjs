@@ -42,6 +42,7 @@ const GEO_CACHE = path.join(ROOT, "data/expansion/geocode-cache.json"); // share
 const geoCache = J(GEO_CACHE, {});
 const UA = "VIBINBot/1.0 (+https://vibin.be; catalogue geocoding, contact via vibin.be/contact)";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const strip = (s) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 let lastGeo = 0;
 
 async function nominatim(q) {
@@ -69,7 +70,16 @@ async function place(c) {
   const glng = Number(ld?.geo?.longitude ?? ld?.longitude);
   if (Number.isFinite(glat) && Number.isFinite(glng) && glat > 49.4 && glat < 51.6 && glng > 2.5 && glng < 6.5)
     return { lat: glat, lng: glng, how: "site schema.org geo" };
-  if (!c.address) return null;
+  if (!c.address) {
+    // No street address on the site: accept a named place in OSM only when it sits in the candidate's own town
+    // (same locality name), never a lookalike elsewhere. Otherwise the row stays unplaced.
+    const hit = await nominatim(`${c.name}, ${c.city}`);
+    const ad = hit?.address ?? {};
+    const town = strip(c.city);
+    const locs = [ad.city, ad.town, ad.village, ad.municipality, ad.suburb, ad.city_district, ad.hamlet].filter(Boolean).map(strip);
+    const ok = hit && ad.country_code === "be" && town.length >= 3 && locs.some((l) => l.includes(town) || town.includes(l));
+    return ok ? { lat: Number(hit.lat), lng: Number(hit.lon), how: "Nominatim (venue name + town)" } : null;
+  }
   // The printed address first. If OSM does not know that exact form, retry spelling variants of the SAME
   // printed address (no "B-" prefix, abbreviations expanded, "SN"/"pavilion" noise dropped, without postcode).
   // A hit is only accepted in Belgium and, when both are known, with the candidate's postcode.
