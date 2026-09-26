@@ -105,6 +105,7 @@ async function place(c) {
   // second cleaning pass: separators, country suffix, "95/F"-style unit suffixes, quay/building names
   const clean2 = clean
     .replace(/\s[-–]\s/g, ", ")
+    .replace(/,?\s*\b(bus|bte|box|boîte)\s*\d+\w*/gi, "")
     .replace(/[,\s]*(\(BE\)|Belgium|Belgique|België)\s*$/i, "")
     .replace(/(\d+)\s?\/\s?[A-Za-z0-9]+/g, "$1")
     .replace(/,\s*quai\s*\d+/i, "")
