@@ -100,7 +100,11 @@ async function place(c) {
     if (!hit || hit.address?.country_code !== "be") return false;
     const pc = hit.address?.postcode;
     if (needPostcode && !pc) return false;
-    return !(c.postcode && pc && String(pc).trim() !== String(c.postcode).trim()); // wrong place
+    if (!(c.postcode && pc && String(pc).trim() !== String(c.postcode).trim())) return true;
+    // A municipality can carry several postcodes (Heuvelland 8950-8958), so a hit in the same 3-digit area is accepted
+    // only when OSM found the exact house number on the very street the venue prints.
+    const road = String(hit.address?.road || "").toLowerCase();
+    return String(pc).slice(0, 3) === String(c.postcode).slice(0, 3) && !!hit.address?.house_number && road.length >= 4 && String(c.address || "").toLowerCase().includes(road);
   };
   // second cleaning pass: separators, country suffix, "95/F"-style unit suffixes, quay/building names
   const clean2 = clean
