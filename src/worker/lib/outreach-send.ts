@@ -137,9 +137,10 @@ export async function checkMessage(
     env.DB.prepare(
       `SELECT 1 AS x FROM outreach_messages
         WHERE status = 'sent' AND test_mode = 0 AND id != ?1
-          AND (org_id = ?2 OR to_email = ?3) LIMIT 1`,
+          AND (org_id = ?2 OR lower(to_email) = ?3
+               OR lower(to_email) LIKE '%@' || ?4 OR lower(to_email) LIKE '%.' || ?4) LIMIT 1`,
     )
-      .bind(row.id, row.org_id, normalizeEmail(row.to_email))
+      .bind(row.id, row.org_id, normalizeEmail(row.to_email), registrableDomain(emailDomain(row.to_email)))
       .first(),
     env.DB.prepare(
       `SELECT COUNT(*) AS n FROM outreach_messages

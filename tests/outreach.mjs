@@ -248,6 +248,11 @@ async function main() {
   r = await A("GET", "/orgs?q=sync&excluded=all&pageSize=50");
   const syncOrg = r.data.rows.find((o) => o.domain === "sync-bowling.be");
   ok("sync: two activities on one domain → one organisation", syncOrg && syncOrg.activityCount === 2, r.data.rows.map((x) => x.domain));
+  ok("sync: several names on one domain → shown by the domain, not a random member name", syncOrg?.name === "sync-bowling.be", syncOrg?.name);
+  r = await A("POST", `/orgs/${syncOrg.id}/contacts`, { email: "info@sync-bowling.be", sourceUrl: "https://sync-bowling.be/contact" });
+  r = await A("POST", `/orgs/${syncOrg.id}/prepare`, {});
+  r = await A("GET", `/messages/${r.data.messageId}`);
+  ok("sync: greeting never uses a bare domain", r.data.bodyText.startsWith("Hallo,"), r.data.bodyText.slice(0, 30));
   r = await A("GET", "/orgs?q=facebook&excluded=all");
   ok("sync: social network is skipped, not treated as a provider", r.data.rows.every((o) => o.discoveryStatus === "skipped"), r.data.rows);
   r = await A("GET", "/orgs?q=dead-site&excluded=all");

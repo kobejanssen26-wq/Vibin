@@ -222,7 +222,9 @@ app.post("/sync", async (c) => {
     db.prepare(
       `${DOMAIN_CTE}
        INSERT OR IGNORE INTO outreach_orgs (id, domain, name, website_url, activity_count, created_at, updated_at)
-       SELECT lower(hex(randomblob(11))), domain, MIN(pname), MIN(raw), COUNT(*), unixepoch(), unixepoch()
+       SELECT lower(hex(randomblob(11))), domain,
+              CASE WHEN COUNT(DISTINCT pname) = 1 THEN MIN(pname) ELSE domain END,
+              MIN(raw), COUNT(*), unixepoch(), unixepoch()
          FROM d WHERE ${DOMAIN_OK} GROUP BY domain`,
     ),
     db.prepare(
@@ -250,6 +252,15 @@ app.post("/sync", async (c) => {
         WHERE review_flag IS NULL AND activity_count >= 12
           AND (SELECT COUNT(DISTINCT a.provider) FROM outreach_org_activities l
                  JOIN activities a ON a.id = l.activity_id WHERE l.org_id = outreach_orgs.id) >= 6`,
+    ),
+    // Government / heritage / library sites are data sources more than providers: a human decides.
+    db.prepare(
+      `UPDATE outreach_orgs SET review_flag = COALESCE(review_flag, 'public_body')
+        WHERE domain LIKE '%bibliotheek%' OR domain LIKE '%gemeente%' OR domain LIKE '%commune%'
+           OR domain LIKE 'provincie%' OR domain LIKE '%.vlaanderen.be' OR domain = 'vlaanderen.be'
+           OR domain LIKE '%.wallonie.be' OR domain LIKE '%.brussels' OR domain LIKE '%.fgov.be'
+           OR domain LIKE '%onroerenderfgoed%' OR domain LIKE '%natuurenbos%' OR domain LIKE '%.gouv.fr'
+           OR domain LIKE '%.nrw.de'`,
     ),
     ...[...AGGREGATOR_DOMAINS].map((d) =>
       db.prepare(
@@ -431,6 +442,7 @@ app.get("/orgs/:id", async (c) => {
     warnings.push("Veel verschillende namen onder één domein: controleer of dit één organisatie is.");
   }
   if (org.reviewFlag === "multiple_addresses") warnings.push("Meerdere adressen gevonden: kies bewust het juiste.");
+  if (org.reviewFlag === "public_body") warnings.push("Lijkt een overheids-, erfgoed- of bibliotheeksite: waarschijnlijk geen commerciële aanbieder.");
   return c.json({
     org: { ...org, excluded: !!org.excluded },
     activities: acts!.results,
