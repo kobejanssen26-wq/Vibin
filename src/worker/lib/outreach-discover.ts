@@ -256,7 +256,7 @@ export async function runDiscoveryBatch(
       WHERE (discovery_status = 'pending'
              OR (discovery_status = 'error' AND discovered_at < unixepoch() - 259200))
         AND excluded = 0
-      ORDER BY activity_count DESC, created_at ASC
+      ORDER BY (review_flag IS NOT NULL) ASC, activity_count DESC, created_at ASC
       LIMIT ?1`,
   )
     .bind(Math.max(1, Math.min(25, limit)))

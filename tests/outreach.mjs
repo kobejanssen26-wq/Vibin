@@ -133,6 +133,10 @@ function fixtureSql() {
       org(`o_c${x}`, `camp-${x}.be`, `Campagne ${x.toUpperCase()}`),
       contact(`c_c${x}`, `o_c${x}`, `info@camp-${x}.be`, "generic", "checked"),
     ]),
+    org("o_rcpt", "bowling-rcpt.be", "Bowling Ontvangstbewijs"),
+    contact("c_rcpt", "o_rcpt", "info@bowling-rcpt.be", "generic", "checked"),
+    `INSERT INTO outreach_messages (id, org_id, contact_id, to_email, subject, body_text, status, test_mode, sent_at)
+     VALUES ('m_rcpt','o_rcpt','c_rcpt','info@bowling-rcpt.be','Onderwerp','Tekst van een eerder echt verzonden bericht.','sent',0,1700000000);`,
     // sync fixtures
     `INSERT INTO providers (id, name, kind) VALUES ('p-test','Test','dataset');`,
     `INSERT INTO activity_categories (id, label) VALUES ('sport','Sport');`,
@@ -357,7 +361,7 @@ async function main() {
   r = await A("GET", `/messages/${failMsg}`);
   ok("9: message is 'failed' with the error kept", r.data.status === "failed" && r.data.attempts === 1, r.data);
   r = await A("GET", "/summary");
-  ok("9: failure is not counted as a real send", r.data.sentLive === 0, r.data);
+  ok("9: failure is not counted as a real send (only the fixture message counts)", r.data.sentLive === 1, r.data);
   r = await A("POST", `/messages/${failMsg}/retry`, {});
   ok("9: failed message can be retried explicitly", r.status === 200, r.data);
   await A("POST", `/messages/${failMsg}/cancel`, {}); // keep the campaign scenario below clean
@@ -386,6 +390,13 @@ async function main() {
   const sid = r.data.rows[0]?.id;
   r = await A("DELETE", `/suppressions/${sid}`);
   ok("opt-out: an objection cannot be deleted from the list", r.status === 400, r.data);
+
+  r = await call(anon, "GET", `/optout/${tokenFor("m_rcpt")}`);
+  ok("opt-out: link of a real (live) message works", r.status === 200, r.status);
+  r = await A("GET", "/orgs/o_rcpt");
+  ok("opt-out: an e-mailed receipt is recorded for real messages (RD 4 April 2003 art. 2)", r.data.events.some((e) => e.kind === "note" && /Ontvangstbevestiging/.test(e.body)), r.data.events);
+  r = await A("GET", "/orgs/o_opt");
+  ok("opt-out: no receipt is sent for test messages", !r.data.events.some((e) => /Ontvangstbevestiging/.test(e.body)), r.data.events);
 
   // ---- 10. campaign with some approved, others not ----
   r = await A("GET", "/orgs?q=Campagne&excluded=all");

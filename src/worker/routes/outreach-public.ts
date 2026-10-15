@@ -12,7 +12,7 @@ import type { Env, Vars } from "../env";
 import { newId } from "../lib/id";
 import { clientIp, rateLimit } from "../lib/ratelimit";
 import { verifyOptOut } from "../lib/outreach-core";
-import { logAudit } from "../lib/outreach-send";
+import { logAudit, sendOptOutReceipt } from "../lib/outreach-send";
 
 type Ctx = { Bindings: Env; Variables: Vars };
 const app = new Hono<Ctx>();
@@ -46,10 +46,11 @@ async function handle(c: import("hono").Context<Ctx>): Promise<Response> {
     return html("Link ongeldig", "<h1>Deze link is niet geldig</h1><p>Stuur ons een mailtje met “stop” als je geen berichten meer wilt ontvangen.</p>", 400);
   }
   const msg = await c.env.DB.prepare(
-    `SELECT id, org_id AS orgId, lower(to_email) AS email FROM outreach_messages WHERE id = ?1`,
+    `SELECT id, org_id AS orgId, lower(to_email) AS email, test_mode AS testMode, status
+       FROM outreach_messages WHERE id = ?1`,
   )
     .bind(messageId)
-    .first<{ id: string; orgId: string; email: string }>();
+    .first<{ id: string; orgId: string; email: string; testMode: number; status: string }>();
   if (!msg) {
     return html("Link ongeldig", "<h1>Deze link is niet geldig</h1>", 404);
   }
@@ -74,6 +75,23 @@ async function handle(c: import("hono").Context<Ctx>): Promise<Response> {
     ).bind(newId(), msg.orgId, msg.id, now),
   ]);
   await logAudit(c.env, { userId: null, kind: "system" }, "outreach.opt_out", msg.id, { orgId: msg.orgId });
+
+  // Legally required e-mailed receipt — only for a real message that was actually sent.
+  if (!msg.testMode && msg.status === "sent") {
+    let note = "Ontvangstbevestiging van de afmelding verzonden.";
+    try {
+      const r = await sendOptOutReceipt(c.env, msg.id, msg.email);
+      if (!r.ok) note = `Ontvangstbevestiging NIET verzonden (${r.error}): stuur die handmatig.`;
+    } catch (e) {
+      note = `Ontvangstbevestiging NIET verzonden (${e instanceof Error ? e.message.slice(0, 80) : "fout"}): stuur die handmatig.`;
+    }
+    await c.env.DB.prepare(
+      `INSERT INTO outreach_events (id, org_id, message_id, kind, body, created_by, created_at)
+       VALUES (?1,?2,?3,'note',?4,NULL,?5)`,
+    )
+      .bind(newId(), msg.orgId, msg.id, note, now)
+      .run();
+  }
 
   return html(
     "Afgemeld",

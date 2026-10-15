@@ -110,17 +110,53 @@ existing is changed or deleted.
 
 ## Legal review (LEGAL REVIEW REQUIRED)
 
-Findings to be verified by a qualified person against the official texts:
+The tool is **not** legally approved; the owner records a review in the settings,
+and real sending stays blocked until then. What was verified against official
+text (Belgian Data Protection Authority, *Aanbeveling uit eigen beweging 01/2025
+over de verwerking van persoonsgegevens bij direct marketing*, consultation
+version, 70 pp.):
 
-- Belgian economic-law code art. XII.13 (electronic direct marketing: opt-in as
-  the rule), the 2003 royal decree, ePrivacy directive 2002/58/EC art. 13 and the
-  GDPR; Belgian DPA recommendation 01/2025 on direct marketing.
-- Secondary sources indicate that impersonal addresses of legal persons may be
-  mailed without prior consent, while personal addresses and sole traders are
-  treated as personal data / natural persons. The exact conditions were **not**
-  verified here.
-- The tool therefore only allows generic business addresses, blocks everything
-  uncertain by default, and requires a documented legal review before live mode.
+- **Rule** — art. XII.13 §1 Wetboek van economisch recht: e-mail advertising is
+  forbidden without the prior, free, specific and informed consent of the
+  recipient (annex, nos. 15–17).
+- **Exception for legal persons** — art. 1, 2° of the royal decree of
+  4 April 2003: no consent needed *when the recipient is a legal person and the
+  electronic contact details used are impersonal* (annex, no. 28, p. 66).
+- **Caution from the DPA** — a functional address (info@…) *can* be personal
+  data when one person uses and manages it in their role and systematically signs
+  with their name and function; being "functional" alone is not enough (no. 27).
+  Hence: only generic addresses, blocked when uncertain, reviewed by a human, and
+  sole traders / personal / freemail addresses never approved.
+- **Right to object** — art. XII.13 §2 WER and art. 2 of the royal decree: clear
+  information about the right to object, an efficient electronic way to do so,
+  and on an objection: an **e-mailed receipt** within a reasonable time, taking
+  the measures, and updating the lists (annex, nos. 19, fn. 126–128). The tool
+  does all three: opt-out page + one-click header, immediate suppression, and an
+  e-mailed receipt after the opt-out of a real message (recorded on the
+  organisation; if it cannot be sent the note says so).
+- **GDPR** still applies to any personal data involved (art. 14 information is
+  given in the mail footer: source of the address and how to object).
+
+Still open for the person who signs off (not verifiable from here): the exact,
+current text of the royal decree and of art. XII.13 §2–4; the information
+obligations on commercial communications (sender identification — the settings
+require a *sender identity* line for exactly this reason); and whether your
+specific recipients are legal persons using impersonal addresses. Public bodies
+and sole traders need their own judgement (they are flagged `public_body`, or
+classified personal/unknown and therefore blocked).
+
+## State of the production data (first sync, 2026-10-15)
+
+3,120 organisations were built from 5,892 active activities (3,748 activity
+links). 484 were skipped at once (474 only have dead/parked/closed sites, 10 are
+platforms or social networks). 203 domains carry several different provider
+names (municipalities, nature agencies, chains) and are shown by their domain;
+89 look like government/heritage/library sites and carry the `public_body` flag.
+A rehearsal of the crawler on 30 random sites found an address for 14 of them,
+of which 9 were generic addresses on the site's own domain (the only ones that
+are marked *gecontroleerd*); personal and other-domain addresses were correctly
+left unverified. The scheduler then checks 10 sites per 30 minutes (commercial
+sites first), so full coverage takes about six days.
 
 ## Operating it
 

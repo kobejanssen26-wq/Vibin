@@ -17,6 +17,7 @@ import {
   buildFooter,
   emailDomain,
   evaluateSend,
+  isValidEmail,
   messageHash,
   normalizeEmail,
   registrableDomain,
@@ -283,6 +284,34 @@ async function deliver(env: Env, mail: Mail): Promise<ProviderResult> {
     // The request may or may not have been processed; the idempotency key makes a retry safe.
     return { ok: false, error: `netwerkfout: ${e instanceof Error ? e.message.slice(0, 120) : "onbekend"}`, retryable: true };
   }
+}
+
+/**
+ * Royal decree of 4 April 2003 art. 2: whoever objects to advertising by e-mail
+ * must get an e-mailed receipt confirming that the objection was registered.
+ * Only ever used in reply to an opt-out of a REAL (live) message; never for tests.
+ */
+export async function sendOptOutReceipt(
+  env: Env,
+  messageId: string,
+  email: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const config = await loadConfig(env);
+  if (!isValidEmail(config.fromEmail)) return { ok: false, error: "geen afzenderadres ingesteld" };
+  const out = await deliver(env, {
+    from: `${config.fromName} <${config.fromEmail}>`,
+    to: email,
+    originalTo: email,
+    replyTo: config.replyTo || config.fromEmail,
+    subject: "We hebben je afmelding ontvangen",
+    text:
+      "Hallo,\n\nWe hebben je verzoek ontvangen en geregistreerd: je ontvangt geen berichten meer van VIBIN op dit adres.\n\n" +
+      "Is dit per vergissing gebeurd? Antwoord dan gerust op deze mail.\n\nHet VIBIN-team" +
+      (config.contactAddress ? `\n${config.contactAddress}` : ""),
+    headers: {},
+    idempotencyKey: `outreach-optout-${messageId}`,
+  });
+  return out.ok ? { ok: true } : { ok: false, error: out.error };
 }
 
 /**

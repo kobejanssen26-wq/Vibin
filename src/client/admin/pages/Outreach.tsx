@@ -320,7 +320,7 @@ function OrgsTab({ onChanged }: { onChanged: () => void }) {
                         {o.name}
                       </button>
                       {o.excluded && <div className="text-[11px] text-rose-600">uitgesloten: {o.excludedReason}</div>}
-                      {o.reviewFlag && <div className="text-[11px] text-amber-600">controleer: {o.reviewFlag === "many_names_one_domain" ? "veel namen, één domein" : "meerdere adressen"}</div>}
+                      {o.reviewFlag && <div className="text-[11px] text-amber-600">controleer: {({ many_names_one_domain: "veel namen, één domein", public_body: "overheids-, erfgoed- of bibliotheeksite", multiple_addresses: "meerdere adressen" } as Record<string, string>)[o.reviewFlag] ?? o.reviewFlag}</div>}
                     </Td>
                     <Td className="text-xs">
                       <a href={/^https?:/i.test(o.websiteUrl) ? o.websiteUrl : `https://${o.websiteUrl}`} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline">
