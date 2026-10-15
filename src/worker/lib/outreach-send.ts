@@ -463,7 +463,8 @@ export async function approveMessage(
 /** Scheduler hook: discovery batch, then drain running campaigns at the configured pace. */
 export async function runOutreachTick(env: Env): Promise<void> {
   const config = await loadConfig(env);
-  if (config.autoDiscovery) {
+  // Discovery only every other hour: D1 free tier bills every row read, and the crawl is not urgent.
+  if (config.autoDiscovery && new Date().getUTCHours() % 2 === 0 && new Date().getUTCMinutes() < 30) {
     const has = await env.DB.prepare(
       `SELECT 1 AS x FROM outreach_orgs WHERE discovery_status = 'pending' AND excluded = 0 LIMIT 1`,
     ).first();

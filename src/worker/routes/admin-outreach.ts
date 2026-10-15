@@ -342,6 +342,7 @@ app.get("/orgs", async (c) => {
   }
   if (usable) where.push(`c.verification = 'checked' AND c.kind = 'generic'`);
 
+  const needsJoin = !!verification || !!emailStatus || usable;
   const from = `
     FROM outreach_orgs o
     LEFT JOIN outreach_contacts c ON c.id = (
@@ -372,7 +373,12 @@ app.get("/orgs", async (c) => {
               MAX(o.updated_at, COALESCE(m.updated_at, 0), COALESCE(o.discovered_at, 0)) AS last_action
          ${from} ORDER BY ${order} LIMIT ? OFFSET ?`,
     ).bind(...binds, pageSize, offset),
-    c.env.DB.prepare(`SELECT COUNT(*) AS n ${from}`).bind(...binds),
+    // The total only needs the contact/message joins when a filter touches them (D1 bills rows read).
+    c.env.DB.prepare(
+      needsJoin
+        ? `SELECT COUNT(*) AS n ${from}`
+        : `SELECT COUNT(*) AS n FROM outreach_orgs o ${where.length ? `WHERE ${where.join(" AND ")}` : ""}`,
+    ).bind(...binds),
   ]);
   const totalN = (total!.results[0] as { n: number }).n;
   return c.json({
