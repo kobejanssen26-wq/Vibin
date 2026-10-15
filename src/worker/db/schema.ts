@@ -1183,6 +1183,211 @@ export const providerCommunications = sqliteTable(
 );
 
 /* -------------------------------------------------------------------------- */
+/*  Owner Command Center — provider outreach                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One row per organisation, keyed by the registrable domain of its own website,
+ * so a business with eight activities is contacted once, not eight times. The
+ * existing `providers` table only holds 2 data *sources*, so it cannot serve as
+ * the organisation entity. Activities keep pointing at `activities.id`.
+ */
+export const outreachOrgs = sqliteTable(
+  "outreach_orgs",
+  {
+    id: text("id").primaryKey(),
+    domain: text("domain").notNull(),
+    name: text("name").notNull(),
+    websiteUrl: text("website_url").notNull(),
+    activityCount: integer("activity_count").notNull().default(0),
+    /** Result of the public-website contact check. */
+    discoveryStatus: text("discovery_status", {
+      enum: ["pending", "found", "none", "error", "skipped"],
+    })
+      .notNull()
+      .default("pending"),
+    discoveryNote: text("discovery_note"),
+    discoveredAt: integer("discovered_at"),
+    /** Excluded from outreach by the owner (or by a recorded objection). */
+    excluded: integer("excluded").notNull().default(0),
+    excludedReason: text("excluded_reason"),
+    /** Why a human should look before anything is sent (null = nothing flagged). */
+    reviewFlag: text("review_flag"),
+    createdAt: integer("created_at").notNull().default(now),
+    updatedAt: integer("updated_at").notNull().default(now),
+  },
+  (t) => ({
+    domainUnq: uniqueIndex("outreach_orgs_domain_unq").on(t.domain),
+    discoveryIdx: index("outreach_orgs_discovery_idx").on(t.discoveryStatus),
+    excludedIdx: index("outreach_orgs_excluded_idx").on(t.excluded),
+  }),
+);
+
+export const outreachOrgActivities = sqliteTable(
+  "outreach_org_activities",
+  {
+    orgId: text("org_id")
+      .notNull()
+      .references(() => outreachOrgs.id, { onDelete: "cascade" }),
+    activityId: text("activity_id")
+      .notNull()
+      .references(() => activities.id, { onDelete: "cascade" }),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.orgId, t.activityId] }),
+    activityIdx: index("outreach_org_activities_activity_idx").on(t.activityId),
+  }),
+);
+
+/** A candidate e-mail address with its provenance. Never invented or guessed. */
+export const outreachContacts = sqliteTable(
+  "outreach_contacts",
+  {
+    id: text("id").primaryKey(),
+    orgId: text("org_id")
+      .notNull()
+      .references(() => outreachOrgs.id, { onDelete: "cascade" }),
+    email: text("email").notNull(), // lower-cased
+    kind: text("kind", { enum: ["generic", "personal", "unknown"] })
+      .notNull()
+      .default("unknown"),
+    sourceType: text("source_type", {
+      enum: ["website_mailto", "website_text", "manual", "csv"],
+    }).notNull(),
+    sourceUrl: text("source_url"),
+    /** The address' domain equals (or is a subdomain of) the website's domain. */
+    domainMatches: integer("domain_matches").notNull().default(0),
+    /** null = MX not looked up yet, 1 = domain accepts mail, 0 = it does not. */
+    mxOk: integer("mx_ok"),
+    verification: text("verification", {
+      enum: ["unverified", "checked", "uncertain"],
+    })
+      .notNull()
+      .default("unverified"),
+    isPrimary: integer("is_primary").notNull().default(0),
+    note: text("note"),
+    foundAt: integer("found_at").notNull().default(now),
+    checkedAt: integer("checked_at"),
+    createdAt: integer("created_at").notNull().default(now),
+  },
+  (t) => ({
+    orgEmailUnq: uniqueIndex("outreach_contacts_org_email_unq").on(t.orgId, t.email),
+    emailIdx: index("outreach_contacts_email_idx").on(t.email),
+  }),
+);
+
+export const outreachCampaigns = sqliteTable("outreach_campaigns", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  status: text("status", {
+    enum: ["running", "paused", "done", "cancelled"],
+  })
+    .notNull()
+    .default("running"),
+  /** true = test campaign: only ever goes to the configured test inbox. */
+  testMode: integer("test_mode").notNull().default(1),
+  total: integer("total").notNull().default(0),
+  createdBy: text("created_by"),
+  createdAt: integer("created_at").notNull().default(now),
+  finishedAt: integer("finished_at"),
+});
+
+/**
+ * Every outreach e-mail (draft → approved → queued → sent / failed). The body
+ * actually sent is stored here. `approvedHash` pins the approval to the exact
+ * recipient + subject + body the owner looked at.
+ */
+export const outreachMessages = sqliteTable(
+  "outreach_messages",
+  {
+    id: text("id").primaryKey(),
+    orgId: text("org_id")
+      .notNull()
+      .references(() => outreachOrgs.id, { onDelete: "cascade" }),
+    contactId: text("contact_id").references(() => outreachContacts.id, {
+      onDelete: "set null",
+    }),
+    campaignId: text("campaign_id").references(() => outreachCampaigns.id, {
+      onDelete: "set null",
+    }),
+    toEmail: text("to_email").notNull(),
+    subject: text("subject").notNull(),
+    bodyText: text("body_text").notNull(),
+    status: text("status", {
+      enum: ["draft", "approved", "queued", "sending", "sent", "failed", "cancelled"],
+    })
+      .notNull()
+      .default("draft"),
+    /** 1 = produced in test mode: sent to the test inbox / dry-run, never real. */
+    testMode: integer("test_mode").notNull().default(0),
+    approvedBy: text("approved_by"),
+    approvedAt: integer("approved_at"),
+    approvedHash: text("approved_hash"),
+    queuedAt: integer("queued_at"),
+    sentAt: integer("sent_at"),
+    attempts: integer("attempts").notNull().default(0),
+    /** Provider's id for the accepted message (or "dry-run" / "mock"). */
+    providerMessageId: text("provider_message_id"),
+    providerResult: text("provider_result"),
+    error: text("error"),
+    createdAt: integer("created_at").notNull().default(now),
+    updatedAt: integer("updated_at").notNull().default(now),
+  },
+  (t) => ({
+    orgIdx: index("outreach_messages_org_idx").on(t.orgId),
+    statusIdx: index("outreach_messages_status_idx").on(t.status),
+    campaignIdx: index("outreach_messages_campaign_idx").on(t.campaignId),
+    // At most one non-cancelled message per contact per mode: a double click or a
+    // network retry can never create (and so never send) a second copy.
+    onePerContact: uniqueIndex("outreach_messages_one_per_contact")
+      .on(t.contactId, t.testMode)
+      .where(sql`status != 'cancelled' AND status != 'failed' AND contact_id IS NOT NULL`),
+  }),
+);
+
+/** Do-not-contact list: a single address or a whole domain. */
+export const outreachSuppressions = sqliteTable(
+  "outreach_suppressions",
+  {
+    id: text("id").primaryKey(),
+    kind: text("kind", { enum: ["email", "domain"] }).notNull(),
+    value: text("value").notNull(), // lower-cased
+    reason: text("reason", {
+      enum: ["opt_out", "bounce", "complaint", "manual", "legal"],
+    }).notNull(),
+    note: text("note"),
+    createdBy: text("created_by"),
+    createdAt: integer("created_at").notNull().default(now),
+  },
+  (t) => ({
+    valueUnq: uniqueIndex("outreach_suppressions_unq").on(t.kind, t.value),
+  }),
+);
+
+/** Replies, notes and objections attached to an organisation (manual log). */
+export const outreachEvents = sqliteTable(
+  "outreach_events",
+  {
+    id: text("id").primaryKey(),
+    orgId: text("org_id")
+      .notNull()
+      .references(() => outreachOrgs.id, { onDelete: "cascade" }),
+    messageId: text("message_id").references(() => outreachMessages.id, {
+      onDelete: "set null",
+    }),
+    kind: text("kind", {
+      enum: ["reply", "note", "opt_out", "bounce", "complaint", "excluded", "contact_edited"],
+    }).notNull(),
+    body: text("body").notNull().default(""),
+    createdBy: text("created_by"),
+    createdAt: integer("created_at").notNull().default(now),
+  },
+  (t) => ({
+    orgIdx: index("outreach_events_org_idx").on(t.orgId),
+  }),
+);
+
+/* -------------------------------------------------------------------------- */
 /*  Owner Command Center — encrypted credential vault                        */
 /* -------------------------------------------------------------------------- */
 

@@ -36,7 +36,8 @@ export type EventName =
   | "calendar_action"
   | "client_error"
   | "server_error"
-  | "activity_maps_fallback_clicked";
+  | "activity_maps_fallback_clicked"
+  | "swipe_session_reset";
 
 export interface TrackOpts {
   userId?: string | null;

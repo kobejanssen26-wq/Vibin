@@ -14,6 +14,7 @@ import { DataQuality } from "./pages/DataQuality";
 import { Categories } from "./pages/Categories";
 import { Events } from "./pages/Events";
 import { Providers } from "./pages/Providers";
+import { Outreach } from "./pages/Outreach";
 import { ProviderDetail } from "./pages/ProviderDetail";
 import { Analytics } from "./pages/Analytics";
 import { Funnel } from "./pages/Funnel";
@@ -68,6 +69,7 @@ function AdminRoutes() {
         <Route path="/categories" element={<Categories />} />
         <Route path="/events" element={<Events />} />
         <Route path="/providers" element={<Providers />} />
+        <Route path="/outreach" element={<Outreach />} />
         <Route path="/providers/:id" element={<ProviderDetail />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/funnel" element={<Funnel />} />

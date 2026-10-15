@@ -38,7 +38,7 @@ export function ReportButton({
     : CONTENT_REASONS;
   const [open, setOpen] = useState(false);
   const [sent, setSent] = useState(false);
-  const [reason, setReason] = useState<string>(reasons[0].id);
+  const [reason, setReason] = useState<string>(reasons[0]?.id ?? "");
   const [detail, setDetail] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);

@@ -12,6 +12,7 @@ const NAV: { to: string; label: string; group: string }[] = [
   { to: "/admin/activities", label: "Activities", group: "Data" },
   { to: "/admin/events", label: "Live events", group: "Data" },
   { to: "/admin/providers", label: "Providers", group: "Data" },
+  { to: "/admin/outreach", label: "Outreach", group: "Data" },
   { to: "/admin/categories", label: "Categories", group: "Data" },
   { to: "/admin/data-quality", label: "Data quality", group: "Insight" },
   { to: "/admin/analytics", label: "Analytics", group: "Insight" },

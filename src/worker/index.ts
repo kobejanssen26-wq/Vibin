@@ -32,6 +32,10 @@ import adminImportRoutes from "./routes/admin-import";
 import adminEventRoutes from "./routes/admin-events";
 import adminSupportRoutes from "./routes/admin-support";
 import adminVaultRoutes from "./routes/admin-vault";
+import adminOutreachRoutes from "./routes/admin-outreach";
+import adminOutreachMailRoutes from "./routes/admin-outreach-mail";
+import outreachPublicRoutes from "./routes/outreach-public";
+import { runOutreachTick } from "./lib/outreach-send";
 import mediaRoutes from "./routes/media";
 import goRoutes from "./routes/go";
 import contactRoutes from "./routes/contact";
@@ -163,6 +167,8 @@ commandCenter.route("/", adminImportRoutes); // CSV template/preview/confirm
 commandCenter.route("/", adminEventRoutes); // live events + ingestion sources
 commandCenter.route("/", adminSupportRoutes); // help-desk tickets
 commandCenter.route("/vault", adminVaultRoutes); // encrypted credential vault
+commandCenter.route("/outreach", adminOutreachRoutes); // provider outreach: orgs, contacts, settings
+commandCenter.route("/outreach", adminOutreachMailRoutes); // drafts, approval, send, campaigns
 api.route("/admin/cc", commandCenter);
 
 // Everything below requires a normal user session.
@@ -214,6 +220,8 @@ api.notFound((c) => c.json({ error: "not_found", message: "Unknown endpoint." },
 
 const app = new Hono<Ctx>();
 app.route("/api", api);
+// Public opt-out page for outreach mail (HMAC-signed link, no session).
+app.route("/optout", outreachPublicRoutes);
 
 /* ---- Deep-link association files for the iOS / Android apps ----------
  * Served from the Worker so the content-type is guaranteed `application/json`
@@ -262,6 +270,11 @@ export default {
     env: Env,
     ctx: ExecutionContext,
   ) {
+    ctx.waitUntil(
+      runOutreachTick(env).catch((e) => {
+        console.error("outreach tick failed", e);
+      }),
+    );
     ctx.waitUntil(
       runDueSources(createDb(env), env).catch((e) => {
         void trackNow(env, "server_error", {

@@ -64,6 +64,9 @@ export interface Env {
   /** Where a new support ticket's escalation email is sent. Falls back to
    *  EMAIL_FROM when unset — set this to the real inbox someone reads. */
   SUPPORT_EMAIL?: string;
+  /** Development / staging only: "fail" makes the outreach mock provider return an error
+   *  (used by the integration tests). Ignored in production. */
+  OUTREACH_MOCK_PROVIDER?: string;
 }
 
 /** Hono context variables set by middleware. */

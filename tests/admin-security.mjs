@@ -256,7 +256,7 @@ const run = async () => {
     admin,
     "POST",
     `/api/admin/cc/users/${vId}/status`,
-    { status: "suspended" },
+    { status: "suspended", reason: "security test" },
     csrf(),
   );
   ok("owner can suspend a normal user", r.status === 200);
