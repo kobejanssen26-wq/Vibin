@@ -40,3 +40,4 @@ seed/osm/raw/
 # crawled third-party pages + prod exports (large, not source)
 data/enrichment/
 data/expansion/
+data/audit/

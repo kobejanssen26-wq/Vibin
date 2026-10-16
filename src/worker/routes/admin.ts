@@ -16,6 +16,7 @@ import { badRequest, notFound } from "../lib/errors";
 import { newId } from "../lib/id";
 import { ACTIVITY_CATEGORIES } from "@shared/constants";
 import { activityInput, ensureAdminProvider, scaleLatLng } from "../lib/activity-input";
+import { assessActivity, QUALITY_RULE } from "../lib/activity-quality";
 
 type Ctx = { Bindings: Env; Variables: Vars };
 const app = new Hono<Ctx>();
@@ -163,6 +164,18 @@ app.get("/activities", async (c) => {
 app.post("/activities", async (c) => {
   const db = createDb(c.env);
   const body = await parseBody(c, activityInput);
+  const verdict = assessActivity({
+    title: body.title,
+    provider: body.provider,
+    category_id: body.categoryId,
+    subcategory: body.subcategory,
+    source: "web",
+    description: body.description,
+    website_url: body.websiteUrl,
+  });
+  if (verdict.outcome === "exclude" && verdict.confidence !== "low" && new URL(c.req.url).searchParams.get("force") !== "1") {
+    throw badRequest(`${verdict.reason} ${QUALITY_RULE} (regel: ${verdict.rule}; voeg ?force=1 toe om als eigenaar toch toe te voegen.)`);
+  }
   const providerId = await ensureAdminProvider(c.env);
   const now = Math.floor(Date.now() / 1000);
   const id = newId();

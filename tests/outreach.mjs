@@ -150,6 +150,13 @@ function fixtureSql() {
         `INSERT INTO activities (id, provider_id, title, category_id, location_label, price_band, provider, website_url, provider_website, web_status, active)
          VALUES ('${id}','p-test','${t}','sport','Gent','10_25','${t}','${url}','${url}','${ws}',1);`,
     ),
+    `INSERT INTO activity_categories (id, label) VALUES ('food_drinks','Eten'),('entertainment','Entertainment');`,
+    `INSERT INTO activities (id, provider_id, title, category_id, location_label, price_band, provider, source, active, status) VALUES
+       ('a5','p-test','Chocoladewinkel Test','food_drinks','Gent','0_10','Chocoladewinkel Test','osm',0,'inactive'),
+       ('a6','p-test','Bowling Test','entertainment','Gent','10_25','Bowling Test','osm',1,'needs_review');`,
+    `INSERT INTO activity_audits (activity_id, outcome, rule, reason, confidence, issues, hidden, previous_active, previous_status, source)
+     VALUES ('a5','exclude','chocolate_shop','Chocoladewinkel','high','[]',1,1,'needs_review','rules'),
+            ('a6','approved','experience_verified','ok','medium','["photo_generic"]',0,1,'needs_review','rules');`,
     // large dataset: 5,000 organisations with 5,000 contacts
     `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 5000)
      INSERT INTO outreach_orgs (id, domain, name, website_url, activity_count, discovery_status)
@@ -466,6 +473,36 @@ async function main() {
   ok("import: confirm adds only new rows", r.status === 200 && r.data.added === 1, r.data);
   r = await A("GET", "/orgs/o_none");
   ok("import: new address starts unverified (never auto-trusted)", r.data.contacts[0]?.verification === "unverified" && r.data.contacts[0]?.sourceType === "csv", r.data.contacts);
+
+  // ---- catalogue quality audit ----
+  const C = (method, p, body) => call(admin, method, `/api/admin/cc${p}`, body, method === "GET" ? {} : csrf());
+  r = await C("GET", "/quality/summary");
+  ok("quality: summary counts verdicts and hidden rows", r.status === 200 && r.data.outcomes.exclude === 1 && r.data.hidden === 1 && /concrete, relevante ervaring/.test(r.data.rule), r.data);
+  ok("quality: gaps are counted (generic photo)", r.data.issues.photo === 1, r.data.issues);
+  r = await C("GET", "/quality/list?outcome=exclude");
+  ok("quality: list shows the excluded row with its reason", r.status === 200 && r.data.rows.length === 1 && r.data.rows[0].id === "a5" && r.data.rows[0].hidden === true, r.data);
+  r = await C("POST", "/quality/activity/a6", { decision: "exclude" });
+  ok("quality: owner can exclude an activity", r.status === 200, r.data);
+  r = await C("GET", "/quality/list?outcome=exclude&q=Bowling");
+  ok("quality: the owner exclusion is recorded and hidden", r.data.rows.some((x) => x.id === "a6" && x.hidden && x.source === "owner"), r.data.rows);
+  r = await C("POST", "/quality/activity/a6", { decision: "approve" });
+  r = await C("GET", "/quality/list?outcome=approved");
+  ok("quality: approving restores it exactly as before (visible)", r.data.rows.some((x) => x.id === "a6" && !x.hidden && x.active === 1 && x.status === "needs_review"), r.data.rows);
+  r = await C("POST", "/quality/restore-rule", { rule: "chocolate_shop" });
+  ok("quality: undoing a rule restores what it hid", r.status === 200 && r.data.restored >= 1, r.data);
+  r = await C("GET", "/quality/list?outcome=manual");
+  ok("quality: restored row is visible again and marked for manual review", r.data.rows.some((x) => x.id === "a5" && !x.hidden && x.active === 1), r.data.rows);
+  r = await call(anon, "GET", "/api/admin/cc/quality/summary");
+  ok("quality: not reachable without an admin session", r.status === 401);
+  const shop = { title: "Leonidas", categoryId: "food_drinks", subcategory: "Chocolate shop", locationLabel: "Brussel", priceBand: "0_10" };
+  r = await C("POST", "/activities", shop);
+  ok("quality gate: a Leonidas shop cannot be added to the catalogue", r.status === 400 && /regel: retail_brand/.test(JSON.stringify(r.data)), r.data);
+  r = await C("POST", "/activities?force=1", shop);
+  ok("quality gate: the owner can override explicitly", r.status === 201, r.data);
+  r = await C("POST", "/activities/import/preview", {
+    csv: ["title,category,location_label,price_band,subcategory", "Leonidas Rivoli,food_drinks,Brussel,0_10,Chocolate shop", "Escape Zone,entertainment,Gent,10_25,Escape room", ""].join("\n"),
+  });
+  ok("quality gate: CSV import rejects the shop and accepts the escape room", r.status === 200 && r.data.createCount === 1 && r.data.errors.some((e) => /Kwaliteitsregel/.test(e.message)), r.data);
 
   // ---- audit trail records the actions ----
   r = await call(admin, "GET", "/api/admin/cc/audit?range=today&action=outreach.sent");

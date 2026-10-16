@@ -16,6 +16,7 @@ import { badRequest, notFound } from "../lib/errors";
 import { newId } from "../lib/id";
 import { parseBody } from "../lib/validate";
 import { audit } from "../lib/audit";
+import { assessActivity } from "../lib/activity-quality";
 import { parseCsvToRecords } from "../lib/csv";
 import {
   ACTIVITY_CSV_COLUMNS,
@@ -146,6 +147,23 @@ app.post("/activities/import/preview", async (c) => {
       });
       if (duplicates.length < PREVIEW_LIST_CAP) {
         duplicates.push({ row, title: data.title, reason, existingId: match.id, existingTitle: match.title });
+      }
+      return;
+    }
+
+    // Quality rule: no shop / ordinary commerce / non-experience gets in just because it exists.
+    const verdict = assessActivity({
+      title: data.title,
+      provider: data.provider,
+      category_id: data.categoryId,
+      subcategory: data.subcategory,
+      source: "web",
+      description: data.description,
+      website_url: data.websiteUrl,
+    });
+    if (verdict.outcome === "exclude" && verdict.confidence !== "low") {
+      if (errors.length < PREVIEW_LIST_CAP) {
+        errors.push({ row, message: `Kwaliteitsregel (${verdict.rule}): ${verdict.reason}` });
       }
       return;
     }

@@ -273,6 +273,43 @@ export const providers = sqliteTable("providers", {
   createdAt: integer("created_at").notNull().default(now),
 });
 
+/**
+ * Quality audit verdict per activity (see lib/activity-quality.ts). Hiding is
+ * reversible: `previousActive` / `previousStatus` hold what the row looked like
+ * before the audit hid it, so a wrongly excluded activity can be restored with
+ * its id, favourites, matches and statistics intact.
+ */
+export const activityAudits = sqliteTable(
+  "activity_audits",
+  {
+    activityId: text("activity_id")
+      .primaryKey()
+      .references(() => activities.id, { onDelete: "cascade" }),
+    outcome: text("outcome", {
+      enum: ["approved", "fix_data", "manual", "exclude", "duplicate", "closed"],
+    }).notNull(),
+    /** Machine id of the rule that decided, or "owner" for a manual decision. */
+    rule: text("rule").notNull(),
+    reason: text("reason").notNull(),
+    confidence: text("confidence", { enum: ["high", "medium", "low"] }).notNull(),
+    /** JSON array of data gaps: photo_generic, description_bare, website_unreliable, … */
+    issues: text("issues").notNull().default("[]"),
+    duplicateOf: text("duplicate_of"),
+    /** 1 = this audit hid the activity (active=0). */
+    hidden: integer("hidden").notNull().default(0),
+    previousActive: integer("previous_active"),
+    previousStatus: text("previous_status"),
+    /** What the verdict is based on: "rules" (+ website crawl) or an owner decision. */
+    source: text("source").notNull().default("rules"),
+    decidedBy: text("decided_by"),
+    auditedAt: integer("audited_at").notNull().default(now),
+  },
+  (t) => ({
+    outcomeIdx: index("activity_audits_outcome_idx").on(t.outcome),
+    ruleIdx: index("activity_audits_rule_idx").on(t.rule),
+  }),
+);
+
 export const activityCategories = sqliteTable("activity_categories", {
   id: text("id").primaryKey(), // slug: "sport", "food_drinks", ...
   label: text("label").notNull(),

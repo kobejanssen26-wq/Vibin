@@ -13,11 +13,14 @@ import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { OSM_CATEGORIES } from "./categories.mjs";
+// Run with tsx (npm run osm:build): the shared quality rules decide what never enters the catalogue.
+import { assessActivity } from "../../src/worker/lib/activity-quality.ts";
 import { resolvePlace, allPlaces } from "../../src/worker/lib/be-places.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const RAW = join(here, "raw");
 const byKey = Object.fromEntries(OSM_CATEGORIES.map((c) => [c.key, c]));
+const REJECTED = {};
 
 // Wikidata P18 photos (fetch-wikidata-images.mjs) — a real, curated photo of
 // this exact entity, keyed by QID. Optional: falls back to {} if not fetched.
@@ -131,6 +134,21 @@ for (const file of readdirSync(RAW).filter((f) => f.endsWith(".json"))) {
       t.cuisine ? `cuisine:${String(t.cuisine).split(";")[0]}` : null,
     ].filter(Boolean);
 
+    // Quality rule: shops, libraries, ordinary markets, monuments… are not VIBIN activities.
+    const verdict = assessActivity({
+      title: name,
+      provider: name,
+      category_id: cat.category,
+      subcategory: cat.subcategory,
+      source: "osm",
+      description,
+      website_url: website,
+    });
+    if (verdict.outcome === "exclude" || verdict.outcome === "closed") {
+      REJECTED[verdict.rule] = (REJECTED[verdict.rule] ?? 0) + 1;
+      continue;
+    }
+
     seen.add(dk);
     bucket.push({
       slug: `osm-${key}-${osmId}`,
@@ -177,6 +195,7 @@ for (const file of readdirSync(RAW).filter((f) => f.endsWith(".json"))) {
 }
 
 writeFileSync(join(here, "osm-activities.json"), JSON.stringify(OUT, null, 1));
+console.log("rejected by the quality rules:", REJECTED);
 console.log(`raw elements scanned: ${raw}`);
 console.log(`kept: ${OUT.length} activities across ${Object.keys(perCat).length} kinds`);
 console.table(perCat);

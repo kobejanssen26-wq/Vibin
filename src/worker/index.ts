@@ -32,6 +32,7 @@ import adminImportRoutes from "./routes/admin-import";
 import adminEventRoutes from "./routes/admin-events";
 import adminSupportRoutes from "./routes/admin-support";
 import adminVaultRoutes from "./routes/admin-vault";
+import adminQualityRoutes from "./routes/admin-quality";
 import adminOutreachRoutes from "./routes/admin-outreach";
 import adminOutreachMailRoutes from "./routes/admin-outreach-mail";
 import outreachPublicRoutes from "./routes/outreach-public";
@@ -167,6 +168,7 @@ commandCenter.route("/", adminImportRoutes); // CSV template/preview/confirm
 commandCenter.route("/", adminEventRoutes); // live events + ingestion sources
 commandCenter.route("/", adminSupportRoutes); // help-desk tickets
 commandCenter.route("/vault", adminVaultRoutes); // encrypted credential vault
+commandCenter.route("/", adminQualityRoutes); // catalogue quality audit
 commandCenter.route("/outreach", adminOutreachRoutes); // provider outreach: orgs, contacts, settings
 commandCenter.route("/outreach", adminOutreachMailRoutes); // drafts, approval, send, campaigns
 api.route("/admin/cc", commandCenter);
