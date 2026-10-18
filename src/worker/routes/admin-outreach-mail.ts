@@ -141,7 +141,17 @@ async function prepareDraft(env: Env, orgId: string, contactId?: string): Promis
   )
     .bind(contact.id, testMode)
     .first<{ id: string; status: string }>();
-  if (existing) {
+  // A test mail that was already "sent" (to the test inbox / dry-run) must never block a new test concept.
+  let replacedTest = false;
+  if (existing && existing.status === "sent" && testMode === 1) {
+    await env.DB.prepare(
+      `UPDATE outreach_messages SET status = 'cancelled', error = 'Vervangen door een nieuw testconcept', updated_at = ?1 WHERE id = ?2`,
+    )
+      .bind(now, existing.id)
+      .run();
+    replacedTest = true;
+  }
+  if (existing && !replacedTest) {
     if (existing.status === "sent") {
       return { ok: false, code: "already_sent", message: "Naar dit adres is al een bericht verzonden." };
     }

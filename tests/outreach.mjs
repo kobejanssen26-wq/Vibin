@@ -322,7 +322,7 @@ async function main() {
   ok("7: message is still a draft", r.data.status === "draft");
 
   // ---- 1. the happy path (test mode → dry-run) ----
-  ok("1: preview ends with a short opt-out line, no source sentence, no '--' separator", /Afmelden: https?:\/\//.test(r.data.finalText) && !/Je adres vonden we/.test(r.data.finalText) && !/^--$/m.test(r.data.finalText), r.data.finalText.slice(-300));
+  ok("1: preview ends with a short opt-out line, no source sentence, no '--' separator", /met "stop"/.test(r.data.finalText) && !/optout|https?:\/\//.test(r.data.finalText.split("\n").slice(-3).join(" ")) && !/Je adres vonden we/.test(r.data.finalText) && !/^--$/m.test(r.data.finalText), r.data.finalText.slice(-300));
   ok("1: greeting uses the provider name", r.data.bodyText.startsWith("Hallo Bowling OK,"), r.data.bodyText.slice(0, 40));
   const okHash = r.data.hash;
   r = await A("POST", `/messages/${okMsg}/send`, { hash: okHash });
@@ -336,9 +336,9 @@ async function main() {
 
   // ---- 5. already contacted ----
   r = await A("POST", "/orgs/o_ok/prepare", {});
-  ok("5: already-sent address cannot be prepared again", r.status === 409, r.data);
+  ok("5: a sent TEST message never blocks a new test concept", r.status === 200 && r.data.messageId !== okMsg, r.data);
   r = await A("POST", `/messages/${okMsg}/send`, { hash: okHash });
-  ok("5: re-sending an already sent message is refused", r.status === 409, r.data);
+  ok("5: re-sending the old (replaced) message is refused", r.status === 409 || r.status === 422, r.data);
 
   // ---- 8. two quick clicks ----
   r = await A("POST", "/orgs/o_dbl/prepare", {});

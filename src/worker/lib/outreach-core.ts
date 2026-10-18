@@ -340,8 +340,7 @@ Alvast bedankt voor jullie tijd!
 
 Met vriendelijke groeten,
 
-Het VIBIN-team
-{{website}} · {{contact}}`;
+Het VIBIN-team`;
 
 export interface TemplateVars {
   provider: string;
@@ -375,7 +374,9 @@ export function buildFooter(f: FooterVars): string {
   // Short and quiet; the right to object must stay clearly visible (art. XII.13 §2 WER).
   const lines = [""];
   if (f.identity.trim()) lines.push(f.identity.trim());
-  lines.push(`Geen berichten meer ontvangen? Afmelden: ${f.optoutUrl}`);
+  // No visible link for now (the site is not public yet): replying "stop" is the electronic way to object.
+  // The one-click List-Unsubscribe header still carries the opt-out URL.
+  lines.push(`Geen berichten meer ontvangen? Antwoord op deze mail met "stop".`);
   return lines.join("\n");
 }
 
@@ -404,7 +405,7 @@ export function buildHtml(f: { body: string; identity: string; optoutUrl: string
 <div style="max-width:560px;margin:0 auto;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#1a1f36">
 ${banner}${paras}
 <div style="margin-top:28px;padding-top:12px;border-top:1px solid #e6e8f0;font-size:12px;line-height:1.5;color:#8a90a8">
-${identity}Geen berichten meer ontvangen? <a href="${escapeHtml(f.optoutUrl)}" style="color:#8a90a8;text-decoration:underline">Afmelden</a>
+${identity}Geen berichten meer ontvangen? Antwoord op deze mail met &quot;stop&quot;.
 </div></div></body></html>`;
 }
 
