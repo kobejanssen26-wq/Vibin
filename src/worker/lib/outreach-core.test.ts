@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildFooter,
+  buildHtml,
   classifyEmail,
   defaultConfig,
   domainMatchesSite,
@@ -120,10 +121,20 @@ describe("template and footer", () => {
     const noName = renderTemplate("Hallo {{provider}},\n\nX", { provider: "", website: "", contact: "" });
     expect(noName).toBe("Hallo,\n\nX");
   });
-  it("footer carries the opt-out link and the data source", () => {
+  it("footer is short: identity + opt-out link, no source sentence", () => {
     const f = buildFooter({ identity: "VIBIN", sourceUrl: "https://bowling.be/contact", optoutUrl: "https://vibin.be/optout/abc" });
     expect(f).toContain("https://vibin.be/optout/abc");
-    expect(f).toContain("https://bowling.be/contact");
+    expect(f).toContain("VIBIN");
+    expect(f).not.toContain("bowling.be");
+    expect(f).not.toContain("--");
+  });
+  it("html mail: paragraphs, links, escaped content, an 'Afmelden' link and no raw token text", () => {
+    const h = buildHtml({ body: "Hallo <b>X</b>,\n\nBezoek vibin.be of mail hello@vibin.be", identity: "VIBIN", optoutUrl: "https://vibin.be/optout/tok.en" });
+    expect(h).toContain("&lt;b&gt;X&lt;/b&gt;");
+    expect(h).toContain('href="https://vibin.be"');
+    expect(h).toContain('href="mailto:hello@vibin.be"');
+    expect(h).toContain('>Afmelden</a>');
+    expect(h).not.toContain("<b>X</b>");
   });
 });
 

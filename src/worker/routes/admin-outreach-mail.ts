@@ -128,8 +128,9 @@ async function prepareDraft(env: Env, orgId: string, contactId?: string): Promis
 
   const looksLikeDomain = /^[a-z0-9-]+(.[a-z0-9-]+)+$/.test(org.name.trim());
   const providerName = looksLikeDomain ? "" : org.name;
-  const subject = renderTemplate(config.subject, { provider: providerName, website: config.websiteUrl, contact: config.contactAddress });
-  const body = renderTemplate(config.body, { provider: providerName, website: config.websiteUrl, contact: config.contactAddress });
+  const shownSite = config.websiteUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  const subject = renderTemplate(config.subject, { provider: providerName, website: shownSite, contact: config.contactAddress });
+  const body = renderTemplate(config.body, { provider: providerName, website: shownSite, contact: config.contactAddress });
   const testMode = config.mode === "live" ? 0 : 1;
   const now = nowSec();
 

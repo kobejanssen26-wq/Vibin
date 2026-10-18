@@ -341,8 +341,7 @@ Alvast bedankt voor jullie tijd!
 Met vriendelijke groeten,
 
 Het VIBIN-team
-{{website}}
-{{contact}}`;
+{{website}} · {{contact}}`;
 
 export interface TemplateVars {
   provider: string;
@@ -358,6 +357,8 @@ export function renderTemplate(tpl: string, vars: TemplateVars): string {
   // A missing value must not leave a gap or a stray placeholder in the mail.
   return out
     .replace(/Hallo ,/g, "Hallo,")
+    .replace(/ · $/gm, "")
+    .replace(/^ · /gm, "")
     .replace(/\{\{[^}]*\}\}/g, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -371,17 +372,40 @@ export interface FooterVars {
 
 /** Always appended; not part of the editable template so it cannot be removed. */
 export function buildFooter(f: FooterVars): string {
-  const lines = ["", "--"];
+  // Short and quiet; the right to object must stay clearly visible (art. XII.13 §2 WER).
+  const lines = [""];
   if (f.identity.trim()) lines.push(f.identity.trim());
-  if (f.sourceUrl) {
-    lines.push(
-      `Je adres vonden we op ${f.sourceUrl}. Dit is een eenmalig bericht aan het algemene adres van jullie organisatie.`,
-    );
-  } else {
-    lines.push("Dit is een eenmalig bericht aan het algemene adres van jullie organisatie.");
-  }
-  lines.push(`Liever geen berichten meer van VIBIN? Meld je af via ${f.optoutUrl} of antwoord "stop" op deze mail.`);
+  lines.push(`Geen berichten meer ontvangen? Afmelden: ${f.optoutUrl}`);
   return lines.join("\n");
+}
+
+const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/** Plain text → a clean, single-column HTML mail (links, paragraphs, small grey footer). */
+export function buildHtml(f: { body: string; identity: string; optoutUrl: string; banner?: string }): string {
+  const link = (s: string) =>
+    escapeHtml(s).replace(
+      /(https?:\/\/[^\s<]+|[\w.+-]+@[\w-]+(?:\.[\w-]+)+|\b(?:[a-z0-9-]+\.)+(?:be|com|eu)\b)/gi,
+      (m) => {
+        const href = m.includes("@") ? `mailto:${m}` : /^https?:/i.test(m) ? m : `https://${m}`;
+        return `<a href="${href}" style="color:#3155ff;text-decoration:none">${m.replace(/^https?:\/\//i, "")}</a>`;
+      },
+    );
+  const paras = f.body
+    .trim()
+    .split(/\n{2,}/)
+    .map((p) => `<p style="margin:0 0 16px">${p.split("\n").map(link).join("<br>")}</p>`)
+    .join("");
+  const banner = f.banner
+    ? `<p style="margin:0 0 18px;padding:8px 12px;background:#fff6d6;border-radius:6px;font-size:13px;color:#6b5600">${escapeHtml(f.banner)}</p>`
+    : "";
+  const identity = f.identity.trim() ? `${escapeHtml(f.identity.trim())} · ` : "";
+  return `<!doctype html><html lang="nl"><body style="margin:0;padding:24px;background:#ffffff">
+<div style="max-width:560px;margin:0 auto;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#1a1f36">
+${banner}${paras}
+<div style="margin-top:28px;padding-top:12px;border-top:1px solid #e6e8f0;font-size:12px;line-height:1.5;color:#8a90a8">
+${identity}Geen berichten meer ontvangen? <a href="${escapeHtml(f.optoutUrl)}" style="color:#8a90a8;text-decoration:underline">Afmelden</a>
+</div></div></body></html>`;
 }
 
 /* -------------------------------------------------------------------------- */

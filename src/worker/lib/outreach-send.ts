@@ -15,6 +15,7 @@ import { loadConfig } from "./outreach-config";
 import { runDiscoveryBatch } from "./outreach-discover";
 import {
   buildFooter,
+  buildHtml,
   emailDomain,
   evaluateSend,
   isValidEmail,
@@ -234,6 +235,7 @@ interface Mail {
   replyTo: string;
   subject: string;
   text: string;
+  html?: string;
   headers: Record<string, string>;
   idempotencyKey: string;
 }
@@ -262,6 +264,7 @@ async function deliver(env: Env, mail: Mail): Promise<ProviderResult> {
         reply_to: mail.replyTo,
         subject: mail.subject,
         text: mail.text,
+        ...(mail.html ? { html: mail.html } : {}),
         headers: mail.headers,
       }),
     });
@@ -382,6 +385,8 @@ export async function sendMessageNow(
     optoutUrl: optOutUrl(env, token || "niet-beschikbaar-in-test"),
   });
   let text = `${row.body_text}\n${footer}`;
+  const optoutLink = optOutUrl(env, token || "niet-beschikbaar-in-test");
+  let banner: string | undefined;
   let subject = row.subject;
   let to = realTo;
   let dryRun = false;
@@ -391,6 +396,7 @@ export async function sendMessageNow(
       to = config.testInbox;
       subject = `[TEST → ${realTo}] ${row.subject}`;
       text = `TESTBERICHT — dit zou naar ${realTo} gaan.\n\n${text}`;
+      banner = `TESTBERICHT — dit zou naar ${realTo} gaan.`;
     } else {
       dryRun = true;
     }
@@ -403,6 +409,7 @@ export async function sendMessageNow(
     replyTo: config.replyTo || config.contactAddress || config.fromEmail,
     subject,
     text,
+    html: buildHtml({ body: row.body_text, identity: config.senderIdentity, optoutUrl: optoutLink, banner }),
     headers: token
       ? {
           "List-Unsubscribe": `<${optOutUrl(env, token)}>${config.contactAddress ? `, <mailto:${config.contactAddress}?subject=stop>` : ""}`,
