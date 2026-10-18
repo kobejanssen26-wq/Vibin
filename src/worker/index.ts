@@ -258,7 +258,55 @@ app.get("/.well-known/assetlinks.json", (c) => {
 
 // Static SPA — assets binding handles hashing, caching and the SPA fallback
 // (not_found_handling: single-page-application in wrangler.jsonc).
-app.all("*", (c) => c.env.ASSETS.fetch(c.req.raw));
+/* ---- "Binnenkort" gate -------------------------------------------------
+ * While maintenance mode is ON (Command Center → Settings) every page
+ * navigation shows this coming-soon page instead of the app. Only the admin
+ * area, its static assets, the opt-out links and the .well-known files stay
+ * reachable, so the owner can still sign in and turn it off. The API is
+ * already answering 503 to everyone but admins (see the maintenance middleware). */
+const COMING_SOON_ALLOW = /^\/(admin(\/|$)|assets\/|\.well-known\/|optout\/|icons?\/|favicon|manifest|robots\.txt|apple-touch)/;
+const comingSoonHtml = (msg: string) => `<!doctype html>
+<html lang="nl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>VIBIN — binnenkort</title>
+<style>
+  :root{color-scheme:dark}
+  body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;text-align:center;
+    font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#f7f8fc;
+    background:radial-gradient(1200px 600px at 50% -10%,#1b2a6b 0%,#0b0e1c 60%)}
+  main{max-width:520px}
+  h1{font-size:44px;letter-spacing:-.02em;margin:18px 0 8px}
+  h1 b{color:#b6f23a}
+  p{color:#b9bfdc;margin:0 0 10px}
+  .pill{display:inline-block;margin-top:14px;padding:6px 14px;border-radius:999px;background:#ffffff14;color:#dfe3f7;font-size:14px}
+  a{color:#7d96ff;font-size:13px;text-decoration:none}
+</style></head><body><main>
+<svg width="72" height="72" viewBox="0 0 72 72" aria-hidden="true"><path d="M14 10 L36 52" stroke="#3155ff" stroke-width="12" stroke-linecap="round" fill="none"/><path d="M58 10 L36 52" stroke="#b6f23a" stroke-width="12" stroke-linecap="round" fill="none"/><circle cx="36" cy="54" r="7" fill="#fff"/></svg>
+<h1>VI<b>BIN</b></h1>
+<p>${msg}</p>
+<span class="pill">Binnenkort beschikbaar</span>
+<p style="margin-top:28px"><a href="/admin">Beheer</a></p>
+</main></body></html>`;
+
+app.all("*", async (c) => {
+  const url = new URL(c.req.url);
+  const isPageNav =
+    (c.req.method === "GET" || c.req.method === "HEAD") &&
+    !COMING_SOON_ALLOW.test(url.pathname) &&
+    !/\.[a-z0-9]{2,5}$/i.test(url.pathname);
+  if (isPageNav) {
+    const m = await maintenanceState(c.env);
+    if (m.on) {
+      return c.html(comingSoonHtml(m.msg || "We werken aan iets moois. Tot snel!"), 503, {
+        "cache-control": "no-store",
+        "retry-after": "3600",
+        "x-content-type-options": "nosniff",
+      });
+    }
+  }
+  return c.env.ASSETS.fetch(c.req.raw);
+});
 
 export default {
   fetch: app.fetch,

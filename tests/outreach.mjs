@@ -447,6 +447,24 @@ async function main() {
   r = await call(anon, "POST", "/api/admin/cc/outreach/test-email", { to: "iemand@example.com" });
   ok("test mail: not reachable without an admin session", r.status === 401, r.status);
 
+  // ---- "binnenkort" gate while maintenance mode is on ----
+  r = await A("GET", "/config");
+  await call(admin, "PUT", "/api/admin/cc/settings", { key: "maintenance_mode", value: "1" }, csrf());
+  await new Promise((res) => setTimeout(res, 16_000)); // the worker caches the flag for 15 s
+  const home = await fetch(BASE + "/");
+  const homeHtml = await home.text();
+  ok("coming soon: visitors get the coming-soon page (503)", home.status === 503 && /Binnenkort beschikbaar/.test(homeHtml), home.status);
+  const deep = await fetch(BASE + "/groups/abc");
+  ok("coming soon: deep links are gated too", deep.status === 503);
+  const adm = await fetch(BASE + "/admin");
+  ok("coming soon: /admin stays reachable", adm.status === 200, adm.status);
+  const opt = await fetch(BASE + "/optout/ongeldig");
+  ok("coming soon: opt-out links keep working", opt.status === 400, opt.status);
+  await call(admin, "PUT", "/api/admin/cc/settings", { key: "maintenance_mode", value: "0" }, csrf());
+  await new Promise((res) => setTimeout(res, 16_000));
+  const back = await fetch(BASE + "/");
+  ok("coming soon: site is back when maintenance mode is off", back.status === 200, back.status);
+
   // ---- test reset ----
   r = await A("POST", "/test-reset", {});
   ok("test reset removes test messages only", r.status === 200 && r.data.removed >= 4, r.data);
