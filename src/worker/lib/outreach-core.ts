@@ -371,13 +371,10 @@ export interface FooterVars {
 
 /** Always appended; not part of the editable template so it cannot be removed. */
 export function buildFooter(f: FooterVars): string {
-  // Short and quiet; the right to object must stay clearly visible (art. XII.13 §2 WER).
-  const lines = [""];
-  if (f.identity.trim()) lines.push(f.identity.trim());
-  // No visible link for now (the site is not public yet): replying "stop" is the electronic way to object.
-  // The one-click List-Unsubscribe header still carries the opt-out URL.
-  lines.push(`Geen berichten meer ontvangen? Antwoord op deze mail met "stop".`);
-  return lines.join("\n");
+  // Owner's choice: no opt-out sentence or link in the visible mail. The one-click
+  // List-Unsubscribe header (invisible in the body) still carries the opt-out URL.
+  return f.identity.trim() ? `
+${f.identity.trim()}` : "";
 }
 
 const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -400,13 +397,12 @@ export function buildHtml(f: { body: string; identity: string; optoutUrl: string
   const banner = f.banner
     ? `<p style="margin:0 0 18px;padding:8px 12px;background:#fff6d6;border-radius:6px;font-size:13px;color:#6b5600">${escapeHtml(f.banner)}</p>`
     : "";
-  const identity = f.identity.trim() ? `${escapeHtml(f.identity.trim())} · ` : "";
+  const identity = f.identity.trim() ? escapeHtml(f.identity.trim()) : "";
   return `<!doctype html><html lang="nl"><body style="margin:0;padding:24px;background:#ffffff">
 <div style="max-width:560px;margin:0 auto;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#1a1f36">
 ${banner}${paras}
-<div style="margin-top:28px;padding-top:12px;border-top:1px solid #e6e8f0;font-size:12px;line-height:1.5;color:#8a90a8">
-${identity}Geen berichten meer ontvangen? Antwoord op deze mail met &quot;stop&quot;.
-</div></div></body></html>`;
+${identity ? `<div style="margin-top:28px;padding-top:12px;border-top:1px solid #e6e8f0;font-size:12px;line-height:1.5;color:#8a90a8">${identity}</div>` : ""}
+</div></body></html>`;
 }
 
 /* -------------------------------------------------------------------------- */

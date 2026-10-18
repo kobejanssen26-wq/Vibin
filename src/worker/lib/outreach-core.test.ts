@@ -121,13 +121,10 @@ describe("template and footer", () => {
     const noName = renderTemplate("Beste {{provider}},\n\nX", { provider: "", website: "", contact: "" });
     expect(noName).toBe("Beste,\n\nX");
   });
-  it("footer is short: identity + reply-stop line, no links, no source sentence", () => {
+  it("footer is only the identity line: no opt-out sentence, no links, no source sentence", () => {
     const f = buildFooter({ identity: "VIBIN", sourceUrl: "https://bowling.be/contact", optoutUrl: "https://vibin.be/optout/abc" });
-    expect(f).toContain('met "stop"');
-    expect(f).not.toContain("http");
-    expect(f).toContain("VIBIN");
-    expect(f).not.toContain("bowling.be");
-    expect(f).not.toContain("--");
+    expect(f.trim()).toBe("VIBIN");
+    expect(buildFooter({ identity: "", sourceUrl: null, optoutUrl: "x" })).toBe("");
   });
   it("html mail: paragraphs, links, escaped content, no footer links", () => {
     const h = buildHtml({ body: "Hallo <b>X</b>,\n\nBezoek vibin.be of mail hello@vibin.be", identity: "VIBIN", optoutUrl: "https://vibin.be/optout/tok.en" });
@@ -135,7 +132,7 @@ describe("template and footer", () => {
     expect(h).toContain('href="https://vibin.be"');
     expect(h).toContain('href="mailto:hello@vibin.be"');
     expect(h).not.toContain('optout');
-    expect(h).toContain('met &quot;stop&quot;');
+    expect(h).not.toContain('stop');
     expect(h).not.toContain("<b>X</b>");
   });
 });

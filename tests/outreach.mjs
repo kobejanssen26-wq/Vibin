@@ -322,7 +322,7 @@ async function main() {
   ok("7: message is still a draft", r.data.status === "draft");
 
   // ---- 1. the happy path (test mode → dry-run) ----
-  ok("1: preview ends with a short opt-out line, no source sentence, no '--' separator", /met "stop"/.test(r.data.finalText) && !/optout|https?:\/\//.test(r.data.finalText.split("\n").slice(-3).join(" ")) && !/Je adres vonden we/.test(r.data.finalText) && !/^--$/m.test(r.data.finalText), r.data.finalText.slice(-300));
+  ok("1: preview ends with the identity only: no opt-out sentence, no source sentence, no '--' separator", !/stop|afmeld/i.test(r.data.finalText.split("\n").slice(-3).join(" ")) &&!/optout|https?:\/\//.test(r.data.finalText.split("\n").slice(-3).join(" ")) && !/Je adres vonden we/.test(r.data.finalText) && !/^--$/m.test(r.data.finalText), r.data.finalText.slice(-300));
   ok("1: greeting uses the provider name", r.data.bodyText.startsWith("Beste Bowling OK,"), r.data.bodyText.slice(0, 40));
   const okHash = r.data.hash;
   r = await A("POST", `/messages/${okMsg}/send`, { hash: okHash });
