@@ -263,7 +263,7 @@ async function main() {
   r = await A("POST", `/orgs/${syncOrg.id}/contacts`, { email: "info@sync-bowling.be", sourceUrl: "https://sync-bowling.be/contact" });
   r = await A("POST", `/orgs/${syncOrg.id}/prepare`, {});
   r = await A("GET", `/messages/${r.data.messageId}`);
-  ok("sync: greeting never uses a bare domain", r.data.bodyText.startsWith("Hallo,"), r.data.bodyText.slice(0, 30));
+  ok("sync: greeting never uses a bare domain", r.data.bodyText.startsWith("Beste,"), r.data.bodyText.slice(0, 30));
   r = await A("GET", "/orgs?q=facebook&excluded=all");
   ok("sync: social network is skipped, not treated as a provider", r.data.rows.every((o) => o.discoveryStatus === "skipped"), r.data.rows);
   r = await A("GET", "/orgs?q=dead-site&excluded=all");
@@ -323,7 +323,7 @@ async function main() {
 
   // ---- 1. the happy path (test mode → dry-run) ----
   ok("1: preview ends with a short opt-out line, no source sentence, no '--' separator", /met "stop"/.test(r.data.finalText) && !/optout|https?:\/\//.test(r.data.finalText.split("\n").slice(-3).join(" ")) && !/Je adres vonden we/.test(r.data.finalText) && !/^--$/m.test(r.data.finalText), r.data.finalText.slice(-300));
-  ok("1: greeting uses the provider name", r.data.bodyText.startsWith("Hallo Bowling OK,"), r.data.bodyText.slice(0, 40));
+  ok("1: greeting uses the provider name", r.data.bodyText.startsWith("Beste Bowling OK,"), r.data.bodyText.slice(0, 40));
   const okHash = r.data.hash;
   r = await A("POST", `/messages/${okMsg}/send`, { hash: okHash });
   ok("1: approve-and-send succeeds in test mode as a dry-run", r.status === 200 && r.data.dryRun === true && r.data.test === true, r.data);

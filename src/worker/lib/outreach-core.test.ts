@@ -115,11 +115,11 @@ describe("template and footer", () => {
       website: "https://vibin.be",
       contact: "",
     });
-    expect(body.startsWith("Hallo Bowling Gent,")).toBe(true);
+    expect(body.startsWith("Beste Bowling Gent,")).toBe(true);
     expect(body.trim().endsWith("Het VIBIN-team")).toBe(true); // no links under the signature for now
     expect(body).not.toMatch(/\{\{/);
-    const noName = renderTemplate("Hallo {{provider}},\n\nX", { provider: "", website: "", contact: "" });
-    expect(noName).toBe("Hallo,\n\nX");
+    const noName = renderTemplate("Beste {{provider}},\n\nX", { provider: "", website: "", contact: "" });
+    expect(noName).toBe("Beste,\n\nX");
   });
   it("footer is short: identity + reply-stop line, no links, no source sentence", () => {
     const f = buildFooter({ identity: "VIBIN", sourceUrl: "https://bowling.be/contact", optoutUrl: "https://vibin.be/optout/abc" });

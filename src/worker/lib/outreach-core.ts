@@ -324,7 +324,7 @@ export function robotsAllows(robotsTxt: string, path: string, botToken = "vibinc
 
 export const DEFAULT_SUBJECT = "Mag ik VIBIN kort aan jullie voorstellen?";
 
-export const DEFAULT_BODY = `Hallo {{provider}},
+export const DEFAULT_BODY = `Beste {{provider}},
 
 Wij zijn VIBIN, een nieuw platform dat binnenkort gelanceerd wordt en mensen helpt om samen met vrienden leuke activiteiten te ontdekken.
 
@@ -334,7 +334,7 @@ We willen graag zoveel mogelijk interessante activiteiten uit België samenbreng
 
 Zouden jullie interesse hebben om meer informatie te ontvangen over een mogelijke vermelding op VIBIN?
 
-Als jullie interesse hebben, vertellen we graag wat meer over het platform en hoe een eventuele samenwerking eruit zou kunnen zien. Jullie zijn uiteraard nergens toe verplicht door op deze mail te reageren.
+Als jullie interesse hebben, vertellen we graag wat meer over het platform en hoe een eventuele samenwerking eruit zou kunnen zien.
 
 Alvast bedankt voor jullie tijd!
 
@@ -355,7 +355,7 @@ export function renderTemplate(tpl: string, vars: TemplateVars): string {
     .replace(/\{\{\s*contact\s*\}\}/g, vars.contact.trim());
   // A missing value must not leave a gap or a stray placeholder in the mail.
   return out
-    .replace(/Hallo ,/g, "Hallo,")
+    .replace(/Beste ,/g, "Beste,")
     .replace(/ · $/gm, "")
     .replace(/^ · /gm, "")
     .replace(/\{\{[^}]*\}\}/g, "")
