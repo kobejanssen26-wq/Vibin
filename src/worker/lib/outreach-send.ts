@@ -12,6 +12,7 @@
 import type { Env } from "../env";
 import { newId } from "./id";
 import { loadConfig } from "./outreach-config";
+import { mentionedElsewhere } from "./outreach-draft";
 import { runDiscoveryBatch } from "./outreach-discover";
 import {
   buildFooter,
@@ -108,6 +109,8 @@ interface Row {
   o_id: string | null;
   o_excl: number | null;
   o_name: string | null;
+  o_gconf: string | null;
+  o_gok: number | null;
 }
 
 async function loadRow(env: Env, id: string): Promise<Row | null> {
@@ -117,7 +120,8 @@ async function loadRow(env: Env, id: string): Promise<Row | null> {
             m.approved_hash, m.attempts,
             c.id AS c_id, c.org_id AS c_org, c.email AS c_email, c.kind AS c_kind,
             c.verification AS c_ver, c.mx_ok AS c_mx, c.source_url AS c_src,
-            o.id AS o_id, o.excluded AS o_excl, o.name AS o_name
+            o.id AS o_id, o.excluded AS o_excl, o.name AS o_name,
+            o.group_confidence AS o_gconf, o.group_confirmed AS o_gok
        FROM outreach_messages m
        LEFT JOIN outreach_contacts c ON c.id = m.contact_id
        LEFT JOIN outreach_orgs o ON o.id = m.org_id
@@ -134,12 +138,14 @@ export async function checkMessage(
   row: Row,
   stage: "approve" | "send",
 ): Promise<Reason[]> {
-  const [suppressed, sentLive, last24] = await Promise.all([
+  const [suppressed, sentLive, last24, mentioned] = await Promise.all([
     isSuppressed(env, row.to_email),
     env.DB.prepare(
       `SELECT 1 AS x FROM outreach_messages
         WHERE status = 'sent' AND test_mode = 0 AND id != ?1
-          AND (org_id = ?2 OR lower(to_email) = ?3
+          AND ((org_id = ?2 AND NOT EXISTS (
+                  SELECT 1 FROM outreach_message_activities x WHERE x.message_id = outreach_messages.id))
+               OR lower(to_email) = ?3
                OR lower(to_email) LIKE '%@' || ?4 OR lower(to_email) LIKE '%.' || ?4) LIMIT 1`,
     )
       .bind(row.id, row.org_id, normalizeEmail(row.to_email), registrableDomain(emailDomain(row.to_email)))
@@ -150,6 +156,8 @@ export async function checkMessage(
     )
       .bind(nowSec() - 86400)
       .first<{ n: number }>(),
+    // Activities this message names that another open or sent message to the organisation already named.
+    mentionedElsewhere(env, { id: row.id, org_id: row.org_id, test_mode: row.test_mode }),
   ]);
   const currentHash = await messageHash({
     toEmail: row.to_email,
@@ -180,7 +188,10 @@ export async function checkMessage(
           mxOk: row.c_mx,
         }
       : null,
-    org: row.o_id ? { id: row.o_id, excluded: row.o_excl ?? 0 } : null,
+    org: row.o_id
+      ? { id: row.o_id, excluded: row.o_excl ?? 0, groupConfidence: row.o_gconf ?? "high", groupConfirmed: row.o_gok ?? 0 }
+      : null,
+    alreadyMentioned: mentioned,
     suppressed,
     alreadySentLive: !!sentLive,
     sentLast24h: last24?.n ?? 0,

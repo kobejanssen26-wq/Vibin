@@ -2,6 +2,8 @@ import { z } from "zod";
 import type { Env } from "../env";
 import { getSetting, setSetting } from "./system-settings";
 import {
+  DEFAULT_BODY,
+  LEGACY_BODY,
   defaultConfig,
   isValidEmail,
   type OutreachConfig,
@@ -32,6 +34,7 @@ export const configPatchSchema = z
     senderIdentity: z.string().trim().max(500),
     subject: z.string().trim().min(3).max(200),
     body: z.string().trim().min(20).max(8000),
+    bodyMulti: z.string().trim().min(20).max(8000),
     dailyCap: z.number().int().min(1).max(500),
     perRun: z.number().int().min(1).max(50),
     autoDiscovery: z.boolean(),
@@ -65,6 +68,8 @@ export async function loadConfig(env: Env): Promise<OutreachConfig> {
         note: typeof lr.note === "string" ? lr.note.slice(0, 1000) : "",
       };
     }
+    // A stored copy of the old wording (before activities were named) moves to the new one.
+    if (merged.body.trim() === LEGACY_BODY.trim()) merged.body = DEFAULT_BODY;
     if (!merged.websiteUrl) merged.websiteUrl = base.websiteUrl;
     return merged;
   } catch {

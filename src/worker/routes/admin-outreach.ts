@@ -17,6 +17,7 @@ import { parseBody } from "../lib/validate";
 import {
   AGGREGATOR_DOMAINS,
   classifyEmail,
+  classifyRole,
   domainMatchesSite,
   hostOf,
   isValidEmail,
@@ -30,6 +31,7 @@ import {
   saveConfig,
 } from "../lib/outreach-config";
 import { electPrimary, runDiscoveryBatch } from "../lib/outreach-discover";
+import { assessOrgs, backfillContactRoles, describeGroup, refreshOrgDrafts } from "../lib/outreach-draft";
 
 type Ctx = { Bindings: Env; Variables: Vars };
 const app = new Hono<Ctx>();
@@ -271,6 +273,13 @@ app.post("/sync", async (c) => {
     ),
   ];
   await db.batch(stmts);
+  // New domains get a grouping verdict; one the owner confirmed is never touched.
+  await db.prepare(
+    `UPDATE outreach_orgs SET group_confidence = 'high', group_source = 'single'
+      WHERE group_confidence = 'unchecked' AND activity_count <= 1`,
+  ).run();
+  const grouping = await assessOrgs(c.env, { limit: 400 });
+  await backfillContactRoles(c.env);
   const after = await db.prepare(`SELECT COUNT(*) AS n FROM outreach_orgs`).first<{ n: number }>();
   const links = await db.prepare(`SELECT COUNT(*) AS n FROM outreach_org_activities`).first<{ n: number }>();
   await audit(c, {
@@ -282,7 +291,16 @@ app.post("/sync", async (c) => {
     orgs: after?.n ?? 0,
     added: (after?.n ?? 0) - (before?.n ?? 0),
     activityLinks: links?.n ?? 0,
+    grouping,
   });
+});
+
+/** Judge organisations that have no grouping verdict yet (also fills in contact roles). */
+app.post("/group/assess", async (c) => {
+  const grouping = await assessOrgs(c.env, { limit: 400 });
+  const roles = await backfillContactRoles(c.env);
+  await audit(c, { action: "outreach.group_assessed", targetType: "outreach", meta: { ...grouping, roles } });
+  return c.json({ ...grouping, roles });
 });
 
 app.post("/discover", async (c) => {
@@ -305,6 +323,7 @@ app.get("/orgs", async (c) => {
   const uncontacted = url.searchParams.get("uncontacted") === "1";
   const usable = url.searchParams.get("usable") === "1";
   const sortReq = url.searchParams.get("sort") || "activities";
+  const group = url.searchParams.get("group") || "";
 
   const where: string[] = [];
   const binds: unknown[] = [];
@@ -341,6 +360,14 @@ app.get("/orgs", async (c) => {
     );
   }
   if (usable) where.push(`c.verification = 'checked' AND c.kind = 'generic'`);
+  if (["high", "medium", "low"].includes(group)) {
+    where.push(`o.group_confidence = ?`);
+    binds.push(group);
+  } else if (group === "needs_confirm") {
+    where.push(`o.group_confidence = 'low' AND o.group_confirmed = 0`);
+  } else if (group === "multi") {
+    where.push(`o.activity_count > 1`);
+  }
 
   const needsJoin = !!verification || !!emailStatus || usable;
   const from = `
@@ -363,6 +390,8 @@ app.get("/orgs", async (c) => {
       `SELECT o.id, o.name, o.domain, o.website_url AS websiteUrl, o.activity_count AS activityCount,
               o.discovery_status AS discoveryStatus, o.discovery_note AS discoveryNote,
               o.excluded, o.excluded_reason AS excludedReason, o.review_flag AS reviewFlag,
+              o.group_confidence AS groupConfidence, o.group_confirmed AS groupConfirmed,
+              (SELECT COUNT(*) FROM outreach_org_activities l WHERE l.org_id = o.id AND l.included = 1) AS includedCount,
               c.id AS contactId, c.email, c.kind, c.verification, c.source_type AS sourceType,
               c.source_url AS sourceUrl,
               (SELECT COUNT(*) FROM outreach_contacts x WHERE x.org_id = o.id) AS contactCount,
@@ -385,6 +414,7 @@ app.get("/orgs", async (c) => {
     rows: (rows!.results as Record<string, unknown>[]).map((r) => ({
       ...r,
       excluded: !!r.excluded,
+      groupConfirmed: !!r.groupConfirmed,
       messageTest: !!r.messageTest,
       lastAction: r.last_action,
       last_action: undefined,
@@ -402,7 +432,8 @@ app.get("/orgs/:id", async (c) => {
     `SELECT id, name, domain, website_url AS websiteUrl, activity_count AS activityCount,
             discovery_status AS discoveryStatus, discovery_note AS discoveryNote,
             discovered_at AS discoveredAt, excluded, excluded_reason AS excludedReason,
-            review_flag AS reviewFlag
+            review_flag AS reviewFlag, group_confidence AS groupConfidence,
+            group_source AS groupSource, group_note AS groupNote, group_confirmed AS groupConfirmed
        FROM outreach_orgs WHERE id = ?1`,
   )
     .bind(id)
@@ -410,13 +441,14 @@ app.get("/orgs/:id", async (c) => {
   if (!org) throw notFound("Aanbieder niet gevonden.");
   const [acts, contacts, messages, events] = await c.env.DB.batch([
     c.env.DB.prepare(
-      `SELECT a.id, a.title, a.city, a.website_url AS websiteUrl, a.web_status AS webStatus
+      `SELECT a.id, a.title, a.city, a.website_url AS websiteUrl, a.web_status AS webStatus,
+              l.confidence, l.source, l.included
          FROM outreach_org_activities l JOIN activities a ON a.id = l.activity_id
         WHERE l.org_id = ?1 ORDER BY a.title LIMIT 60`,
     ).bind(id),
     c.env.DB.prepare(
       `SELECT c.id, c.email, c.kind, c.verification, c.source_type AS sourceType, c.source_url AS sourceUrl,
-              c.domain_matches AS domainMatches, c.mx_ok AS mxOk, c.is_primary AS isPrimary, c.note,
+              c.domain_matches AS domainMatches, c.mx_ok AS mxOk, c.is_primary AS isPrimary, c.note, c.role, c.activity_id AS activityId,
               c.found_at AS foundAt, c.checked_at AS checkedAt,
               EXISTS (SELECT 1 FROM outreach_suppressions s
                        WHERE (s.kind = 'email' AND s.value = c.email)
@@ -447,11 +479,15 @@ app.get("/orgs/:id", async (c) => {
   if (org.reviewFlag === "many_names_one_domain") {
     warnings.push("Veel verschillende namen onder één domein: controleer of dit één organisatie is.");
   }
+  if (org.groupConfidence === "low" && !org.groupConfirmed) {
+    warnings.push("Onzeker of alle activiteiten bij één organisatie horen: bevestig de groepering voor je verstuurt.");
+  }
   if (org.reviewFlag === "multiple_addresses") warnings.push("Meerdere adressen gevonden: kies bewust het juiste.");
   if (org.reviewFlag === "public_body") warnings.push("Lijkt een overheids-, erfgoed- of bibliotheeksite: waarschijnlijk geen commerciële aanbieder.");
   return c.json({
-    org: { ...org, excluded: !!org.excluded },
-    activities: acts!.results,
+    org: { ...org, excluded: !!org.excluded, groupConfirmed: !!org.groupConfirmed },
+    group: await describeGroup(c.env, id),
+    activities: (acts!.results as Record<string, unknown>[]).map((a) => ({ ...a, included: !!a.included })),
     contacts: cs.map((x) => ({ ...x, suppressed: !!x.suppressed })),
     messages: messages!.results,
     events: events!.results,
@@ -495,6 +531,138 @@ app.post("/orgs/:id/recheck", async (c) => {
   return c.json({ ok: true });
 });
 
+/* ---------------------------- grouping & activities ---------------------------- */
+
+/** Messages already in a campaign queue must not change under the owner's feet. */
+async function assertNoQueued(env: Env, orgId: string): Promise<void> {
+  const q = await env.DB.prepare(
+    `SELECT 1 AS x FROM outreach_messages WHERE org_id = ?1 AND status IN ('queued','sending') LIMIT 1`,
+  )
+    .bind(orgId)
+    .first();
+  if (q) throw conflict("Er staat een bericht in een campagne. Annuleer dat eerst.");
+}
+
+/** Choose which linked activities are named in the mail. Drafts of the organisation are rebuilt. */
+app.put("/orgs/:id/activities", async (c) => {
+  const orgId = c.req.param("id");
+  const b = await parseBody(c, z.object({ included: z.record(z.string().max(40), z.boolean()) }));
+  const ids = Object.keys(b.included);
+  if (!ids.length) throw badRequest("Geen activiteiten opgegeven.");
+  await assertNoQueued(c.env, orgId);
+  const stmts = ids.map((aid) =>
+    c.env.DB.prepare(`UPDATE outreach_org_activities SET included = ?1 WHERE org_id = ?2 AND activity_id = ?3`).bind(
+      b.included[aid] ? 1 : 0,
+      orgId,
+      aid,
+    ),
+  );
+  await c.env.DB.batch(stmts);
+  const drafts = await refreshOrgDrafts(c.env, orgId);
+  await logEvent(c.env, orgId, "contact_edited", `Activiteitenselectie aangepast (${ids.length})`, c.get("adminUserId"));
+  await audit(c, { action: "outreach.activities_selected", targetType: "outreach_org", targetId: orgId, meta: { count: ids.length, ...drafts } });
+  return c.json({ ok: true, ...drafts });
+});
+
+/** Link an activity to this organisation by hand (the activities table itself is never changed). */
+app.post("/orgs/:id/activities/link", async (c) => {
+  const orgId = c.req.param("id");
+  const b = await parseBody(c, z.object({ activityId: z.string().trim().max(40) }));
+  const [org, act] = await Promise.all([
+    c.env.DB.prepare(`SELECT id FROM outreach_orgs WHERE id = ?1`).bind(orgId).first(),
+    c.env.DB.prepare(`SELECT id FROM activities WHERE id = ?1`).bind(b.activityId).first(),
+  ]);
+  if (!org) throw notFound("Aanbieder niet gevonden.");
+  if (!act) throw notFound("Activiteit niet gevonden.");
+  await assertNoQueued(c.env, orgId);
+  try {
+    await c.env.DB.prepare(
+      `INSERT INTO outreach_org_activities (org_id, activity_id, confidence, source, included) VALUES (?1,?2,'high','manual',1)`,
+    )
+      .bind(orgId, b.activityId)
+      .run();
+  } catch {
+    throw conflict("Deze activiteit is al gekoppeld.");
+  }
+  await c.env.DB.prepare(
+    `UPDATE outreach_orgs SET activity_count = (SELECT COUNT(*) FROM outreach_org_activities WHERE org_id = ?1), updated_at = ?2 WHERE id = ?1`,
+  )
+    .bind(orgId, nowSec())
+    .run();
+  const drafts = await refreshOrgDrafts(c.env, orgId);
+  await logEvent(c.env, orgId, "contact_edited", `Activiteit handmatig gekoppeld (${b.activityId})`, c.get("adminUserId"));
+  await audit(c, { action: "outreach.activity_linked", targetType: "outreach_org", targetId: orgId, meta: { activityId: b.activityId } });
+  return c.json({ ok: true, ...drafts });
+});
+
+/** Remove a manual link (domain-derived links can only be un-ticked, not removed). */
+app.delete("/orgs/:id/activities/:aid", async (c) => {
+  const orgId = c.req.param("id");
+  await assertNoQueued(c.env, orgId);
+  const r = await c.env.DB.prepare(
+    `DELETE FROM outreach_org_activities WHERE org_id = ?1 AND activity_id = ?2 AND source = 'manual'`,
+  )
+    .bind(orgId, c.req.param("aid"))
+    .run();
+  if (!r.meta.changes) throw conflict("Alleen een handmatig gekoppelde activiteit kan worden losgemaakt.");
+  await c.env.DB.prepare(
+    `UPDATE outreach_orgs SET activity_count = (SELECT COUNT(*) FROM outreach_org_activities WHERE org_id = ?1), updated_at = ?2 WHERE id = ?1`,
+  )
+    .bind(orgId, nowSec())
+    .run();
+  const drafts = await refreshOrgDrafts(c.env, orgId);
+  await audit(c, { action: "outreach.activity_unlinked", targetType: "outreach_org", targetId: orgId });
+  return c.json({ ok: true, ...drafts });
+});
+
+/** Confirm (or withdraw confirmation of) the grouping; "reassess" recomputes the automatic verdict. */
+app.post("/orgs/:id/group", async (c) => {
+  const orgId = c.req.param("id");
+  const b = await parseBody(
+    c,
+    z.object({ action: z.enum(["confirm", "unconfirm", "reassess"]), note: z.string().trim().max(300).optional() }),
+  );
+  const org = await c.env.DB.prepare(`SELECT id, group_confirmed AS confirmed FROM outreach_orgs WHERE id = ?1`)
+    .bind(orgId)
+    .first<{ id: string; confirmed: number }>();
+  if (!org) throw notFound("Aanbieder niet gevonden.");
+  if (b.action === "confirm") {
+    await c.env.DB.prepare(
+      `UPDATE outreach_orgs SET group_confirmed = 1, group_source = 'manual', updated_at = ?1 WHERE id = ?2`,
+    )
+      .bind(nowSec(), orgId)
+      .run();
+  } else if (b.action === "unconfirm") {
+    await assertNoQueued(c.env, orgId);
+    await c.env.DB.prepare(`UPDATE outreach_orgs SET group_confirmed = 0, updated_at = ?1 WHERE id = ?2`)
+      .bind(nowSec(), orgId)
+      .run();
+  } else {
+    if (org.confirmed) throw conflict("Deze groepering is bevestigd. Trek de bevestiging eerst in.");
+    await assertNoQueued(c.env, orgId);
+    await assessOrgs(c.env, { orgId });
+    await refreshOrgDrafts(c.env, orgId);
+  }
+  await logEvent(c.env, orgId, "contact_edited", `Groepering: ${b.action}${b.note ? ` — ${b.note}` : ""}`, c.get("adminUserId"));
+  await audit(c, { action: `outreach.group_${b.action}`, targetType: "outreach_org", targetId: orgId });
+  return c.json({ ok: true });
+});
+
+/** Find an activity to link by hand: title or id fragment. */
+app.get("/activity-search", async (c) => {
+  const q = (new URL(c.req.url).searchParams.get("q") || "").trim().slice(0, 80);
+  if (q.length < 2) return c.json({ rows: [] });
+  const rows = await c.env.DB.prepare(
+    `SELECT a.id, a.title, a.city, a.provider,
+            (SELECT o.name FROM outreach_org_activities l JOIN outreach_orgs o ON o.id = l.org_id
+              WHERE l.activity_id = a.id LIMIT 1) AS orgName
+       FROM activities a WHERE a.active = 1 AND (a.title LIKE ? ESCAPE '\\' OR a.id = ?) ORDER BY a.title LIMIT 15`,
+  )
+    .bind(like(q), q)
+    .all();
+  return c.json({ rows: rows.results });
+});
+
 /* --------------------------------- contacts -------------------------------- */
 
 const kindEnum = z.enum(["generic", "personal", "unknown"]);
@@ -522,12 +690,12 @@ app.post("/orgs/:id/contacts", async (c) => {
   try {
     await c.env.DB.prepare(
       `INSERT INTO outreach_contacts
-         (id, org_id, email, kind, source_type, source_url, domain_matches, verification, note, found_at, created_at)
-       VALUES (?1,?2,?3,?4,'manual',?5,?6,'unverified',?7,?8,?8)`,
+         (id, org_id, email, kind, source_type, source_url, domain_matches, verification, note, role, found_at, created_at)
+       VALUES (?1,?2,?3,?4,'manual',?5,?6,'unverified',?7,?9,?8,?8)`,
     )
       .bind(
         id, orgId, email, b.kind ?? classifyEmail(email), b.sourceUrl,
-        domainMatchesSite(email, org.domain) ? 1 : 0, b.note ?? null, nowSec(),
+        domainMatchesSite(email, org.domain) ? 1 : 0, b.note ?? null, nowSec(), classifyRole(email),
       )
       .run();
   } catch {
@@ -549,6 +717,9 @@ app.put("/contacts/:id", async (c) => {
       verification: verifEnum.optional(),
       isPrimary: z.boolean().optional(),
       note: z.string().trim().max(500).nullable().optional(),
+      role: z.enum(["general", "sales", "groups", "reservations", "other"]).optional(),
+      /** Tie this address to ONE activity of the organisation (null = the whole organisation). */
+      activityId: z.string().max(40).nullable().optional(),
     }),
   );
   const cur = await c.env.DB.prepare(
@@ -586,6 +757,23 @@ app.put("/contacts/:id", async (c) => {
   if (b.note !== undefined) {
     sets.push("note = ?");
     vals.push(b.note);
+  }
+  if (b.role !== undefined) {
+    sets.push("role = ?");
+    vals.push(b.role);
+  }
+  if (b.activityId !== undefined) {
+    if (b.activityId) {
+      const linked = await c.env.DB.prepare(
+        `SELECT 1 AS x FROM outreach_org_activities WHERE org_id = ?1 AND activity_id = ?2`,
+      )
+        .bind(cur.orgId, b.activityId)
+        .first();
+      if (!linked) throw badRequest("Die activiteit hoort niet bij deze aanbieder.");
+    }
+    sets.push("activity_id = ?");
+    vals.push(b.activityId);
+    resetMessages = true;
   }
   if (sets.length) {
     try {

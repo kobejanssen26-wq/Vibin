@@ -34,6 +34,9 @@ export interface OrgRow {
   excluded: boolean;
   excludedReason: string | null;
   reviewFlag: string | null;
+  groupConfidence: "unchecked" | "high" | "medium" | "low";
+  groupConfirmed: boolean;
+  includedCount: number;
   contactId: string | null;
   email: string | null;
   kind: string | null;
@@ -143,6 +146,7 @@ function OrgsTab({ onChanged }: { onChanged: () => void }) {
   const q = useDebounced(qInput, 350);
   const [verification, setVerification] = useState("");
   const [emailStatus, setEmailStatus] = useState("");
+  const [group, setGroup] = useState("");
   const [discovery, setDiscovery] = useState("");
   const [excluded, setExcluded] = useState("hide");
   const [uncontacted, setUncontacted] = useState(false);
@@ -153,7 +157,7 @@ function OrgsTab({ onChanged }: { onChanged: () => void }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const query = `q=${encodeURIComponent(q)}&verification=${verification}&emailStatus=${emailStatus}&discovery=${discovery}&excluded=${excluded}&uncontacted=${uncontacted ? 1 : 0}&usable=${usable ? 1 : 0}&page=${page}&pageSize=25`;
+  const query = `q=${encodeURIComponent(q)}&verification=${verification}&emailStatus=${emailStatus}&group=${group}&discovery=${discovery}&excluded=${excluded}&uncontacted=${uncontacted ? 1 : 0}&usable=${usable ? 1 : 0}&page=${page}&pageSize=25`;
   const { data, loading, error, reload } = useResource<ListResp>(() => cc<ListResp>(`/outreach/orgs?${query}`), query);
 
   const run = async (label: string, fn: () => Promise<string>) => {
@@ -234,6 +238,14 @@ function OrgsTab({ onChanged }: { onChanged: () => void }) {
             <option value="sent">Verzonden</option>
             <option value="error">Fout</option>
           </Select>
+          <Select value={group} onChange={(e) => setF(setGroup)(e.target.value)} title="Groepering van activiteiten">
+            <option value="">Alle groeperingen</option>
+            <option value="needs_confirm">Te bevestigen (onzeker)</option>
+            <option value="multi">Meerdere activiteiten</option>
+            <option value="low">Onzeker</option>
+            <option value="medium">Waarschijnlijk zeker</option>
+            <option value="high">Zeker</option>
+          </Select>
           <Select value={discovery} onChange={(e) => setF(setDiscovery)(e.target.value)}>
             <option value="">Alle ontdekkingsstatussen</option>
             {Object.entries(DISC_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -289,6 +301,7 @@ function OrgsTab({ onChanged }: { onChanged: () => void }) {
                   <Th />
                   <Th>Activiteit</Th>
                   <Th>Aanbieder</Th>
+                  <Th>Groep</Th>
                   <Th>Website</Th>
                   <Th>E-mailadres</Th>
                   <Th>Bron</Th>
@@ -321,6 +334,18 @@ function OrgsTab({ onChanged }: { onChanged: () => void }) {
                       </button>
                       {o.excluded && <div className="text-[11px] text-rose-600">uitgesloten: {o.excludedReason}</div>}
                       {o.reviewFlag && <div className="text-[11px] text-amber-600">controleer: {({ many_names_one_domain: "veel namen, één domein", public_body: "overheids-, erfgoed- of bibliotheeksite", multiple_addresses: "meerdere adressen" } as Record<string, string>)[o.reviewFlag] ?? o.reviewFlag}</div>}
+                    </Td>
+                    <Td className="text-xs">
+                      {o.activityCount > 1 ? (
+                        <>
+                          <Badge tone={(({ high: "green", medium: "blue", low: "amber", unchecked: "slate" } as Record<string, string>)[o.groupConfidence] ?? "slate") as never}>
+                            {({ high: "zeker", medium: "waarschijnlijk", low: "onzeker", unchecked: "?" } as Record<string, string>)[o.groupConfidence]}
+                          </Badge>
+                          <div className="mt-0.5 text-[11px] text-slate-400">
+                            {o.includedCount}/{o.activityCount} in mail{o.groupConfirmed ? " · bevestigd" : ""}
+                          </div>
+                        </>
+                      ) : <span className="text-slate-400">1 activiteit</span>}
                     </Td>
                     <Td className="text-xs">
                       <a href={/^https?:/i.test(o.websiteUrl) ? o.websiteUrl : `https://${o.websiteUrl}`} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline">

@@ -15,8 +15,20 @@ interface Detail {
     discoveryNote: string | null;
     excluded: boolean;
     excludedReason: string | null;
+    groupConfidence: "unchecked" | "high" | "medium" | "low";
+    groupConfirmed: boolean;
   };
-  activities: { id: string; title: string; city: string | null; websiteUrl: string | null; webStatus: string | null }[];
+  group: { confidence: string; note: string | null; confirmed: boolean; reasons: { code: string; message: string }[] } | null;
+  activities: {
+    id: string;
+    title: string;
+    city: string | null;
+    websiteUrl: string | null;
+    webStatus: string | null;
+    confidence: string;
+    source: "domain" | "manual";
+    included: boolean;
+  }[];
   contacts: {
     id: string;
     email: string;
@@ -29,6 +41,8 @@ interface Detail {
     isPrimary: number;
     suppressed: boolean;
     note: string | null;
+    role: string;
+    activityId: string | null;
   }[];
   messages: {
     id: string;
@@ -58,6 +72,12 @@ interface Preview {
   testInbox: string | null;
   blockers: { code: string; message: string }[];
   canApprove: boolean;
+  context?: {
+    activities: { id: string; title: string; websiteUrl: string | null; city: string | null }[];
+    priorMessages: { id: string; toEmail: string; status: string; testMode: number; sentAt: number | null; createdAt: number }[];
+    group: { confidence: string; confirmed: boolean; reasons: { code: string; message: string }[] } | null;
+    sources: { contact: string | null; website: string | null; role: string | null };
+  };
 }
 
 const EVENT_LABEL: Record<string, string> = {
@@ -69,6 +89,17 @@ const EVENT_LABEL: Record<string, string> = {
   excluded: "Uitsluiting",
   contact_edited: "Contact aangepast",
 };
+
+const ROLE_LABEL: Record<string, string> = {
+  unknown: "Rol onbekend",
+  general: "Algemeen (info@)",
+  sales: "Commercieel",
+  groups: "Groepen / events",
+  reservations: "Reservaties",
+  other: "Andere",
+};
+const GROUP_LABEL: Record<string, string> = { high: "Zeker één organisatie", medium: "Waarschijnlijk één organisatie", low: "Onzeker", unchecked: "Nog niet beoordeeld" };
+const GROUP_TONE: Record<string, string> = { high: "green", medium: "blue", low: "amber", unchecked: "slate" };
 
 function errText(e: unknown): string {
   if (e instanceof AdminApiError) {
@@ -156,19 +187,8 @@ export function OrgPanel({ orgId, onClose, onChanged }: { orgId: string; onClose
               </ul>
             )}
 
-            <Section title="Activiteiten">
-              <ul className="space-y-1 text-[13px]">
-                {data.activities.map((a) => (
-                  <li key={a.id} className="text-slate-700">
-                    {a.title}
-                    {a.city ? <span className="text-slate-400"> · {a.city}</span> : null}
-                    {a.webStatus && a.webStatus !== "alive" ? <span className="ml-1 text-xs text-amber-600">({a.webStatus})</span> : null}
-                  </li>
-                ))}
-                {data.org.activityCount > data.activities.length && (
-                  <li className="text-xs text-slate-400">+{data.org.activityCount - data.activities.length} meer</li>
-                )}
-              </ul>
+            <Section title="Groepering en activiteiten">
+              <GroupBox data={data} orgId={orgId} busy={busy} act={act} />
             </Section>
 
             <Section title="Contactadressen">
@@ -200,6 +220,19 @@ export function OrgPanel({ orgId, onClose, onChanged }: { orgId: string; onClose
                         {Object.entries(VERIFY_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                       </Select>
                       <Badge tone={(VERIFY_TONE[c.verification] ?? "slate") as never}>{VERIFY_LABEL[c.verification]}</Badge>
+                      <Select value={c.role} title="Waarvoor dient dit adres?" onChange={(e) => act(async () => { await cc(`/outreach/contacts/${c.id}`, { method: "PUT", body: { role: e.target.value } }); })}>
+                        {Object.entries(ROLE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      </Select>
+                      {data.activities.length > 1 && (
+                        <Select
+                          value={c.activityId ?? ""}
+                          title="Alleen deze activiteit noemen in de mail aan dit adres"
+                          onChange={(e) => act(async () => { await cc(`/outreach/contacts/${c.id}`, { method: "PUT", body: { activityId: e.target.value || null } }); })}
+                        >
+                          <option value="">Alle gekozen activiteiten</option>
+                          {data.activities.map((a) => <option key={a.id} value={a.id}>Alleen: {a.title}</option>)}
+                        </Select>
+                      )}
                       {c.sourceUrl && (
                         <a href={c.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline">
                           Bron openen ↗
@@ -413,6 +446,8 @@ function MessagePreview({ messageId, onChanged, onGone }: { messageId: string; o
         </ul>
       )}
 
+      {data.context && <MessageContext ctx={data.context} />}
+
       <Field label="Onderwerp">
         <Input value={subject} disabled={!editable} onChange={(e) => setSubject(e.target.value)} className="w-full" />
       </Field>
@@ -488,5 +523,168 @@ function MessagePreview({ messageId, onChanged, onGone }: { messageId: string; o
       </div>
       <p className="text-[12px] text-slate-500">Verzendmodus: {target}</p>
     </div>
+  );
+}
+
+
+type ActFn = (fn: () => Promise<string | void>) => Promise<void>;
+
+/** Why these activities are grouped, which of them go in the mail, and the owner's override. */
+function GroupBox({ data, orgId, busy, act }: { data: Detail; orgId: string; busy: boolean; act: ActFn }) {
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState<{ id: string; title: string; city: string | null; orgName: string | null }[]>([]);
+  const conf = data.org.groupConfidence;
+  const needsConfirm = conf === "low" && !data.org.groupConfirmed;
+  const includedCount = data.activities.filter((a) => a.included).length;
+
+  useEffect(() => {
+    if (q.trim().length < 2) {
+      setHits([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      cc<{ rows: typeof hits }>(`/outreach/activity-search?q=${encodeURIComponent(q.trim())}`)
+        .then((r) => setHits(r.rows))
+        .catch(() => setHits([]));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2 text-[13px]">
+        <Badge tone={(GROUP_TONE[conf] ?? "slate") as never}>{GROUP_LABEL[conf] ?? conf}</Badge>
+        {data.org.groupConfirmed && <Badge tone="green">door jou bevestigd</Badge>}
+        <span className="text-slate-500">{includedCount} van {data.activities.length} activiteiten in de mail</span>
+      </div>
+      {data.group && data.group.reasons.length > 0 && (
+        <ul className="text-[13px] text-slate-600">
+          {data.group.reasons.map((r) => <li key={r.code}>• {r.message}</li>)}
+        </ul>
+      )}
+      {needsConfirm && (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
+          Controleer de lijst hieronder (vink weg wat er niet bij hoort) en bevestig dan. Zolang dit onzeker is, kan er geen bericht worden goedgekeurd.
+        </p>
+      )}
+
+      <ul className="space-y-1 text-[13px]">
+        {data.activities.map((a) => (
+          <li key={a.id} className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 text-slate-800">
+              <input
+                type="checkbox"
+                checked={a.included}
+                disabled={busy}
+                onChange={(e) => act(async () => {
+                  const r = await cc<{ refreshed: number }>(`/outreach/orgs/${orgId}/activities`, { method: "PUT", body: { included: { [a.id]: e.target.checked } } });
+                  return r.refreshed ? "Selectie opgeslagen. Het concept is opnieuw opgesteld: bekijk en keur het opnieuw goed." : "Selectie opgeslagen.";
+                })}
+              />
+              {a.title}
+            </label>
+            {a.city ? <span className="text-slate-400">· {a.city}</span> : null}
+            {a.source === "manual" && <Badge tone="blue">handmatig gekoppeld</Badge>}
+            {a.confidence === "low" && <Badge tone="amber">past minder goed</Badge>}
+            {a.webStatus && a.webStatus !== "alive" ? <span className="text-xs text-amber-600">({a.webStatus})</span> : null}
+            {a.source === "manual" && (
+              <Btn variant="ghost" className="!px-2 !py-0.5 text-rose-600" disabled={busy} onClick={() => act(async () => { await cc(`/outreach/orgs/${orgId}/activities/${a.id}`, { method: "DELETE" }); })}>
+                Loskoppelen
+              </Btn>
+            )}
+          </li>
+        ))}
+        {data.org.activityCount > data.activities.length && (
+          <li className="text-xs text-slate-400">+{data.org.activityCount - data.activities.length} meer (niet getoond)</li>
+        )}
+      </ul>
+
+      <div>
+        <Input placeholder="Activiteit koppelen: zoek op titel of id" value={q} onChange={(e) => setQ(e.target.value)} className="w-full" />
+        {hits.length > 0 && (
+          <ul className="mt-1 divide-y divide-slate-100 rounded-md border border-slate-200 bg-white text-[13px]">
+            {hits.map((h) => (
+              <li key={h.id} className="flex items-center justify-between gap-2 px-2.5 py-1.5">
+                <span className="min-w-0 truncate">
+                  {h.title}
+                  <span className="text-slate-400"> · {h.city ?? "?"}{h.orgName ? ` · nu bij ${h.orgName}` : ""}</span>
+                </span>
+                <Btn
+                  className="!px-2 !py-0.5"
+                  disabled={busy || data.activities.some((a) => a.id === h.id)}
+                  onClick={() => act(async () => {
+                    await cc(`/outreach/orgs/${orgId}/activities/link`, { method: "POST", body: { activityId: h.id } });
+                    setQ("");
+                    return "Gekoppeld. De activiteit zelf is niet gewijzigd.";
+                  })}
+                >
+                  Koppelen
+                </Btn>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {!data.org.groupConfirmed ? (
+          <Btn variant={needsConfirm ? "primary" : "neutral"} disabled={busy} onClick={() => act(async () => { await cc(`/outreach/orgs/${orgId}/group`, { method: "POST", body: { action: "confirm" } }); return "Groepering bevestigd."; })}>
+            Dit is één organisatie, bevestigen
+          </Btn>
+        ) : (
+          <Btn variant="neutral" disabled={busy} onClick={() => act(async () => { await cc(`/outreach/orgs/${orgId}/group`, { method: "POST", body: { action: "unconfirm" } }); return "Bevestiging ingetrokken."; })}>
+            Bevestiging intrekken
+          </Btn>
+        )}
+        {!data.org.groupConfirmed && (
+          <Btn variant="ghost" disabled={busy} onClick={() => act(async () => { await cc(`/outreach/orgs/${orgId}/group`, { method: "POST", body: { action: "reassess" } }); return "Opnieuw beoordeeld."; })}>
+            Opnieuw beoordelen
+          </Btn>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** What the owner needs to know before approving: which activities, why grouped, sources, earlier contact. */
+function MessageContext({ ctx }: { ctx: NonNullable<Preview["context"]> }) {
+  const prior = ctx.priorMessages;
+  return (
+    <details open className="rounded-md border border-slate-200 bg-white p-2.5 text-[13px]">
+      <summary className="cursor-pointer font-semibold text-slate-700">
+        Dit bericht noemt {ctx.activities.length === 0 ? "geen specifieke activiteiten" : `${ctx.activities.length} activiteit${ctx.activities.length === 1 ? "" : "en"}`}
+      </summary>
+      <div className="mt-2 space-y-2 text-slate-700">
+        {ctx.activities.length > 0 && (
+          <ul>
+            {ctx.activities.map((a) => (
+              <li key={a.id}>
+                • {a.title}
+                {a.websiteUrl && /^https?:/i.test(a.websiteUrl) ? (
+                  <a href={a.websiteUrl} target="_blank" rel="noopener noreferrer" className="ml-1 text-brand-600 hover:underline">bron ↗</a>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+        {ctx.group && (
+          <div>
+            <Badge tone={(GROUP_TONE[ctx.group.confidence] ?? "slate") as never}>{GROUP_LABEL[ctx.group.confidence] ?? ctx.group.confidence}</Badge>
+            {ctx.group.confirmed && <Badge tone="green">bevestigd</Badge>}
+            <ul className="mt-1 text-slate-600">{ctx.group.reasons.map((r) => <li key={r.code}>• {r.message}</li>)}</ul>
+          </div>
+        )}
+        <p className="text-slate-600">
+          Adres{ctx.sources.role ? ` (${ROLE_LABEL[ctx.sources.role] ?? ctx.sources.role})` : ""} gevonden op:{" "}
+          {ctx.sources.contact ? (
+            <a href={ctx.sources.contact} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline">{ctx.sources.contact} ↗</a>
+          ) : "onbekend"}
+        </p>
+        <p className="text-slate-600">
+          Eerder contact met deze aanbieder:{" "}
+          {prior.length === 0 ? "geen." : prior.map((m) => `${m.toEmail} (${MSG_LABEL[m.status] ?? m.status}${m.testMode ? ", test" : ""})`).join("; ")}
+        </p>
+      </div>
+    </details>
   );
 }

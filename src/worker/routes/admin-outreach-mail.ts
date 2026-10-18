@@ -17,13 +17,8 @@ import { badRequest, conflict, notFound } from "../lib/errors";
 import { newId } from "../lib/id";
 import { rateLimit } from "../lib/ratelimit";
 import { parseBody } from "../lib/validate";
-import {
-  buildFooter,
-  messageHash,
-  renderTemplate,
-  signOptOut,
-  type Reason,
-} from "../lib/outreach-core";
+import { buildFooter, messageHash, signOptOut, type Reason } from "../lib/outreach-core";
+import { messageContext, prepareDraft } from "../lib/outreach-draft";
 import { liveReadiness, loadConfig } from "../lib/outreach-config";
 import {
   approveMessage,
@@ -68,6 +63,8 @@ interface MsgRow {
   o_id: string | null;
   o_excl: number | null;
   o_name: string | null;
+  o_gconf: string | null;
+  o_gok: number | null;
 }
 
 async function loadMsg(env: Env, id: string): Promise<MsgRow | null> {
@@ -76,7 +73,8 @@ async function loadMsg(env: Env, id: string): Promise<MsgRow | null> {
             m.status, m.test_mode, m.approved_by, m.approved_at, m.approved_hash, m.attempts,
             c.id AS c_id, c.org_id AS c_org, c.email AS c_email, c.kind AS c_kind,
             c.verification AS c_ver, c.mx_ok AS c_mx, c.source_url AS c_src,
-            o.id AS o_id, o.excluded AS o_excl, o.name AS o_name
+            o.id AS o_id, o.excluded AS o_excl, o.name AS o_name,
+            o.group_confidence AS o_gconf, o.group_confirmed AS o_gok
        FROM outreach_messages m
        LEFT JOIN outreach_contacts c ON c.id = m.contact_id
        LEFT JOIN outreach_orgs o ON o.id = m.org_id
@@ -98,91 +96,6 @@ async function fullText(env: Env, row: MsgRow, identity: string): Promise<string
 }
 
 /* --------------------------------- prepare -------------------------------- */
-
-type PrepareResult =
-  | { ok: true; messageId: string; created: boolean }
-  | { ok: false; code: string; message: string };
-
-async function prepareDraft(env: Env, orgId: string, contactId?: string): Promise<PrepareResult> {
-  const config = await loadConfig(env);
-  const org = await env.DB.prepare(
-    `SELECT id, name, excluded FROM outreach_orgs WHERE id = ?1`,
-  )
-    .bind(orgId)
-    .first<{ id: string; name: string; excluded: number }>();
-  if (!org) return { ok: false, code: "org_missing", message: "Aanbieder niet gevonden." };
-  if (org.excluded) return { ok: false, code: "org_excluded", message: "Aanbieder is uitgesloten." };
-
-  const contact = contactId
-    ? await env.DB.prepare(`SELECT id, email FROM outreach_contacts WHERE id = ?1 AND org_id = ?2`)
-        .bind(contactId, orgId)
-        .first<{ id: string; email: string }>()
-    : await env.DB.prepare(
-        `SELECT id, email FROM outreach_contacts WHERE org_id = ?1
-          ORDER BY is_primary DESC, (verification = 'checked') DESC, (kind = 'generic') DESC, created_at ASC
-          LIMIT 1`,
-      )
-        .bind(orgId)
-        .first<{ id: string; email: string }>();
-  if (!contact) return { ok: false, code: "no_contact", message: "Geen e-mailadres beschikbaar." };
-
-  const looksLikeDomain = /^[a-z0-9-]+(.[a-z0-9-]+)+$/.test(org.name.trim());
-  const providerName = looksLikeDomain ? "" : org.name;
-  const shownSite = config.websiteUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
-  const subject = renderTemplate(config.subject, { provider: providerName, website: shownSite, contact: config.contactAddress });
-  const body = renderTemplate(config.body, { provider: providerName, website: shownSite, contact: config.contactAddress });
-  const testMode = config.mode === "live" ? 0 : 1;
-  const now = nowSec();
-
-  const existing = await env.DB.prepare(
-    `SELECT id, status FROM outreach_messages
-      WHERE contact_id = ?1 AND test_mode = ?2 AND status NOT IN ('cancelled','failed')
-      LIMIT 1`,
-  )
-    .bind(contact.id, testMode)
-    .first<{ id: string; status: string }>();
-  // A test mail that was already "sent" (to the test inbox / dry-run) must never block a new test concept.
-  let replacedTest = false;
-  if (existing && existing.status === "sent" && testMode === 1) {
-    await env.DB.prepare(
-      `UPDATE outreach_messages SET status = 'cancelled', error = 'Vervangen door een nieuw testconcept', updated_at = ?1 WHERE id = ?2`,
-    )
-      .bind(now, existing.id)
-      .run();
-    replacedTest = true;
-  }
-  if (existing && !replacedTest) {
-    if (existing.status === "sent") {
-      return { ok: false, code: "already_sent", message: "Naar dit adres is al een bericht verzonden." };
-    }
-    if (existing.status === "queued" || existing.status === "sending") {
-      return { ok: false, code: "in_queue", message: "Dit bericht staat al in een campagne." };
-    }
-    await env.DB.prepare(
-      `UPDATE outreach_messages
-          SET subject = ?1, body_text = ?2, to_email = ?3, status = 'draft',
-              approved_by = NULL, approved_at = NULL, approved_hash = NULL,
-              error = NULL, updated_at = ?4
-        WHERE id = ?5`,
-    )
-      .bind(subject, body, contact.email, now, existing.id)
-      .run();
-    return { ok: true, messageId: existing.id, created: false };
-  }
-  const id = newId();
-  try {
-    await env.DB.prepare(
-      `INSERT INTO outreach_messages
-         (id, org_id, contact_id, to_email, subject, body_text, status, test_mode, created_at, updated_at)
-       VALUES (?1,?2,?3,?4,?5,?6,'draft',?7,?8,?8)`,
-    )
-      .bind(id, orgId, contact.id, contact.email, subject, body, testMode, now)
-      .run();
-  } catch {
-    return { ok: false, code: "duplicate", message: "Er bestaat al een bericht voor dit adres." };
-  }
-  return { ok: true, messageId: id, created: true };
-}
 
 app.post("/orgs/:id/prepare", async (c) => {
   const b = await parseBody(c, z.object({ contactId: z.string().max(40).optional() }));
@@ -236,6 +149,7 @@ app.get("/messages/:id", async (c) => {
     mode: config.mode,
     testInbox: config.mode === "live" ? null : config.testInbox || null,
     blockers: reasons,
+    context: await messageContext(c.env, row.id, row.org_id),
     // Approval needs a draft/approved row without blocking reasons at the "approve" stage.
     canApprove:
       (row.status === "draft" || row.status === "approved") &&

@@ -9,6 +9,7 @@ import type { Env } from "../env";
 import { newId } from "./id";
 import {
   classifyEmail,
+  classifyRole,
   domainMatchesSite,
   extractEmails,
   findContactLinks,
@@ -193,12 +194,12 @@ export async function applyDiscovery(
       env.DB.prepare(
         `INSERT OR IGNORE INTO outreach_contacts
            (id, org_id, email, kind, source_type, source_url, domain_matches,
-            verification, is_primary, found_at, checked_at, created_at)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,0,?9,?9,?9)`,
+            verification, is_primary, role, found_at, checked_at, created_at)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,0,?10,?9,?9,?9)`,
       ).bind(
         newId(), orgId, c.email, c.kind,
         c.via === "mailto" ? "website_mailto" : "website_text",
-        c.sourceUrl, c.domainMatches ? 1 : 0, verification, now,
+        c.sourceUrl, c.domainMatches ? 1 : 0, verification, now, classifyRole(c.email),
       ),
     );
   }

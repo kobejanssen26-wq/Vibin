@@ -157,6 +157,40 @@ function fixtureSql() {
     `INSERT INTO activity_audits (activity_id, outcome, rule, reason, confidence, issues, hidden, previous_active, previous_status, source)
      VALUES ('a5','exclude','chocolate_shop','Chocoladewinkel','high','[]',1,1,'needs_review','rules'),
             ('a6','approved','experience_verified','ok','medium','["photo_generic"]',0,1,'needs_review','rules');`,
+    // grouping fixtures: activities (provider = name used for grouping), orgs, links, contacts
+    ...[
+      ["g1", "Klimmuur Alpha", "Alpha Sport", "Gent"],
+      ["g2", "Karting Beta", "Beta Fun", "Gent"], ["g3", "Lasergame Beta", "Beta Fun", "Gent"], ["g4", "Minigolf Beta", "Beta Fun", "Gent"],
+      ["g5", "Extra Gamma", "Gamma Zaak", "Gent"], ["g6", "Extra Delta", "Delta Zaak", "Brugge"],
+      ["g7", "Escape Eps 1", "Eps 1", "Gent"], ["g8", "Escape Eps 2", "Eps 2", "Brugge"], ["g9", "Escape Eps 3", "Eps 3", "Leuven"],
+      ["g10", "Escape Eps 4", "Eps 4", "Aalst"], ["g11", "Escape Eps 5", "Eps 5", "Hasselt"], ["g12", "Escape Eps 6", "Eps 6", "Genk"],
+      ["g13", "Zeta Een", "Zeta Club", "Gent"], ["g14", "Zeta Twee", "Zeta Club", "Gent"],
+      ["g15", "Eta Een", "Eta Club", "Gent"], ["g16", "Eta Twee", "Eta Club", "Gent"],
+    ].map(
+      ([id, t, prov, city]) =>
+        `INSERT INTO activities (id, provider_id, title, category_id, location_label, city, price_band, provider, active)
+         VALUES ('${id}','p-test','${t}','sport','${city}','${city}','10_25','${prov}',1);`,
+    ),
+    ...[
+      ["og_one", "alpha-sport.be", "Alpha Sport", ["g1"]],
+      ["og_multi", "beta-fun.be", "Beta Fun", ["g2", "g3", "g4"]],
+      ["og_low", "eps-platform.be", "eps-platform.be", ["g7", "g8", "g9", "g10", "g11", "g12"]],
+      ["og_tick", "zeta-club.be", "Zeta Club", ["g13", "g14"]],
+      ["og_two", "eta-club.be", "Eta Club", ["g15", "g16"]],
+    ].flatMap(([id, dom, name, acts]) => [
+      `INSERT INTO outreach_orgs (id, domain, name, website_url, activity_count, discovery_status) VALUES ('${id}','${dom}','${name}','https://${dom}',${acts.length},'found');`,
+      ...acts.map((a) => `INSERT INTO outreach_org_activities (org_id, activity_id) VALUES ('${id}','${a}');`),
+    ]),
+    // contacts: for og_one the reservations desk is created FIRST (older), info@ second; neither is primary
+    `INSERT INTO outreach_contacts (id, org_id, email, kind, source_type, source_url, domain_matches, verification, is_primary, role, created_at)
+     VALUES ('cg_one_res','og_one','reservaties@alpha-sport.be','generic','website_mailto','https://alpha-sport.be/contact',1,'checked',0,'reservations',1000),
+            ('cg_one_info','og_one','info@alpha-sport.be','generic','website_mailto','https://alpha-sport.be/contact',1,'checked',0,'general',2000),
+            ('cg_multi','og_multi','info@beta-fun.be','generic','website_mailto','https://beta-fun.be/contact',1,'checked',1,'general',1000),
+            ('cg_multi2','og_multi','groepen@beta-fun.be','generic','website_mailto','https://beta-fun.be/groepen',1,'checked',0,'groups',2000),
+            ('cg_low','og_low','info@eps-platform.be','generic','website_mailto','https://eps-platform.be/contact',1,'checked',1,'general',1000),
+            ('cg_tick','og_tick','info@zeta-club.be','generic','website_mailto','https://zeta-club.be/contact',1,'checked',1,'general',1000),
+            ('cg_two','og_two','info@eta-club.be','generic','website_mailto','https://eta-club.be/contact',1,'checked',1,'general',1000),
+            ('cg_two2','og_two','groepen@eta-club.be','generic','website_mailto','https://eta-club.be/groepen',1,'checked',0,'groups',2000);`,
     // large dataset: 5,000 organisations with 5,000 contacts
     `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 5000)
      INSERT INTO outreach_orgs (id, domain, name, website_url, activity_count, discovery_status)
@@ -530,6 +564,99 @@ async function main() {
   });
   ok("quality gate: CSV import rejects the shop and accepts the escape room", r.status === 200 && r.data.createCount === 1 && r.data.errors.some((e) => /Kwaliteitsregel/.test(e.message)), r.data);
 
+
+  // ---- smart grouping (activities per organisation) ----
+  const readMsg = async (orgId, contactId) => {
+    const p = await A("POST", `/orgs/${orgId}/prepare`, contactId ? { contactId } : {});
+    if (p.status !== 200) return { prep: p };
+    const m = await A("GET", `/messages/${p.data.messageId}`);
+    return { prep: p, msg: m.data, id: p.data.messageId };
+  };
+  const titlesOf = (msg) => (msg.context?.activities ?? []).map((a) => a.title).sort();
+
+  // 1. one organisation, one activity → the single template names exactly that activity
+  let g = await readMsg("og_one", "cg_one_info");
+  ok("grouping 1: one activity is named in the single template", g.msg.bodyText.includes('"Klimmuur Alpha"') && !g.msg.bodyText.includes("{{"), g.msg?.bodyText);
+  ok("grouping 1: group is 'high' and shows why", g.msg.context.group.confidence === "high" && g.msg.context.group.reasons.length > 0, g.msg.context.group);
+
+  // 2. several activities, same provider → ONE mail, listing all of them
+  g = await readMsg("og_multi", "cg_multi");
+  ok("grouping 2: one mail lists all three activities", ["Karting Beta", "Lasergame Beta", "Minigolf Beta"].every((t) => g.msg.bodyText.includes(`- ${t}`)), g.msg.bodyText);
+  ok("grouping 2: snapshot stored per message", titlesOf(g.msg).length === 3);
+  const multiMsg = g.id;
+
+  // 3. unsure grouping → draft allowed, approval blocked until the owner confirms
+  g = await readMsg("og_low", "cg_low");
+  ok("grouping 3: many unrelated names → confidence 'low'", g.msg.context.group.confidence === "low", g.msg.context.group);
+  ok("grouping 3: approval is blocked (group_unconfirmed)", g.msg.canApprove === false && g.msg.blockers.some((b) => b.code === "group_unconfirmed"), g.msg.blockers);
+  r = await A("POST", `/messages/${g.id}/send`, { hash: g.msg.hash });
+  ok("grouping 3: sending an unconfirmed group is refused server-side", r.status === 422, r.data);
+  r = await A("POST", "/orgs/og_low/group", { action: "confirm", note: "gecontroleerd" });
+  ok("grouping 3: the owner can confirm the group", r.status === 200, r.data);
+  r = await A("GET", `/messages/${g.id}`);
+  ok("grouping 3: after confirming, the blocker is gone", !r.data.blockers.some((b) => b.code === "group_unconfirmed"), r.data.blockers);
+
+  // 4. unticking an activity rebuilds the draft and voids any approval
+  g = await readMsg("og_tick", "cg_tick");
+  ok("grouping 4: both activities listed", g.msg.bodyText.includes("- Zeta Een") && g.msg.bodyText.includes("- Zeta Twee"));
+  r = await A("POST", `/messages/${g.id}/send`, { hash: "0".repeat(64) });
+  r = await A("PUT", "/orgs/og_tick/activities", { included: { g14: false } });
+  ok("grouping 4: selection saved and draft rebuilt", r.status === 200 && r.data.refreshed === 1, r.data);
+  r = await A("GET", `/messages/${g.id}`);
+  ok("grouping 4: the mail now names only the remaining activity", r.data.bodyText.includes('"Zeta Een"') && !r.data.bodyText.includes("Zeta Twee") && r.data.status === "draft", r.data.bodyText);
+
+  // 5. manual link adds an activity without touching the activities table
+  r = await A("GET", "/activity-search?q=Extra%20Gamma");
+  ok("grouping 5: activity can be found to link by hand", r.data.rows.some((x) => x.id === "g5"), r.data);
+  r = await A("POST", "/orgs/og_tick/activities/link", { activityId: "g5" });
+  ok("grouping 5: manual link accepted", r.status === 200, r.data);
+  r = await A("GET", `/messages/${g.id}`);
+  ok("grouping 5: the manually linked activity is in the mail", r.data.bodyText.includes("- Zeta Een") && r.data.bodyText.includes("- Extra Gamma"), r.data.bodyText);
+  r = await A("GET", "/orgs/og_tick");
+  ok("grouping 5: link is marked manual", r.data.activities.find((x) => x.id === "g5")?.source === "manual");
+  r = await A("DELETE", "/orgs/og_tick/activities/g13");
+  ok("grouping 5: a domain-derived link cannot be deleted, only unticked", r.status === 409, r.data);
+  r = await A("GET", "/activity-search?q=Extra%20Gamma");
+  ok("grouping 5: the activities table itself is untouched", r.data.rows.find((x) => x.id === "g5")?.title === "Extra Gamma");
+
+  // 6. an address tied to one activity names only that activity
+  r = await A("PUT", "/contacts/cg_multi2", { activityId: "g3" });
+  ok("grouping 6: contact tied to a single activity", r.status === 200, r.data);
+  r = await A("PUT", "/contacts/cg_multi2", { activityId: "g5" });
+  ok("grouping 6: cannot tie a contact to an activity of another organisation", r.status === 400, r.data);
+
+  // 7. same activities to a second contact of the same org are refused once the first is approved
+  g = await readMsg("og_two", "cg_two");
+  const second = await readMsg("og_two", "cg_two2");
+  ok("grouping 7: both drafts exist before anything is approved", !!g.id && !!second.id);
+  r = await A("POST", `/messages/${g.id}/send`, { hash: g.msg.hash });
+  ok("grouping 7: first contact is sent (dry-run)", r.status === 200, r.data);
+  r = await A("GET", `/messages/${second.id}`);
+  ok("grouping 7: second contact is blocked, activities already mentioned", r.data.blockers.some((b) => b.code === "activities_already_mentioned"), r.data.blockers);
+  r = await A("POST", `/messages/${second.id}/send`, { hash: r.data.hash });
+  ok("grouping 7: sending it is refused server-side", r.status === 422, r.data);
+  r = await A("POST", `/messages/${second.id}/cancel`, {});
+  r = await A("POST", "/orgs/og_two/prepare", { contactId: "cg_two2" });
+  ok("grouping 7: a new draft with nothing left to name is refused", r.status === 400 && /al genoemd/.test(JSON.stringify(r.data)), r.data);
+
+  // 8. default contact choice prefers a general mailbox over the reservations desk
+  g = await readMsg("og_one");
+  ok("grouping 8: info@ is chosen over reservaties@", g.msg.toEmail === "info@alpha-sport.be", g.msg?.toEmail);
+
+  // 9. preview context: activities, why grouped, sources, earlier contact
+  g = await readMsg("og_multi", "cg_multi");
+  ok("grouping 9: preview shows activities, group reasons and the address source", g.msg.context.activities.length === 3 && g.msg.context.group.reasons.length > 0 && g.msg.context.sources.contact === "https://beta-fun.be/contact", g.msg.context);
+  r = await A("GET", "/orgs/og_two");
+  ok("grouping 9: earlier contact (sent mail) is visible on the organisation", r.data.messages.some((m) => m.status === "sent"), r.data.messages);
+
+  // 10. org list exposes the group column and filters
+  r = await A("GET", "/orgs?group=needs_confirm&excluded=all&pageSize=100");
+  ok("grouping 10: list filters on unconfirmed low-confidence groups", r.status === 200 && r.data.rows.every((o) => o.groupConfidence === "low" && !o.groupConfirmed), r.data.rows?.length);
+  r = await A("GET", "/orgs?q=beta-fun");
+  ok("grouping 10: list row carries confidence and included count", r.data.rows[0]?.groupConfidence === "high" && r.data.rows[0]?.includedCount === 3, r.data.rows[0]);
+  r = await A("POST", "/sync", {});
+  ok("grouping 10: sync reports the grouping step", r.status === 200 && r.data.grouping && typeof r.data.grouping.assessed === "number", r.data);
+
   // ---- audit trail records the actions ----
   r = await call(admin, "GET", "/api/admin/cc/audit?range=today&action=outreach.sent");
   ok("audit: sends are recorded", r.status === 200 && r.data.rows.length >= 1, r.data);
@@ -556,6 +683,7 @@ if (fail) {
     if (/ERROR|Unhandled error|D1_ERROR/.test(l)) out.push(...lines.slice(i, i + 4));
   });
   console.error("\n--- worker errors ---\n" + out.join("\n").slice(0, 6000));
+  if (process.env.DEBUG_LOG) console.error("\n--- full worker log (tail) ---\n" + serverLog.slice(-6000));
 }
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

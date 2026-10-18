@@ -18,6 +18,12 @@ import {
   signOptOut,
   verifyOptOut,
   DEFAULT_BODY,
+  DEFAULT_BODY_MULTI,
+  assessGroup,
+  classifyRole,
+  composeMail,
+  formatActivityList,
+  rolePriority,
   type SendCheckInput,
 } from "./outreach-core";
 
@@ -261,5 +267,108 @@ describe("evaluateSend — nothing leaves without every check", () => {
     expect(codes(live({ alreadySentLive: true }))).toContain("already_sent");
     expect(codes(live({ sentLast24h: 50 }))).toContain("daily_cap");
     expect(codes(live({ sentLast24h: 49 }))).not.toContain("daily_cap");
+  });
+});
+
+describe("assessGroup", () => {
+  const a = (id: string, title: string, provider: string | null, city = "Gent") => ({ id, title, provider, city });
+  it("one activity is always a safe group", () => {
+    const r = assessGroup({ domain: "bowling.be", activities: [a("1", "Bowling", "Bowling Gent")] });
+    expect(r.confidence).toBe("high");
+    expect(r.perActivity[0]).toMatchObject({ included: true });
+  });
+  it("same provider name = high, legal suffix ignored", () => {
+    const r = assessGroup({ domain: "x.be", activities: [a("1", "Karting", "Fun BV"), a("2", "Lasergame", "Fun B.V.")] });
+    expect(r.confidence).toBe("high");
+    expect(r.source).toBe("same_name");
+  });
+  it("names that carry the domain brand = high", () => {
+    const r = assessGroup({
+      domain: "www.zandpark.be",
+      activities: [a("1", "Klimmen", "Zandpark Klimmen"), a("2", "Minigolf", "Zandpark Minigolf")],
+    });
+    expect(r.confidence).toBe("high");
+    expect(r.source).toBe("domain_brand");
+  });
+  it("a dominant name with outliers = medium; outliers still included", () => {
+    const acts = [
+      ...[1, 2, 3, 4, 5, 6, 7].map((i) => a(`d${i}`, `Spel ${i}`, "Pretpark Oost")),
+      a("o1", "Iets anders", "Andere Zaak"),
+    ];
+    const r = assessGroup({ domain: "oost-pret.be", activities: acts });
+    expect(r.confidence).toBe("medium");
+    expect(r.perActivity.every((p) => p.included)).toBe(true);
+  });
+  it("many different names under one domain = low; unrelated ones are not included", () => {
+    const acts = [1, 2, 3, 4, 5, 6, 7].map((i) => a(`n${i}`, `Activiteit ${i}`, `Aanbieder ${i}`, `Stad ${i}`));
+    const r = assessGroup({ domain: "platform.be", activities: acts });
+    expect(r.confidence).toBe("low");
+    expect(r.source).toBe("many_names");
+    expect(r.perActivity.some((p) => !p.included)).toBe(true);
+    expect(r.reasons.some((x) => x.code === "different_cities")).toBe(true);
+  });
+  it("a public body is never trusted automatically", () => {
+    const r = assessGroup({
+      domain: "gemeente-x.be",
+      reviewFlag: "public_body",
+      activities: [a("1", "A", "Cultuurdienst"), a("2", "B", "Cultuurdienst")],
+    });
+    expect(r.confidence).toBe("low");
+  });
+});
+
+describe("classifyRole / rolePriority", () => {
+  it("reads the role from the mailbox name", () => {
+    expect(classifyRole("info@x.be")).toBe("general");
+    expect(classifyRole("Reservaties@x.be")).toBe("reservations");
+    expect(classifyRole("groepen@x.be")).toBe("groups");
+    expect(classifyRole("sales@x.be")).toBe("sales");
+    expect(classifyRole("jan@x.be")).toBe("other");
+  });
+  it("prefers a general mailbox over a reservations desk", () => {
+    expect(rolePriority("general")).toBeLessThan(rolePriority("reservations"));
+    expect(rolePriority("reservations")).toBeLessThan(rolePriority("other"));
+  });
+});
+
+describe("composeMail", () => {
+  const cfg = { subject: "Onderwerp", body: DEFAULT_BODY, bodyMulti: DEFAULT_BODY_MULTI };
+  const v = { provider: "Fun", website: "vibin.be", contact: "a@b.be" };
+  it("names one activity in the single template", () => {
+    const m = composeMail(cfg, { ...v, titles: ["Karting"] });
+    expect(m.body).toContain('"Karting"');
+    expect(m.body).not.toContain("{{");
+  });
+  it("lists several activities once, in a single mail", () => {
+    const m = composeMail(cfg, { ...v, titles: ["Karting", "Lasergame"] });
+    expect(m.body).toContain("- Karting\n- Lasergame");
+    expect(m.body).toContain("jullie activiteiten");
+  });
+  it("summarises a long list", () => {
+    const t = Array.from({ length: 9 }, (_, i) => `Act ${i + 1}`);
+    expect(formatActivityList(t).split("\n")).toHaveLength(7);
+    expect(formatActivityList(t)).toContain("en nog 3 andere activiteiten");
+  });
+  it("falls back to neutral wording without activities", () => {
+    const m = composeMail(cfg, { ...v, titles: [] });
+    expect(m.body).toContain("jullie activiteit(en)");
+    expect(m.body).not.toContain("{{");
+  });
+});
+
+describe("send gate: grouping", () => {
+  const codes = (i: SendCheckInput) => evaluateSend(i).map((r) => r.code);
+  it("blocks an unconfirmed low-confidence group, allows it once confirmed", () => {
+    expect(codes(base({ org: { id: "o1", excluded: 0, groupConfidence: "low", groupConfirmed: 0 } }))).toContain("group_unconfirmed");
+    expect(codes(base({ org: { id: "o1", excluded: 0, groupConfidence: "low", groupConfirmed: 1 } }))).not.toContain("group_unconfirmed");
+  });
+  it("medium and high groups are not blocked", () => {
+    for (const g of ["medium", "high"]) {
+      expect(codes(base({ org: { id: "o1", excluded: 0, groupConfidence: g, groupConfirmed: 0 } }))).not.toContain("group_unconfirmed");
+    }
+  });
+  it("blocks activities that another message already named", () => {
+    expect(codes(base({ alreadyMentioned: ["Karting"] }))).toContain("activities_already_mentioned");
+    expect(codes(base({ alreadyMentioned: [] }))).not.toContain("activities_already_mentioned");
   });
 });

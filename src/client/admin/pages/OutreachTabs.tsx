@@ -280,6 +280,7 @@ interface Config {
   senderIdentity: string;
   subject: string;
   body: string;
+  bodyMulti: string;
   legalReview: { status: "not_reviewed" | "approved"; reviewedAt: number | null; note: string };
   dailyCap: number;
   perRun: number;
@@ -466,13 +467,21 @@ export function OutreachSettings({ onChanged }: { onChanged: () => void }) {
         </div>
       </Panel>
 
-      <Panel title="Tekst van de kennismakingsmail" subtitle="{{provider}}, {{website}} en {{contact}} worden ingevuld. De afmeldregel en je identiteit worden altijd onderaan toegevoegd.">
+      <Panel title="Tekst van de kennismakingsmail" subtitle="{{provider}}, {{website}} en {{contact}} worden ingevuld; {{activity}} (één activiteit) of {{activities}} (lijst) noemt de activiteiten. De afmeldregel en je identiteit worden altijd onderaan toegevoegd.">
         <div className="space-y-3">
           <Field label="Onderwerp"><Input className="w-full" value={form.subject} onChange={(e) => set("subject", e.target.value)} /></Field>
-          <Field label="Tekst">
+          <Field label="Tekst bij één activiteit ({{activity}})">
             <textarea
               value={form.body}
               onChange={(e) => set("body", e.target.value)}
+              rows={16}
+              className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 font-mono text-[12px]"
+            />
+          </Field>
+          <Field label="Tekst bij meerdere activiteiten ({{activities}})">
+            <textarea
+              value={form.bodyMulti}
+              onChange={(e) => set("bodyMulti", e.target.value)}
               rows={16}
               className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 font-mono text-[12px]"
             />
@@ -508,6 +517,7 @@ export function OutreachSettings({ onChanged }: { onChanged: () => void }) {
                 senderIdentity: form.senderIdentity,
                 subject: form.subject,
                 body: form.body,
+                bodyMulti: form.bodyMulti,
                 dailyCap: form.dailyCap,
                 perRun: form.perRun,
                 autoDiscovery: form.autoDiscovery,

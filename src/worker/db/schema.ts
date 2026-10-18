@@ -1250,6 +1250,16 @@ export const outreachOrgs = sqliteTable(
     excludedReason: text("excluded_reason"),
     /** Why a human should look before anything is sent (null = nothing flagged). */
     reviewFlag: text("review_flag"),
+    /** How sure we are that every activity on this domain belongs to ONE organisation. */
+    groupConfidence: text("group_confidence", {
+      enum: ["unchecked", "high", "medium", "low"],
+    })
+      .notNull()
+      .default("unchecked"),
+    groupSource: text("group_source"),
+    groupNote: text("group_note"),
+    /** The owner confirmed (or corrected) the grouping; assessment never overwrites it. */
+    groupConfirmed: integer("group_confirmed").notNull().default(0),
     createdAt: integer("created_at").notNull().default(now),
     updatedAt: integer("updated_at").notNull().default(now),
   },
@@ -1269,6 +1279,11 @@ export const outreachOrgActivities = sqliteTable(
     activityId: text("activity_id")
       .notNull()
       .references(() => activities.id, { onDelete: "cascade" }),
+    confidence: text("confidence", { enum: ["high", "medium", "low"] }).notNull().default("high"),
+    /** Why the link exists: derived from the website domain, or linked by hand. */
+    source: text("source", { enum: ["domain", "manual"] }).notNull().default("domain"),
+    /** Part of the activities named in the mail (the owner can untick). */
+    included: integer("included").notNull().default(1),
   },
   (t) => ({
     pk: primaryKey({ columns: [t.orgId, t.activityId] }),
@@ -1302,6 +1317,10 @@ export const outreachContacts = sqliteTable(
       .notNull()
       .default("unverified"),
     isPrimary: integer("is_primary").notNull().default(0),
+    /** What the mailbox is for (info@ → general, reservaties@ → reservations …). */
+    role: text("role").notNull().default("unknown"),
+    /** Set when this address belongs to ONE activity only (then only that one is named). */
+    activityId: text("activity_id"),
     note: text("note"),
     foundAt: integer("found_at").notNull().default(now),
     checkedAt: integer("checked_at"),
@@ -1379,6 +1398,22 @@ export const outreachMessages = sqliteTable(
     onePerContact: uniqueIndex("outreach_messages_one_per_contact")
       .on(t.contactId, t.testMode)
       .where(sql`status != 'cancelled' AND status != 'failed' AND contact_id IS NOT NULL`),
+  }),
+);
+
+/** Which activities a message named, frozen at draft time (the body text is frozen with it). */
+export const outreachMessageActivities = sqliteTable(
+  "outreach_message_activities",
+  {
+    messageId: text("message_id")
+      .notNull()
+      .references(() => outreachMessages.id, { onDelete: "cascade" }),
+    activityId: text("activity_id").notNull(),
+    title: text("title").notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.messageId, t.activityId] }),
+    activityIdx: index("outreach_message_activities_activity_idx").on(t.activityId),
   }),
 );
 

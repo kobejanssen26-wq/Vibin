@@ -324,15 +324,13 @@ export function robotsAllows(robotsTxt: string, path: string, botToken = "vibinc
 
 export const DEFAULT_SUBJECT = "Mag ik VIBIN kort aan jullie voorstellen?";
 
-export const DEFAULT_BODY = `Beste {{provider}},
+const INTRO = `Beste {{provider}},
 
 Wij zijn VIBIN, een nieuw platform dat binnenkort gelanceerd wordt en mensen helpt om samen met vrienden leuke activiteiten te ontdekken.
 
-Met VIBIN kunnen gebruikers door verschillende activiteiten swipen, aangeven wat ze wel of niet leuk vinden en ontdekken welke activiteiten bij hun groep passen. Zodra er een match is, kunnen ze de activiteit verder bekijken en eventueel via de website van de aanbieder reserveren of boeken.
+Met VIBIN kunnen gebruikers door verschillende activiteiten swipen, aangeven wat ze wel of niet leuk vinden en ontdekken welke activiteiten bij hun groep passen. Zodra er een match is, kunnen ze de activiteit verder bekijken en eventueel via de website van de aanbieder reserveren of boeken.`;
 
-We willen graag zoveel mogelijk interessante activiteiten uit België samenbrengen op ons platform. Daarom leek het ons leuk om jullie activiteit(en) aan jullie voor te stellen als mogelijke aanvulling op VIBIN.
-
-Zouden jullie interesse hebben om meer informatie te ontvangen over een mogelijke vermelding op VIBIN?
+const OUTRO = `Zouden jullie interesse hebben om meer informatie te ontvangen over een mogelijke vermelding op VIBIN?
 
 Als jullie interesse hebben, vertellen we graag wat meer over het platform en hoe een eventuele samenwerking eruit zou kunnen zien.
 
@@ -342,17 +340,46 @@ Met vriendelijke groeten,
 
 Het VIBIN-team`;
 
+/** One activity named in the mail ({{activity}}). */
+export const DEFAULT_BODY = `${INTRO}
+
+We willen graag zoveel mogelijk interessante activiteiten uit België samenbrengen op ons platform. Daarom leek het ons leuk om jullie activiteit "{{activity}}" aan jullie voor te stellen als mogelijke aanvulling op VIBIN.
+
+${OUTRO}`;
+
+/** Several activities of one organisation, listed once in a single mail ({{activities}}). */
+export const DEFAULT_BODY_MULTI = `${INTRO}
+
+We willen graag zoveel mogelijk interessante activiteiten uit België samenbrengen op ons platform. Daarom leek het ons leuk om jullie activiteiten aan jullie voor te stellen als mogelijke aanvulling op VIBIN:
+
+{{activities}}
+
+${OUTRO}`;
+
+/** The body that shipped before activities were named: still recognised so a stored copy is upgraded. */
+export const LEGACY_BODY = `${INTRO}
+
+We willen graag zoveel mogelijk interessante activiteiten uit België samenbrengen op ons platform. Daarom leek het ons leuk om jullie activiteit(en) aan jullie voor te stellen als mogelijke aanvulling op VIBIN.
+
+${OUTRO}`;
+
 export interface TemplateVars {
   provider: string;
   website: string;
   contact: string;
+  /** Title of the single activity (single template). */
+  activity?: string;
+  /** Pre-formatted bullet list (multi template). */
+  activities?: string;
 }
 
 export function renderTemplate(tpl: string, vars: TemplateVars): string {
   const out = tpl
-    .replace(/\{\{\s*provider\s*\}\}/g, vars.provider.trim())
-    .replace(/\{\{\s*website\s*\}\}/g, vars.website.trim())
-    .replace(/\{\{\s*contact\s*\}\}/g, vars.contact.trim());
+    .replace(/\{\{\s*provider\s*\}\}/g, () => vars.provider.trim())
+    .replace(/\{\{\s*website\s*\}\}/g, () => vars.website.trim())
+    .replace(/\{\{\s*contact\s*\}\}/g, () => vars.contact.trim())
+    .replace(/\{\{\s*activity\s*\}\}/g, () => (vars.activity ?? "").trim())
+    .replace(/\{\{\s*activities\s*\}\}/g, () => (vars.activities ?? "").trim());
   // A missing value must not leave a gap or a stray placeholder in the mail.
   return out
     .replace(/Beste ,/g, "Beste,")
@@ -361,6 +388,45 @@ export function renderTemplate(tpl: string, vars: TemplateVars): string {
     .replace(/\{\{[^}]*\}\}/g, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+/** Most activities listed by name in one mail; the rest is summarised. */
+export const MAX_LISTED_ACTIVITIES = 6;
+
+export function formatActivityList(titles: string[]): string {
+  const shown = titles.slice(0, MAX_LISTED_ACTIVITIES).map((t) => `- ${t.trim()}`);
+  const rest = titles.length - shown.length;
+  if (rest > 0) shown.push(`- en nog ${rest} andere activiteit${rest === 1 ? "" : "en"}`);
+  return shown.join("\n");
+}
+
+/**
+ * Picks the template for the number of activities and fills it in. With no
+ * known activity (a legacy organisation without links) it falls back to the
+ * neutral wording, so the mail never contains a gap or a made-up name.
+ */
+export function composeMail(
+  cfg: { subject: string; body: string; bodyMulti: string },
+  vars: { provider: string; website: string; contact: string; titles: string[] },
+): { subject: string; body: string } {
+  const base = { provider: vars.provider, website: vars.website, contact: vars.contact };
+  const n = vars.titles.length;
+  if (n === 0) {
+    const generic = cfg.body.replace(/jullie activiteit\s+"?\{\{\s*activity\s*\}\}"?/g, "jullie activiteit(en)");
+    return {
+      subject: renderTemplate(cfg.subject, base),
+      body: renderTemplate(generic, { ...base, activity: "" }),
+    };
+  }
+  const single = n === 1;
+  return {
+    subject: renderTemplate(cfg.subject, { ...base, activity: vars.titles[0], activities: formatActivityList(vars.titles) }),
+    body: renderTemplate(single ? cfg.body : cfg.bodyMulti, {
+      ...base,
+      activity: vars.titles[0],
+      activities: formatActivityList(vars.titles),
+    }),
+  };
 }
 
 export interface FooterVars {
@@ -467,6 +533,8 @@ export interface OutreachConfig {
   senderIdentity: string;
   subject: string;
   body: string;
+  /** Template for a mail that names several activities. */
+  bodyMulti: string;
   legalReview: {
     status: "not_reviewed" | "approved";
     reviewedAt: number | null;
@@ -502,7 +570,9 @@ export interface SendCheckInput {
     verification: string;
     mxOk: number | null;
   } | null;
-  org: { id: string; excluded: number } | null;
+  org: { id: string; excluded: number; groupConfidence?: string; groupConfirmed?: number } | null;
+  /** Titles named in this message that another open/sent message to the same org already named. */
+  alreadyMentioned?: string[];
   suppressed: boolean;
   alreadySentLive: boolean;
   sentLast24h: number;
@@ -547,6 +617,12 @@ export function evaluateSend(i: SendCheckInput): Reason[] {
   }
   if (!org) add("org_missing", "De aanbieder bestaat niet meer.");
   else if (org.excluded) add("org_excluded", "Deze aanbieder is uitgesloten van outreach.");
+  if (org && org.groupConfidence === "low" && !org.groupConfirmed) {
+    add("group_unconfirmed", "Onzeker of deze activiteiten bij één organisatie horen. Bevestig eerst de groepering.");
+  }
+  if (i.alreadyMentioned && i.alreadyMentioned.length) {
+    add("activities_already_mentioned", `Al genoemd in een ander bericht aan deze aanbieder: ${i.alreadyMentioned.slice(0, 3).join(", ")}${i.alreadyMentioned.length > 3 ? " …" : ""}.`);
+  }
   if (i.suppressed) add("suppressed", "Dit adres of domein staat op de uitsluitingslijst (bezwaar, afmelding of bounce).");
 
   if (i.stage === "send") {
@@ -580,7 +656,7 @@ export function evaluateSend(i: SendCheckInput): Reason[] {
     if (!config.senderIdentity.trim()) add("config_incomplete", "Identiteit van de afzender (bedrijfsgegevens) is niet ingesteld.");
     if (!i.runtime.hasProviderKey) add("no_provider_key", "Er is geen e-mailprovider-sleutel geconfigureerd.");
     if (!i.runtime.hasSigningKey) add("no_signing_key", "Er is geen server-sleutel voor afmeldlinks geconfigureerd.");
-    if (i.alreadySentLive) add("already_sent", "Naar dit adres is al eerder een bericht verzonden.");
+    if (i.alreadySentLive) add("already_sent", "Naar dit adres of deze aanbieder is al eerder een bericht verzonden.");
     if (i.stage === "send" && i.sentLast24h >= config.dailyCap) {
       add("daily_cap", `Het daglimiet van ${config.dailyCap} berichten is bereikt.`);
     }
@@ -603,10 +679,168 @@ export function defaultConfig(appUrl: string): OutreachConfig {
     senderIdentity: "",
     subject: DEFAULT_SUBJECT,
     body: DEFAULT_BODY,
+    bodyMulti: DEFAULT_BODY_MULTI,
     legalReview: { status: "not_reviewed", reviewedAt: null, reviewedBy: null, note: "" },
     dailyCap: 50,
     perRun: 10,
     autoDiscovery: true,
     discoveryPerRun: 10,
   };
+}
+
+
+/* -------------------------------------------------------------------------- */
+/*  Smart grouping: do these activities belong to ONE organisation?           */
+/* -------------------------------------------------------------------------- */
+
+export type GroupConfidence = "high" | "medium" | "low";
+
+export interface GroupActivity {
+  id: string;
+  title: string;
+  provider: string | null;
+  city: string | null;
+}
+
+export interface GroupReason {
+  code: string;
+  message: string;
+}
+
+export interface GroupAssessment {
+  confidence: GroupConfidence;
+  /** Short machine-readable source, e.g. "same_name", "domain_brand", "many_names". */
+  source: string;
+  reasons: GroupReason[];
+  perActivity: { id: string; confidence: GroupConfidence; included: boolean }[];
+}
+
+const LEGAL_SUFFIX = /\b(bv|bvba|nv|vzw|sprl|sa|srl|gcv|comm\.?v|cvba|asbl|ltd|gmbh)\b/g;
+
+/** "Bowling 't Zand B.V.B.A." → "bowlingtzand": comparable across spelling and legal form. */
+export function nameKey(raw: string | null | undefined): string {
+  return (raw ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\./g, "")
+    .replace(LEGAL_SUFFIX, " ")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+/** The brand part of a domain: `www.bowlingzand.be` → `bowlingzand`. */
+export function domainBrand(domain: string): string {
+  const reg = registrableDomain(domain);
+  return nameKey(reg.split(".")[0] ?? "");
+}
+
+function matchesBrand(key: string, brand: string): boolean {
+  if (key.length < 4 || brand.length < 4) return false;
+  return key.includes(brand) || brand.includes(key);
+}
+
+/**
+ * Judges whether the activities linked to one website belong to one
+ * organisation. Pure and deterministic; the reasons are shown to the owner.
+ *
+ *   high   one activity, one consistent name, or every name carries the domain's brand
+ *   medium one name clearly dominates, or the names mostly share the brand
+ *   low    many different names, a public body, or nothing in common → a human decides
+ */
+export function assessGroup(input: {
+  domain: string;
+  activities: GroupActivity[];
+  reviewFlag?: string | null;
+}): GroupAssessment {
+  const acts = input.activities;
+  const reasons: GroupReason[] = [];
+  const mk = (confidence: GroupConfidence, source: string, per?: (a: GroupActivity) => GroupConfidence): GroupAssessment => ({
+    confidence,
+    source,
+    reasons,
+    perActivity: acts.map((a) => {
+      const c = per ? per(a) : confidence;
+      return { id: a.id, confidence: c, included: c !== "low" };
+    }),
+  });
+
+  if (acts.length <= 1) {
+    reasons.push({ code: "single", message: "Eén activiteit op deze website." });
+    return mk("high", "single");
+  }
+
+  const brand = domainBrand(input.domain);
+  const keys = acts.map((a) => nameKey(a.provider) || nameKey(a.title));
+  const counts = new Map<string, number>();
+  for (const k of keys) counts.set(k, (counts.get(k) ?? 0) + 1);
+  const distinct = counts.size;
+  let dominant = "";
+  let top = 0;
+  for (const [k, n] of counts) if (n > top) { top = n; dominant = k; }
+  const share = top / acts.length;
+  const brandHits = keys.filter((k) => matchesBrand(k, brand)).length;
+  const cities = new Set(acts.map((a) => (a.city ?? "").trim().toLowerCase()).filter(Boolean));
+  const perByKey = (good: (k: string) => boolean, rest: GroupConfidence) => (a: GroupActivity): GroupConfidence => {
+    const k = nameKey(a.provider) || nameKey(a.title);
+    return good(k) ? "high" : rest;
+  };
+
+  if (input.reviewFlag === "public_body") {
+    reasons.push({ code: "public_body", message: "Lijkt een overheids-, erfgoed- of bibliotheeksite: waarschijnlijk geen enkele aanbieder." });
+    return mk("low", "public_body", perByKey((k) => k === dominant, "low"));
+  }
+  if (distinct === 1) {
+    reasons.push({ code: "same_name", message: `Alle ${acts.length} activiteiten hebben dezelfde aanbiedernaam.` });
+    return mk("high", "same_name");
+  }
+  if (brandHits === acts.length) {
+    reasons.push({ code: "domain_brand", message: `De naam van elke activiteit past bij het domein (${input.domain}).` });
+    return mk("high", "domain_brand");
+  }
+  if (share >= 0.7) {
+    reasons.push({ code: "dominant_name", message: `${top} van de ${acts.length} activiteiten delen dezelfde aanbiedernaam; de rest wijkt af.` });
+    return mk("medium", "dominant_name", perByKey((k) => k === dominant || matchesBrand(k, brand), "medium"));
+  }
+  if (brandHits / acts.length >= 0.5) {
+    reasons.push({ code: "mostly_brand", message: `${brandHits} van de ${acts.length} namen passen bij het domein.` });
+    return mk("medium", "mostly_brand", perByKey((k) => matchesBrand(k, brand), "medium"));
+  }
+  if (distinct >= 6 || (acts.length >= 4 && distinct / acts.length >= 0.5)) {
+    reasons.push({ code: "many_names", message: `${distinct} verschillende aanbiedernamen onder één domein: waarschijnlijk een platform, keten of datafout.` });
+  } else {
+    reasons.push({ code: "different_names", message: `De activiteiten hebben ${distinct} verschillende aanbiedernamen die niet bij het domein passen.` });
+  }
+  if (cities.size > 1) reasons.push({ code: "different_cities", message: `Ze liggen in ${cities.size} verschillende plaatsen.` });
+  return mk("low", distinct >= 6 ? "many_names" : "different_names", perByKey((k) => k === dominant || matchesBrand(k, brand), "low"));
+}
+
+/* ------------------------------ contact roles ------------------------------ */
+
+export type ContactRole = "general" | "sales" | "groups" | "reservations" | "other";
+
+const ROLE_LOCALS: Record<Exclude<ContactRole, "other">, string[]> = {
+  general: ["info", "contact", "contactus", "hello", "hallo", "hi", "welkom", "welcome", "mail", "post", "office", "kantoor", "bureau", "administratie", "admin", "secretariaat", "secretary", "receptie", "reception", "accueil", "balie", "vragen", "question", "questions", "service", "klantenservice", "customerservice", "klantendienst", "support", "team", "enquiries", "enquiry"],
+  sales: ["sales", "verkoop", "commercial", "commercieel", "partners", "partnership", "marketing"],
+  groups: ["groepen", "groups", "group", "events", "event", "evenementen", "teambuilding", "feesten", "party", "verhuur", "rental", "zaal", "zalen", "aanvraag", "aanvragen", "offerte"],
+  reservations: ["reservatie", "reservaties", "reservation", "reservations", "reserveren", "reserveer", "booking", "bookings", "boeking", "boekingen", "boeken", "book", "tickets", "ticket"],
+};
+
+/** What a mailbox is for, from its local part (never from guessing a person). */
+export function classifyRole(email: string): ContactRole {
+  const local = (normalizeEmail(email).split("@")[0] ?? "").split("+")[0] ?? "";
+  for (const [role, locals] of Object.entries(ROLE_LOCALS)) {
+    if (locals.includes(local)) return role as ContactRole;
+  }
+  return "other";
+}
+
+/** Lower = better mailbox for a partnership pitch (reservations desks come last). */
+export function rolePriority(role: string): number {
+  switch (role) {
+    case "general": return 0;
+    case "sales": return 1;
+    case "groups": return 2;
+    case "reservations": return 3;
+    default: return 4;
+  }
 }

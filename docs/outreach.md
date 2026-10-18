@@ -158,6 +158,37 @@ are marked *gecontroleerd*); personal and other-domain addresses were correctly
 left unverified. The scheduler then checks 10 sites per 30 minutes (commercial
 sites first), so full coverage takes about six days.
 
+## Grouping activities per organisation (migration 0014)
+
+One organisation (= one website domain) gets **one** mail that names its
+activities, not one mail per activity. `assessGroup()` (lib/outreach-core.ts)
+judges whether the activities on a domain really belong together:
+
+| verdict | when | effect |
+|---|---|---|
+| high | one activity, one provider name, or every name carries the domain's brand | none |
+| medium | one name clearly dominates (≥70 %) or half the names fit the domain | warning only |
+| low | many different names, different cities, public body | **approval/send blocked until the owner confirms** (`group_unconfirmed`) |
+
+Per activity (`outreach_org_activities`): `confidence`, `source` (`domain` or
+`manual`), `included`. Only included activities are named; the owner can untick
+them or link one by hand in the organisation panel. The `activities` table is
+never changed. A grouping the owner confirmed is never re-assessed.
+
+- **Templates**: `body` (one activity, `{{activity}}`) and `bodyMulti` (list,
+  `{{activities}}`, max 6 named + "en nog N"). No linked activities → neutral wording.
+- **Contacts** get a `role` (general / sales / groups / reservations) from the
+  mailbox name; the default contact prefers general over reservations. A contact
+  can be tied to one activity (`activity_id`): its mail names only that one.
+- **Snapshot**: `outreach_message_activities` freezes which activities a message
+  named. Gate `activities_already_mentioned`: another approved/queued/sent message
+  to the same org already named one of them. Sent/mail-domain/address rules stay.
+- Changing the selection rebuilds the org's drafts and sets them back to `draft`
+  (approval is void). Nothing is ever sent without a per-message approval.
+- Preview shows the activities, why they were grouped, the address source and
+  earlier contact. `POST /outreach/sync` and `/outreach/group/assess` fill in
+  verdicts and roles for new orgs/contacts (cheap: only unassessed orgs).
+
 ## Operating it
 
 1. *Aanbieders bijwerken* → *Zoek contactgegevens* (or leave automatic discovery
@@ -171,7 +202,7 @@ sites first), so full coverage takes about six days.
 
 ```bash
 npx vitest run src/worker/lib/outreach-core.test.ts   # rules (unit)
-npm run test:outreach                                  # 12 scenarios over HTTP, local D1, mock provider
+npm run test:outreach                                  # 12 original + 10 grouping scenarios over HTTP, local D1, mock provider
 ```
 
 `tests/outreach.mjs` starts its own throw-away local D1 and `wrangler dev`; it
