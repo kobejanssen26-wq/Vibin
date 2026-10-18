@@ -297,6 +297,7 @@ export function OutreachSettings({ onChanged }: { onChanged: () => void }) {
   const [form, setForm] = useState<Config | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [legalNote, setLegalNote] = useState("");
+  const [testTo, setTestTo] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -371,6 +372,29 @@ export function OutreachSettings({ onChanged }: { onChanged: () => void }) {
               Testberichten wissen
             </Btn>
           </div>
+        </div>
+      </Panel>
+
+      <Panel title="Testmail" subtitle="Stuurt één gewone testmail vanaf het ingestelde afzenderadres naar het adres dat je hier typt — zo controleer je dat versturen werkt.">
+        <div className="flex flex-wrap items-center gap-2">
+          <Input value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder="jouw@adres.be" className="w-64" />
+          <Btn
+            variant="primary"
+            disabled={busy || !testTo.includes("@")}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const r = await cc<{ from: string; mock: boolean }>("/outreach/test-email", { method: "POST", body: { to: testTo } });
+                setNotice(r.mock ? `Testomgeving: er is niets echt verzonden (mock).` : `Testmail verzonden vanaf ${r.from} naar ${testTo}. Controleer je inbox (en spam).`);
+              } catch (e) {
+                setNotice(errText(e));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Testmail sturen
+          </Btn>
         </div>
       </Panel>
 

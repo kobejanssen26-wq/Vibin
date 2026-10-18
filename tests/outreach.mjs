@@ -439,6 +439,14 @@ async function main() {
   pv = await A("GET", `/messages/${cd}`);
   ok("…the message is a draft again", pv.data.status === "draft", pv.data.status);
 
+  r = await A("POST", "/test-email", { to: "niet-geldig" });
+  ok("test mail: an invalid address is refused", r.status === 400, r.status);
+  await A("PUT", "/config", { fromEmail: "kobe.janssen@vibin.be" });
+  r = await A("POST", "/test-email", { to: "iemand@example.com" });
+  ok("test mail: works through the mock provider outside production", r.status === 200 && r.data.mock === true, r.data);
+  r = await call(anon, "POST", "/api/admin/cc/outreach/test-email", { to: "iemand@example.com" });
+  ok("test mail: not reachable without an admin session", r.status === 401, r.status);
+
   // ---- test reset ----
   r = await A("POST", "/test-reset", {});
   ok("test reset removes test messages only", r.status === 200 && r.data.removed >= 4, r.data);

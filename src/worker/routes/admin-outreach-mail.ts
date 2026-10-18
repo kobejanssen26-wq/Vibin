@@ -30,6 +30,7 @@ import {
   checkMessage,
   optOutUrl,
   drainCampaigns,
+  sendTestEmail,
   sendMessageNow,
   type Actor,
 } from "../lib/outreach-send";
@@ -360,6 +361,16 @@ app.post("/test-reset", async (c) => {
   const removed = res[0]?.meta.changes ?? 0;
   await audit(c, { action: "outreach.test_reset", targetType: "outreach", meta: { removed } });
   return c.json({ removed });
+});
+
+/** Owner-only: one plain test mail to an address the owner types, to prove the sender works. */
+app.post("/test-email", async (c) => {
+  const b = await parseBody(c, z.object({ to: z.string().trim().toLowerCase().email().max(254) }));
+  await rateLimit(c.env, "outreach-testmail", c.get("adminUserId") ?? "owner", 5, 300);
+  const r = await sendTestEmail(c.env, b.to);
+  await audit(c, { action: "outreach.test_email", targetType: "outreach", meta: { ok: r.ok } });
+  if (!r.ok) throw badRequest(r.error);
+  return c.json(r);
 });
 
 /* -------------------------------- campaigns -------------------------------- */

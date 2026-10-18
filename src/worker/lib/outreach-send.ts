@@ -286,6 +286,31 @@ async function deliver(env: Env, mail: Mail): Promise<ProviderResult> {
   }
 }
 
+/** One plain test mail from the configured sender to an address the owner types. Not an outreach mail. */
+export async function sendTestEmail(
+  env: Env,
+  to: string,
+): Promise<{ ok: true; from: string; id: string; mock: boolean } | { ok: false; error: string }> {
+  const config = await loadConfig(env);
+  if (!isValidEmail(config.fromEmail)) return { ok: false, error: "Er is nog geen afzenderadres ingesteld." };
+  const from = `${config.fromName} <${config.fromEmail}>`;
+  const out = await deliver(env, {
+    from,
+    to,
+    originalTo: to,
+    replyTo: config.replyTo || config.fromEmail,
+    subject: "Testmail vanuit VIBIN",
+    text: `Dit is een testmail om te controleren dat versturen vanaf ${config.fromEmail} werkt.
+
+Als je dit leest, werkt de afzender (Resend + vibin.be).
+
+Het VIBIN-team`,
+    headers: {},
+    idempotencyKey: `outreach-testmail-${Date.now()}`,
+  });
+  return out.ok ? { ok: true, from: config.fromEmail, id: out.id, mock: env.APP_ENV !== "production" } : { ok: false, error: out.error };
+}
+
 /**
  * Royal decree of 4 April 2003 art. 2: whoever objects to advertising by e-mail
  * must get an e-mailed receipt confirming that the objection was registered.
