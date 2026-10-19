@@ -657,6 +657,20 @@ async function main() {
   r = await A("POST", "/sync", {});
   ok("grouping 10: sync reports the grouping step", r.status === 200 && r.data.grouping && typeof r.data.grouping.assessed === "number", r.data);
 
+  // ---- bulk approval ----
+  r = await A("POST", "/prepare-bulk", { orgIds: ["o_ca", "o_cb", "o_cc", "o_cd"] });
+  r = await A("GET", "/bulk-approve/preview");
+  ok("bulk: preview lists drafts that pass the gate and reports blocked ones", r.status === 200 && r.data.ready >= 4 && typeof r.data.blockedCount === "number", r.data);
+  const bp = r.data;
+  r = await A("POST", "/bulk-approve", { fingerprint: "0".repeat(64), expectedCount: bp.ready });
+  ok("bulk: a stale/wrong fingerprint approves nothing", r.status === 409, r.data);
+  r = await A("POST", "/bulk-approve", { fingerprint: bp.fingerprint, expectedCount: bp.ready });
+  ok("bulk: reviewed drafts are approved in one go", r.status === 200 && r.data.approved === bp.ready && r.data.failedCount === 0, r.data);
+  r = await A("GET", "/campaign/preview");
+  ok("bulk: approved messages show up for the campaign, nothing was sent", r.data.approvedTotal >= bp.ready, r.data);
+  r = await A("GET", "/bulk-approve/preview");
+  ok("bulk: second preview no longer lists them", !r.data.sample.some((x) => /camp-[abcd]\.be/.test(x.toEmail)), r.data.sample);
+
   // ---- audit trail records the actions ----
   r = await call(admin, "GET", "/api/admin/cc/audit?range=today&action=outreach.sent");
   ok("audit: sends are recorded", r.status === 200 && r.data.rows.length >= 1, r.data);

@@ -17,7 +17,7 @@ import { badRequest, conflict, notFound } from "../lib/errors";
 import { newId } from "../lib/id";
 import { rateLimit } from "../lib/ratelimit";
 import { parseBody } from "../lib/validate";
-import { buildFooter, messageHash, signOptOut, type Reason } from "../lib/outreach-core";
+import { buildFooter, messageHash, sha256Hex, signOptOut, type Reason } from "../lib/outreach-core";
 import { messageContext, prepareDraft } from "../lib/outreach-draft";
 import { liveReadiness, loadConfig } from "../lib/outreach-config";
 import {
@@ -212,6 +212,84 @@ app.post("/messages/:id/unapprove", async (c) => {
   if (!r.meta.changes) throw conflict("Alleen een goedgekeurd bericht kan worden ingetrokken.");
   await audit(c, { action: "outreach.unapproved", targetType: "outreach_message", targetId: c.req.param("id") });
   return c.json({ ok: true });
+});
+
+/* ------------------------------- bulk approval ------------------------------ */
+
+const BULK_MAX = 300;
+
+/**
+ * Drafts (current mode) that pass the full approval gate right now, plus those that do not.
+ * The fingerprint pins the exact set of texts the owner was shown.
+ */
+async function bulkCandidates(env: Env, config: Awaited<ReturnType<typeof loadConfig>>) {
+  const testMode = config.mode === "live" ? 0 : 1;
+  const rows = await env.DB.prepare(
+    `SELECT id FROM outreach_messages WHERE status = 'draft' AND test_mode = ?1 AND contact_id IS NOT NULL
+      ORDER BY created_at ASC LIMIT ?2`,
+  )
+    .bind(testMode, BULK_MAX)
+    .all<{ id: string }>();
+  const ok: { id: string; hash: string; toEmail: string; org: string | null; subject: string; activities: number }[] = [];
+  const blocked: { id: string; toEmail: string; org: string | null; reasons: Reason[] }[] = [];
+  for (const r of rows.results) {
+    const m = await loadMsg(env, r.id);
+    if (!m) continue;
+    const reasons = await checkMessage(env, config, m, "approve");
+    if (reasons.length) {
+      blocked.push({ id: m.id, toEmail: m.to_email, org: m.o_name, reasons });
+      continue;
+    }
+    const hash = await messageHash({ toEmail: m.to_email, subject: m.subject, bodyText: m.body_text });
+    const n = await env.DB.prepare(`SELECT COUNT(*) AS n FROM outreach_message_activities WHERE message_id = ?1`)
+      .bind(m.id)
+      .first<{ n: number }>();
+    ok.push({ id: m.id, hash, toEmail: m.to_email, org: m.o_name, subject: m.subject, activities: n?.n ?? 0 });
+  }
+  const fingerprint = await sha256Hex(ok.map((x) => `${x.id}:${x.hash}`).join("|"));
+  return { ok, blocked, fingerprint, more: rows.results.length === BULK_MAX };
+}
+
+app.get("/bulk-approve/preview", async (c) => {
+  const config = await loadConfig(c.env);
+  const { ok, blocked, fingerprint, more } = await bulkCandidates(c.env, config);
+  // One full text so the owner sees what all of them look like (the template is the same for all).
+  const sample = ok[0] ? await loadMsg(c.env, ok[0].id) : null;
+  return c.json({
+    mode: config.mode,
+    ready: ok.length,
+    fingerprint,
+    more,
+    blockedCount: blocked.length,
+    blocked: blocked.slice(0, 40),
+    sample: ok.slice(0, 8).map((x) => ({ id: x.id, toEmail: x.toEmail, org: x.org, subject: x.subject, activities: x.activities })),
+    sampleText: sample ? sample.body_text : null,
+  });
+});
+
+/**
+ * Approve every draft the owner just reviewed in one go. Nothing is sent here: approved
+ * messages still need a campaign (or a single send). Each message still passes the full
+ * gate, and approval stays pinned to that message's own hash.
+ */
+app.post("/bulk-approve", async (c) => {
+  const b = await parseBody(c, z.object({ fingerprint: z.string().min(32).max(80), expectedCount: z.number().int().min(1).max(BULK_MAX) }));
+  const actor = actorOf(c);
+  await rateLimit(c.env, "outreach-bulk-approve", actor.userId ?? "owner", 6, 60);
+  const config = await loadConfig(c.env);
+  const cand = await bulkCandidates(c.env, config);
+  if (cand.fingerprint !== b.fingerprint || cand.ok.length !== b.expectedCount) {
+    throw conflict("De lijst concepten is gewijzigd sinds je ze bekeek. Open de samenvatting opnieuw.", { now: cand.ok.length });
+  }
+  let approved = 0;
+  const failed: { id: string; toEmail: string; reasons: Reason[] }[] = [];
+  for (const m of cand.ok) {
+    const res = await approveMessage(c.env, m.id, actor, m.hash);
+    if (res.ok) approved++;
+    else failed.push({ id: m.id, toEmail: m.toEmail, reasons: res.reasons });
+  }
+  await audit(c, { action: "outreach.bulk_approved", targetType: "outreach", meta: { approved, failed: failed.length, mode: config.mode } });
+  return c.json({ approved, failed: failed.slice(0, 40), failedCount: failed.length });
 });
 
 /** "Goedkeuren en verzenden": approve exactly what was previewed, then deliver this one message. */

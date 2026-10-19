@@ -203,6 +203,30 @@ function OrgsTab({ onChanged }: { onChanged: () => void }) {
               Aanbieders bijwerken
             </Btn>
             <Btn
+              variant="primary"
+              loading={busy === "bulk"}
+              onClick={() =>
+                run("bulk", async () => {
+                  const p = await cc<{
+                    mode: string; ready: number; fingerprint: string; more: boolean; blockedCount: number;
+                    sample: { toEmail: string; org: string | null; subject: string; activities: number }[];
+                    sampleText: string | null;
+                  }>("/outreach/bulk-approve/preview");
+                  if (p.ready === 0) return `Geen concepten om goed te keuren (${p.blockedCount} geblokkeerd).`;
+                  const lines = p.sample.map((x) => `• ${x.org ?? x.toEmail} → ${x.toEmail} (${x.activities} activiteit${x.activities === 1 ? "" : "en"})`).join("\n");
+                  const msg = `${p.mode === "live" ? "ECHT" : "TEST"}: ${p.ready} concepten goedkeuren?\n\n${lines}${p.ready > p.sample.length ? `\n… en ${p.ready - p.sample.length} meer` : ""}\n\nVoorbeeldtekst:\n${(p.sampleText ?? "").slice(0, 600)}…\n\n${p.blockedCount} geblokkeerde concepten blijven liggen.${p.more ? "\nEr zijn er meer dan 300: doe dit daarna nog een keer." : ""}\nGoedkeuren verzendt niets; daarna start je de campagne.`;
+                  if (!window.confirm(msg)) return "Niet goedgekeurd.";
+                  const r = await cc<{ approved: number; failedCount: number }>("/outreach/bulk-approve", {
+                    method: "POST",
+                    body: { fingerprint: p.fingerprint, expectedCount: p.ready },
+                  });
+                  return `${r.approved} goedgekeurd${r.failedCount ? `, ${r.failedCount} mislukt (open ze om te zien waarom)` : ""}. Start nu de campagne om te verzenden.`;
+                })
+              }
+            >
+              Alle klare concepten goedkeuren
+            </Btn>
+            <Btn
               loading={busy === "discover"}
               onClick={() =>
                 run("discover", async () => {
