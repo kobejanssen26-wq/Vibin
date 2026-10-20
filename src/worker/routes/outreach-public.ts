@@ -1,5 +1,5 @@
 /**
- * Public opt-out for outreach mail: GET/POST /optout/:token.
+ * Public opt-out for outreach mail: GET /optout/:token shows a confirm button, POST /optout/:token opts out.
  *
  * The token is an HMAC over the message id, so it cannot be guessed or forged
  * and needs no stored secret per message. Opting out is immediate and
@@ -28,7 +28,12 @@ const page = (title: string, body: string) => `<!doctype html>
   h1{font-size:22px;margin:0 0 12px} p{margin:0 0 10px;color:#3b4160} a{color:#3155ff}
 </style></head><body><main>${body}</main></body></html>`;
 
-async function handle(c: import("hono").Context<Ctx>): Promise<Response> {
+/**
+ * `commit` is true only for POST. A GET never changes anything: mail-security scanners
+ * and link previewers open every URL in a mail (and in List-Unsubscribe), which would
+ * otherwise unsubscribe people who never asked to be. The GET page asks for a click.
+ */
+async function handle(c: import("hono").Context<Ctx>, commit: boolean): Promise<Response> {
   const html = (title: string, body: string, status = 200) =>
     c.html(page(title, body), status as 200, {
       "cache-control": "no-store",
@@ -53,6 +58,14 @@ async function handle(c: import("hono").Context<Ctx>): Promise<Response> {
     .first<{ id: string; orgId: string; email: string; testMode: number; status: string }>();
   if (!msg) {
     return html("Link ongeldig", "<h1>Deze link is niet geldig</h1>", 404);
+  }
+
+  if (!commit) {
+    return html(
+      "Afmelden",
+      `<h1>Geen berichten meer ontvangen?</h1><p>Klik op de knop om je af te melden. Er wordt niets gewijzigd zolang je niet klikt.</p>
+<form method="post" style="margin-top:16px"><button type="submit" style="font:inherit;font-weight:600;padding:10px 18px;border:0;border-radius:10px;background:#3155ff;color:#fff;cursor:pointer">Ja, meld mij af</button></form>`,
+    );
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -99,7 +112,7 @@ async function handle(c: import("hono").Context<Ctx>): Promise<Response> {
   );
 }
 
-app.get("/:token", handle);
-app.post("/:token", handle);
+app.get("/:token", (c) => handle(c, false));
+app.post("/:token", (c) => handle(c, true));
 
 export default app;

@@ -421,9 +421,13 @@ async function main() {
   r = await call(anon, "GET", `/optout/${tokenFor(optMsg).replace(/.$/, "0")}`);
   ok("opt-out: tampered link is rejected", r.status === 400, r.status);
   r = await call(anon, "GET", `/optout/${tokenFor(optMsg)}`);
-  ok("opt-out: valid link confirms and works without login", r.status === 200 && /afgemeld/i.test(String(r.data)), String(r.data).slice(0, 120));
+  ok("opt-out: opening the link (scanner/preview) only shows a confirm button", r.status === 200 && /<form/i.test(String(r.data)) && !/Je bent afgemeld/.test(String(r.data)), String(r.data).slice(0, 120));
+  r = await A("GET", "/orgs/o_opt");
+  ok("opt-out: a plain GET does NOT unsubscribe anyone", r.data.org.excluded === false && r.data.contacts[0].suppressed === false, r.data.org);
   r = await call(anon, "POST", `/optout/${tokenFor(optMsg)}`);
-  ok("opt-out: one-click POST is idempotent", r.status === 200);
+  ok("opt-out: POST (button / one-click) unsubscribes, no login needed", r.status === 200 && /afgemeld/i.test(String(r.data)), String(r.data).slice(0, 120));
+  r = await call(anon, "POST", `/optout/${tokenFor(optMsg)}`);
+  ok("opt-out: POST is idempotent", r.status === 200);
   r = await A("GET", "/orgs/o_opt");
   ok("opt-out: organisation is excluded and its address suppressed", r.data.org.excluded === true && r.data.contacts[0].suppressed === true, r.data.org);
   r = await A("GET", "/suppressions?q=bowling-opt");
@@ -432,7 +436,7 @@ async function main() {
   r = await A("DELETE", `/suppressions/${sid}`);
   ok("opt-out: an objection cannot be deleted from the list", r.status === 400, r.data);
 
-  r = await call(anon, "GET", `/optout/${tokenFor("m_rcpt")}`);
+  r = await call(anon, "POST", `/optout/${tokenFor("m_rcpt")}`);
   ok("opt-out: link of a real (live) message works", r.status === 200, r.status);
   r = await A("GET", "/orgs/o_rcpt");
   ok("opt-out: an e-mailed receipt is recorded for real messages (RD 4 April 2003 art. 2)", r.data.events.some((e) => e.kind === "note" && /Ontvangstbevestiging/.test(e.body)), r.data.events);
