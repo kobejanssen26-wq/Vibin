@@ -671,6 +671,18 @@ async function main() {
   r = await A("GET", "/bulk-approve/preview");
   ok("bulk: second preview no longer lists them", !r.data.sample.some((x) => /camp-[abcd]\.be/.test(x.toEmail)), r.data.sample);
 
+  // ---- send to a chosen selection ----
+  r = await A("POST", "/send-selected/preview", { orgIds: ["o_ca", "o_cb", "og_one", "og_low", "o_none"] });
+  ok("select: preview shows sender, recipients and why some are blocked", r.status === 200 && r.data.from.email !== undefined && r.data.recipients.length >= 2 && r.data.blocked.some((b) => b.org === "Bowling Zonder Adres"), r.data);
+  const sp = r.data;
+  ok("select: a test run goes to the test inbox, never to the recipients", sp.mode === "test");
+  r = await A("POST", "/send-selected", { orgIds: ["o_ca", "o_cb", "og_one", "og_low", "o_none"], fingerprint: "0".repeat(64), expectedCount: sp.ready });
+  ok("select: a changed/wrong fingerprint sends nothing", r.status === 409, r.data);
+  r = await A("POST", "/send-selected", { orgIds: ["o_ca", "o_cb", "og_one", "og_low", "o_none"], fingerprint: sp.fingerprint, expectedCount: sp.ready });
+  ok("select: confirmed selection is queued and the first batch is sent", r.status === 200 && r.data.queued === sp.ready && r.data.sent >= 1, r.data);
+  r = await A("GET", "/log?status=sent");
+  ok("log: shows who got what, from which sender, as test", r.status === 200 && r.data.rows.filter((x) => x.campaign && x.testMode).length >= 2 && r.data.rows.every((x) => x.toEmail) && "from" in r.data, r.data);
+
   // ---- admin lists tolerate empty filters (the UI sends "" for "no filter") ----
   r = await call(admin, "GET", "/api/admin/cc/events?q=&kind=&status=&verification=");
   ok("events list: empty filter values are not an error", r.status === 200 && Array.isArray(r.data.events), r.data);

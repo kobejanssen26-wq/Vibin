@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AdminApiError, cc } from "../api";
 import { useResource } from "../lib";
+import { MSG_LABEL, MSG_TONE } from "./OutreachShared";
 import { Badge, Btn, ErrorNote, Field, Input, Loading, Pager, Panel, Select, Table, Td, Th, Tr, fmtDate, fmtNum } from "../ui";
 
 function errText(e: unknown): string {
@@ -643,5 +644,79 @@ export function OutreachImport({ onChanged }: { onChanged: () => void }) {
         </div>
       </Panel>
     </div>
+  );
+}
+
+
+interface SentRow {
+  id: string;
+  toEmail: string;
+  subject: string;
+  status: string;
+  testMode: boolean;
+  sentAt: number | null;
+  approvedAt: number | null;
+  error: string | null;
+  org: string;
+  campaign: string | null;
+  activities: string | null;
+}
+
+/** Who got (or will get) which mail, from which address, when, and whether it was a test. */
+export function OutreachSent() {
+  const [status, setStatus] = useState("");
+  const [page, setPage] = useState(1);
+  const key = `sent-${status}-${page}`;
+  const { data, loading, error, reload } = useResource<{ from: string; rows: SentRow[]; total: number; page: number; pageCount: number }>(
+    () => cc(`/outreach/log?status=${status}&page=${page}`),
+    key,
+  );
+  return (
+    <Panel
+      title="Verzonden en klaarstaand"
+      subtitle={data ? `Afzender: ${data.from || "niet ingesteld"}. Testmails gaan alleen naar je testinbox.` : undefined}
+      right={
+        <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
+          <option value="">Alles</option>
+          <option value="sent">Verzonden</option>
+          <option value="queued">In wachtrij</option>
+          <option value="approved">Goedgekeurd (nog niet verzonden)</option>
+          <option value="failed">Fout</option>
+        </Select>
+      }
+      bodyClassName=""
+    >
+      {error && <ErrorNote message={error} onRetry={reload} />}
+      {loading && !data && <Loading />}
+      {data && (
+        <>
+          <Table>
+            <thead>
+              <tr><Th>Wanneer</Th><Th>Aan</Th><Th>Aanbieder</Th><Th>Activiteiten</Th><Th>Status</Th><Th>Campagne</Th></tr>
+            </thead>
+            <tbody>
+              {data.rows.length === 0 && (
+                <tr><Td className="py-8 text-center text-slate-400">Nog niets verzonden of klaargezet.</Td></tr>
+              )}
+              {data.rows.map((r) => (
+                <Tr key={r.id}>
+                  <Td className="whitespace-nowrap text-xs">{fmtDate(r.sentAt ?? r.approvedAt)}</Td>
+                  <Td className="font-mono text-xs">{r.toEmail}</Td>
+                  <Td className="text-xs">{r.org}</Td>
+                  <Td className="max-w-[260px] text-xs text-slate-600"><div className="truncate" title={r.activities ?? ""}>{r.activities ?? "—"}</div></Td>
+                  <Td className="text-xs">
+                    <Badge tone={(MSG_TONE[r.status] ?? "slate") as never}>{MSG_LABEL[r.status] ?? r.status}</Badge>{" "}
+                    {r.testMode ? <Badge tone="blue">test</Badge> : <Badge tone="red">echt</Badge>}
+                    {r.error ? <div className="text-[11px] text-rose-600">{r.error}</div> : null}
+                  </Td>
+                  <Td className="text-xs text-slate-500">{r.campaign ?? "—"}</Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+          <Pager page={data.page} pageCount={data.pageCount} total={data.total} onPage={setPage} />
+        </>
+      )}
+    </Panel>
   );
 }

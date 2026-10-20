@@ -21,7 +21,7 @@ import {
 } from "../ui";
 import { OrgPanel } from "./OutreachOrgPanel";
 import { MSG_LABEL, MSG_TONE, VERIFY_LABEL, VERIFY_TONE } from "./OutreachShared";
-import { OutreachCampaign, OutreachImport, OutreachSettings, OutreachSuppressions } from "./OutreachTabs";
+import { OutreachCampaign, OutreachImport, OutreachSent, OutreachSettings, OutreachSuppressions } from "./OutreachTabs";
 
 export interface OrgRow {
   id: string;
@@ -80,7 +80,7 @@ const DISC_LABEL: Record<string, string> = {
   skipped: "Overgeslagen",
 };
 
-type Tab = "orgs" | "campaign" | "suppress" | "settings" | "import";
+type Tab = "orgs" | "sent" | "campaign" | "suppress" | "settings" | "import";
 
 export function Outreach() {
   const [tab, setTab] = useState<Tab>("orgs");
@@ -90,6 +90,7 @@ export function Outreach() {
 
   const tabs: [Tab, string][] = [
     ["orgs", "Aanbieders"],
+    ["sent", "Verzonden"],
     ["campaign", "Campagne"],
     ["suppress", "Uitsluitingen"],
     ["settings", "Instellingen"],
@@ -133,6 +134,7 @@ export function Outreach() {
       </div>
 
       {tab === "orgs" && <OrgsTab onChanged={() => summary.reload()} />}
+      {tab === "sent" && <OutreachSent />}
       {tab === "campaign" && <OutreachCampaign onChanged={() => summary.reload()} />}
       {tab === "suppress" && <OutreachSuppressions />}
       {tab === "settings" && <OutreachSettings onChanged={() => { config.reload(); summary.reload(); }} />}
@@ -308,6 +310,38 @@ function OrgsTab({ onChanged }: { onChanged: () => void }) {
               }
             >
               Concepten voorbereiden
+            </Btn>
+            <Btn
+              variant="primary"
+              loading={busy === "sendsel"}
+              onClick={() =>
+                run("sendsel", async () => {
+                  const orgIds = [...selected].slice(0, 100);
+                  const p = await cc<{
+                    mode: "test" | "live"; from: { name: string; email: string }; testInbox: string | null; ready: number; fingerprint: string;
+                    recipients: { toEmail: string; org: string; activities: string[] }[];
+                    blocked: { org: string; toEmail: string | null; reasons: string[] }[];
+                    sampleSubject: string | null; sampleText: string | null;
+                    pace: { perRun: number; everyMinutes: number; dailyCap: number };
+                  }>("/outreach/send-selected/preview", { method: "POST", body: { orgIds } });
+                  const blockedTxt = p.blocked.length
+                    ? `\n\nNiet verzonden (${p.blocked.length}):\n` + p.blocked.slice(0, 8).map((b) => `• ${b.org}: ${b.reasons[0]}`).join("\n") + (p.blocked.length > 8 ? `\n… en ${p.blocked.length - 8} meer` : "")
+                    : "";
+                  if (p.ready === 0) return `Niets om te verzenden.${blockedTxt}`;
+                  const list = p.recipients.slice(0, 12).map((r) => `• ${r.org} → ${r.toEmail}${r.activities.length ? ` (${r.activities.length} act.)` : ""}`).join("\n");
+                  const where = p.mode === "live" ? "ECHT verzenden" : `TEST: gaat naar ${p.testInbox ?? "niemand (dry-run)"}`;
+                  const msg = `${where}\nVan: ${p.from.name} <${p.from.email}>\n\n${p.ready} mails:\n${list}${p.ready > 12 ? `\n… en ${p.ready - 12} meer` : ""}${blockedTxt}\n\nOnderwerp: ${p.sampleSubject}\n\nTempo: ${p.pace.perRun} per ${p.pace.everyMinutes} min, max ${p.pace.dailyCap} per dag.\n\nVerzenden starten?`;
+                  if (!window.confirm(msg)) return "Niet verzonden.";
+                  const r = await cc<{ queued: number; sent: number; failed: unknown[] }>("/outreach/send-selected", {
+                    method: "POST",
+                    body: { orgIds, fingerprint: p.fingerprint, expectedCount: p.ready },
+                  });
+                  setSelected(new Set());
+                  return `${r.sent} nu verzonden, ${r.queued - r.sent} volgen op tempo${r.failed.length ? `, ${r.failed.length} geweigerd` : ""}. Zie het tabblad Verzonden.`;
+                })
+              }
+            >
+              Verstuur naar geselecteerde
             </Btn>
             <Btn variant="ghost" onClick={() => setSelected(new Set())}>Selectie wissen</Btn>
           </div>

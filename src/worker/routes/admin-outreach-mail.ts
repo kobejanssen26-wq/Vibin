@@ -292,6 +292,163 @@ app.post("/bulk-approve", async (c) => {
   return c.json({ approved, failed: failed.slice(0, 40), failedCount: failed.length });
 });
 
+/* ------------------------- send to a chosen selection ------------------------- */
+
+const SELECT_MAX = 100;
+const selectBody = z.object({ orgIds: z.array(z.string().max(40)).min(1).max(SELECT_MAX) });
+
+/**
+ * Per chosen organisation: (re)build its draft, then run the full approval gate.
+ * `rebuild` is only true for the preview; the send step re-reads the drafts the owner saw.
+ */
+async function selectionCandidates(env: Env, config: Awaited<ReturnType<typeof loadConfig>>, orgIds: string[], rebuild: boolean) {
+  const testMode = config.mode === "live" ? 0 : 1;
+  const ok: { id: string; hash: string; toEmail: string; org: string; activities: string[] }[] = [];
+  const blocked: { orgId: string; org: string; toEmail: string | null; reasons: string[] }[] = [];
+  for (const orgId of orgIds) {
+    const org = await env.DB.prepare(`SELECT name FROM outreach_orgs WHERE id = ?1`).bind(orgId).first<{ name: string }>();
+    const name = org?.name ?? orgId;
+    let messageId: string | null = null;
+    if (rebuild) {
+      const r = await prepareDraft(env, orgId);
+      if (!r.ok) {
+        blocked.push({ orgId, org: name, toEmail: null, reasons: [r.message] });
+        continue;
+      }
+      messageId = r.messageId;
+    } else {
+      const d = await env.DB.prepare(
+        `SELECT id FROM outreach_messages WHERE org_id = ?1 AND status = 'draft' AND test_mode = ?2 AND contact_id IS NOT NULL ORDER BY updated_at DESC LIMIT 1`,
+      )
+        .bind(orgId, testMode)
+        .first<{ id: string }>();
+      messageId = d?.id ?? null;
+    }
+    const m = messageId ? await loadMsg(env, messageId) : null;
+    if (!m) {
+      blocked.push({ orgId, org: name, toEmail: null, reasons: ["Geen concept gevonden."] });
+      continue;
+    }
+    const reasons = await checkMessage(env, config, m, "approve");
+    if (reasons.length) {
+      blocked.push({ orgId, org: name, toEmail: m.to_email, reasons: reasons.map((x) => x.message) });
+      continue;
+    }
+    const hash = await messageHash({ toEmail: m.to_email, subject: m.subject, bodyText: m.body_text });
+    const acts = await env.DB.prepare(`SELECT title FROM outreach_message_activities WHERE message_id = ?1 ORDER BY title`)
+      .bind(m.id)
+      .all<{ title: string }>();
+    ok.push({ id: m.id, hash, toEmail: m.to_email, org: name, activities: acts.results.map((a) => a.title) });
+  }
+  const fingerprint = await sha256Hex(ok.map((x) => `${x.id}:${x.hash}`).join("|"));
+  return { ok, blocked, fingerprint };
+}
+
+app.post("/send-selected/preview", async (c) => {
+  const b = await parseBody(c, selectBody);
+  const config = await loadConfig(c.env);
+  const { ok, blocked, fingerprint } = await selectionCandidates(c.env, config, b.orgIds, true);
+  const sample = ok[0] ? await loadMsg(c.env, ok[0].id) : null;
+  return c.json({
+    mode: config.mode,
+    from: { name: config.fromName, email: config.fromEmail },
+    testInbox: config.mode === "live" ? null : config.testInbox || null,
+    ready: ok.length,
+    recipients: ok.map((x) => ({ id: x.id, toEmail: x.toEmail, org: x.org, activities: x.activities })),
+    blocked,
+    fingerprint,
+    sampleSubject: sample?.subject ?? null,
+    sampleText: sample?.body_text ?? null,
+    pace: { perRun: config.perRun, everyMinutes: 30, dailyCap: config.dailyCap },
+  });
+});
+
+/**
+ * One confirmed step for the owner: approve exactly the drafts that were previewed (full gate
+ * and per-message hash each), queue them in a new campaign and send the first batch at once.
+ * The rest follows at the configured pace.
+ */
+app.post("/send-selected", async (c) => {
+  const b = await parseBody(c, selectBody.extend({ fingerprint: z.string().min(32).max(80), expectedCount: z.number().int().min(1).max(SELECT_MAX) }));
+  const actor = actorOf(c);
+  await rateLimit(c.env, "outreach-send-selected", actor.userId ?? "owner", 6, 60);
+  const config = await loadConfig(c.env);
+  if (config.mode === "live") {
+    const ready = liveReadiness(config, c.env);
+    if (!ready.ready) throw badRequest("Echte verzending is niet klaar.", { blockers: ready.blockers });
+  }
+  const cand = await selectionCandidates(c.env, config, b.orgIds, false);
+  if (cand.fingerprint !== b.fingerprint || cand.ok.length !== b.expectedCount) {
+    throw conflict("De selectie is gewijzigd sinds je de samenvatting bekeek. Open hem opnieuw.", { now: cand.ok.length });
+  }
+  const approvedIds: string[] = [];
+  const failed: { toEmail: string; reasons: string[] }[] = [];
+  for (const m of cand.ok) {
+    const res = await approveMessage(c.env, m.id, actor, m.hash);
+    if (res.ok) approvedIds.push(m.id);
+    else failed.push({ toEmail: m.toEmail, reasons: res.reasons.map((r) => r.message) });
+  }
+  if (!approvedIds.length) return c.json({ campaignId: null, queued: 0, sent: 0, failed }, 422);
+  const testMode = config.mode === "live" ? 0 : 1;
+  const campaignId = newId();
+  const now = nowSec();
+  const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO outreach_campaigns (id, name, status, test_mode, total, created_by, created_at)
+       VALUES (?1, ?2, 'running', ?3, ?4, ?5, ?6)`,
+    ).bind(campaignId, `Selectie ${stamp}`, testMode, approvedIds.length, c.get("adminUserId"), now),
+    c.env.DB.prepare(
+      `UPDATE outreach_messages SET status = 'queued', campaign_id = ?1, queued_at = ?2, updated_at = ?2
+        WHERE status = 'approved' AND campaign_id IS NULL AND test_mode = ?3 AND approved_by IS NOT NULL
+          AND approved_hash IS NOT NULL AND id IN (${approvedIds.map((_, i) => `?${i + 4}`).join(",")})`,
+    ).bind(campaignId, now, testMode, ...approvedIds),
+  ]);
+  const first = await drainCampaigns(c.env);
+  await audit(c, {
+    action: "outreach.send_selected",
+    targetType: "outreach_campaign",
+    targetId: campaignId,
+    meta: { queued: approvedIds.length, failed: failed.length, mode: config.mode, firstBatchSent: first.sent },
+  });
+  return c.json({ campaignId, queued: approvedIds.length, sent: first.sent, failed });
+});
+
+/** Everything that was approved, queued, sent or failed: who, to what address, when. */
+app.get("/log", async (c) => {
+  const url = new URL(c.req.url);
+  const pg = Math.max(1, Number(url.searchParams.get("page")) || 1);
+  const status = url.searchParams.get("status") || "";
+  const where = ["m.status IN ('approved','queued','sending','sent','failed')"];
+  const binds: unknown[] = [];
+  if (["approved", "queued", "sending", "sent", "failed"].includes(status)) {
+    where.push("m.status = ?");
+    binds.push(status);
+  }
+  const config = await loadConfig(c.env);
+  const [rows, total] = await c.env.DB.batch([
+    c.env.DB.prepare(
+      `SELECT m.id, m.to_email AS toEmail, m.subject, m.status, m.test_mode AS testMode, m.sent_at AS sentAt,
+              m.approved_at AS approvedAt, m.error, m.provider_message_id AS providerId,
+              o.id AS orgId, o.name AS org, g.name AS campaign,
+              (SELECT GROUP_CONCAT(x.title, ' | ') FROM outreach_message_activities x WHERE x.message_id = m.id) AS activities
+         FROM outreach_messages m JOIN outreach_orgs o ON o.id = m.org_id
+         LEFT JOIN outreach_campaigns g ON g.id = m.campaign_id
+        WHERE ${where.join(" AND ")}
+        ORDER BY COALESCE(m.sent_at, m.approved_at, m.updated_at) DESC LIMIT 50 OFFSET ?`,
+    ).bind(...binds, (pg - 1) * 50),
+    c.env.DB.prepare(`SELECT COUNT(*) AS n FROM outreach_messages m WHERE ${where.join(" AND ")}`).bind(...binds),
+  ]);
+  const n = (total!.results[0] as { n: number }).n;
+  return c.json({
+    from: config.fromEmail,
+    rows: (rows!.results as Record<string, unknown>[]).map((r) => ({ ...r, testMode: !!r.testMode })),
+    total: n,
+    page: pg,
+    pageCount: Math.ceil(n / 50) || 1,
+  });
+});
+
 /** "Goedkeuren en verzenden": approve exactly what was previewed, then deliver this one message. */
 app.post("/messages/:id/send", async (c) => {
   const id = c.req.param("id");
