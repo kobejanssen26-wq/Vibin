@@ -502,7 +502,8 @@ function MessagePreview({ messageId, onChanged, onGone }: { messageId: string; o
             onClick={() => {
               if (!window.confirm(`Goedkeuren en verzenden?\n\n${target}\nOnderwerp: ${data.subject}`)) return;
               void act(async () => {
-                const r = await cc<{ test: boolean; dryRun: boolean }>(`/outreach/messages/${messageId}/send`, { method: "POST", body: { hash: data.hash } });
+                const r = await cc<{ test: boolean; dryRun: boolean; queued?: boolean }>(`/outreach/messages/${messageId}/send`, { method: "POST", body: { hash: data.hash } });
+                if (r.queued) return "Daglimiet bereikt: het bericht staat in de wachtrij en wordt automatisch verzonden zodra het kan.";
                 return r.dryRun ? "Dry-run voltooid: er is niets verzonden." : r.test ? "Testbericht verzonden naar de testinbox." : "Verzonden.";
               });
             }}

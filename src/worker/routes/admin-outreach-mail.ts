@@ -355,8 +355,15 @@ app.post("/send-selected/preview", async (c) => {
   const config = await loadConfig(c.env);
   const { ok, blocked, fingerprint } = await selectionCandidates(c.env, config, b.orgIds, true);
   const sample = ok[0] ? await loadMsg(c.env, ok[0].id) : null;
+  const last24 = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM outreach_messages WHERE status = 'sent' AND test_mode = 0 AND sent_at > ?1`,
+  )
+    .bind(nowSec() - 86400)
+    .first<{ n: number }>();
+  const remainingToday = Math.max(0, config.dailyCap - (last24?.n ?? 0));
   return c.json({
     mode: config.mode,
+    remainingToday,
     from: { name: config.fromName, email: config.fromEmail },
     testInbox: config.mode === "live" ? null : config.testInbox || null,
     ready: ok.length,
@@ -512,6 +519,24 @@ app.post("/messages/:id/send", async (c) => {
   if (out.ok) return c.json({ ok: true, test: out.test, dryRun: out.dryRun, providerId: out.providerId });
   if (out.kind === "in_progress") throw conflict("Dit bericht wordt al verzonden of is al verzonden.");
   if (out.kind === "blocked") {
+    // Only the daily limit stands in the way: not an error. The approved message waits in a
+    // queue and the scheduler sends it as soon as the 24-hour window has room again.
+    if (out.reasons.every((r) => r.code === "daily_cap")) {
+      const config = await loadConfig(c.env);
+      const campaignId = newId();
+      const now = nowSec();
+      await c.env.DB.batch([
+        c.env.DB.prepare(
+          `INSERT INTO outreach_campaigns (id, name, status, test_mode, total, created_by, created_at)
+           VALUES (?1, 'Wachtrij (daglimiet)', 'running', ?2, 1, ?3, ?4)`,
+        ).bind(campaignId, config.mode === "live" ? 0 : 1, c.get("adminUserId"), now),
+        c.env.DB.prepare(
+          `UPDATE outreach_messages SET status = 'queued', campaign_id = ?1, queued_at = ?2, updated_at = ?2
+            WHERE id = ?3 AND status = 'approved'`,
+        ).bind(campaignId, now, id),
+      ]);
+      return c.json({ ok: true, queued: true, message: "Daglimiet bereikt: het bericht staat in de wachtrij en wordt automatisch verzonden zodra het kan." });
+    }
     const e = reasonsError(out.reasons);
     return c.json({ error: e.error, message: e.message, details: e.details }, 422);
   }

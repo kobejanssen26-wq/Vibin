@@ -190,7 +190,7 @@ function OrgsTab({ onChanged }: { onChanged: () => void }) {
   /** Preview (rebuilds the drafts) → one confirmation → approve + queue + first batch. */
   const sendFlow = async (orgIds: string[], extra = "") => {
     const p = await cc<{
-      mode: "test" | "live"; from: { name: string; email: string }; testInbox: string | null; ready: number; fingerprint: string;
+      mode: "test" | "live"; remainingToday: number; from: { name: string; email: string }; testInbox: string | null; ready: number; fingerprint: string;
       recipients: { toEmail: string; org: string; activities: string[] }[];
       blocked: { org: string; toEmail: string | null; reasons: string[] }[];
       sampleSubject: string | null; sampleText: string | null;
@@ -202,7 +202,7 @@ function OrgsTab({ onChanged }: { onChanged: () => void }) {
     if (p.ready === 0) return `Niets om te verzenden.${blockedTxt}`;
     const list = p.recipients.slice(0, 12).map((r) => `• ${r.org} → ${r.toEmail}${r.activities.length ? ` (${r.activities.length} act.)` : ""}`).join("\n");
     const where = p.mode === "live" ? "ECHT verzenden" : `TEST: gaat naar ${p.testInbox ?? "niemand (dry-run)"}`;
-    const msg = `${where}\nVan: ${p.from.name} <${p.from.email}>\n\n${p.ready} mails:\n${list}${p.ready > 12 ? `\n… en ${p.ready - 12} meer` : ""}${blockedTxt}\n\nOnderwerp: ${p.sampleSubject}\n\nTempo: ${p.pace.perRun} per ${p.pace.everyMinutes} min, max ${p.pace.dailyCap} per dag.\n\nVerzenden starten?${extra}`;
+    const msg = `${where}\nVan: ${p.from.name} <${p.from.email}>\n\n${p.ready} mails:\n${list}${p.ready > 12 ? `\n… en ${p.ready - 12} meer` : ""}${blockedTxt}\n\nOnderwerp: ${p.sampleSubject}\n\nTempo: ${p.pace.perRun} per ${p.pace.everyMinutes} min, max ${p.pace.dailyCap} per dag.${p.mode === "live" ? (p.remainingToday >= p.ready ? `\nVandaag kunnen er nog ${p.remainingToday} weg.` : `\nDaglimiet: vandaag kunnen er nog ${p.remainingToday} weg; de overige ${p.ready - p.remainingToday} staan in de wachtrij en gaan automatisch morgen.`) : ""}\n\nVerzenden starten?${extra}`;
     if (!window.confirm(msg)) return "Niet verzonden.";
     const r = await cc<{ queued: number; sent: number; failed: unknown[] }>("/outreach/send-selected", {
       method: "POST",

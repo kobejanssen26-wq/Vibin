@@ -687,6 +687,16 @@ async function main() {
   r = await A("GET", "/log?status=sent");
   ok("log: shows who got what, from which sender, as test", r.status === 200 && r.data.rows.filter((x) => x.campaign && x.testMode).length >= 2 && r.data.rows.every((x) => x.toEmail) && "from" in r.data, r.data);
 
+  // ---- daily limit: never an error, the mail waits in the queue ----
+  r = await A("GET", "/config");
+  const capCfg = r.data.config;
+  r = await A("PUT", "/config", { dailyCap: 1 });
+  ok("cap: daily limit can be lowered", r.status === 200, r.data);
+  r = await A("POST", "/orgs/o_ca/prepare", {});
+  r = await A("POST", "/send-selected/preview", { orgIds: ["o_cc", "o_cd"] });
+  ok("cap: preview tells how many can still go today", typeof r.data.remainingToday === "number", r.data);
+  r = await A("PUT", "/config", { dailyCap: capCfg.dailyCap });
+
   // ---- batch size stays within the Worker's request budget ----
   r = await A("POST", "/send-selected/preview", { orgIds: Array.from({ length: 16 }, (_, i) => `big${i + 1}`) });
   ok("batch: more than 15 organisations per send is refused (subrequest budget)", r.status === 400 || r.status === 422, r.status);
