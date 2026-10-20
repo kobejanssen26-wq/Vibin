@@ -41,19 +41,23 @@ const VERIF = z.enum(["verified", "needs_review", "unverified", "archived"]);
 const urlOrNull = z.string().trim().url().max(500).nullable().default(null);
 
 /* --------------------------------- list --------------------------------- */
+/** The admin filters send "" for "no filter"; that must mean "not set", not "invalid". */
+const blankIsUnset = <T extends z.ZodTypeAny>(t: T) =>
+  z.preprocess((v) => (v === "" ? undefined : v), t);
+
 app.get("/events", async (c) => {
   const q = parseQuery(
     c,
     z.object({
-      kind: KIND.optional(),
-      status: STATUS.optional(),
-      verification: VERIF.optional(),
+      kind: blankIsUnset(KIND.optional()),
+      status: blankIsUnset(STATUS.optional()),
+      verification: blankIsUnset(VERIF.optional()),
       city: z.string().trim().max(80).optional(),
       sourceId: z.string().max(40).optional(),
       q: z.string().trim().max(80).optional(),
-      from: z.coerce.number().int().positive().optional(),
-      to: z.coerce.number().int().positive().optional(),
-      limit: z.coerce.number().int().min(1).max(1000).default(300),
+      from: blankIsUnset(z.coerce.number().int().positive().optional()),
+      to: blankIsUnset(z.coerce.number().int().positive().optional()),
+      limit: blankIsUnset(z.coerce.number().int().min(1).max(1000).default(300)),
     }),
   );
   const db = createDb(c.env);

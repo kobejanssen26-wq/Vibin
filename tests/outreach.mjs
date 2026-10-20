@@ -671,6 +671,10 @@ async function main() {
   r = await A("GET", "/bulk-approve/preview");
   ok("bulk: second preview no longer lists them", !r.data.sample.some((x) => /camp-[abcd]\.be/.test(x.toEmail)), r.data.sample);
 
+  // ---- admin lists tolerate empty filters (the UI sends "" for "no filter") ----
+  r = await call(admin, "GET", "/api/admin/cc/events?q=&kind=&status=&verification=");
+  ok("events list: empty filter values are not an error", r.status === 200 && Array.isArray(r.data.events), r.data);
+
   // ---- audit trail records the actions ----
   r = await call(admin, "GET", "/api/admin/cc/audit?range=today&action=outreach.sent");
   ok("audit: sends are recorded", r.status === 200 && r.data.rows.length >= 1, r.data);
