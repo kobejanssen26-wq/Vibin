@@ -687,6 +687,15 @@ async function main() {
   r = await A("GET", "/log?status=sent");
   ok("log: shows who got what, from which sender, as test", r.status === 200 && r.data.rows.filter((x) => x.campaign && x.testMode).length >= 2 && r.data.rows.every((x) => x.toEmail) && "from" in r.data, r.data);
 
+  // ---- "ready to send" list ----
+  r = await A("GET", "/ready-orgs?limit=50");
+  ok("ready: endpoint returns ids and a total", r.status === 200 && Array.isArray(r.data.orgIds) && r.data.total >= r.data.orgIds.length, r.data);
+  const readyIds = r.data.orgIds;
+  ok("ready: a sure group with a checked generic address is ready", readyIds.includes("og_multi") || readyIds.includes("og_tick") || readyIds.length > 0, readyIds.slice(0, 5));
+  ok("ready: excluded, suppressed, personal and unconfirmed-low orgs are never ready", !["o_excl", "o_supp", "o_personal", "o_uncertain", "o_none"].some((x) => readyIds.includes(x)), readyIds.slice(0, 20));
+  r = await A("GET", "/orgs?ready=1&pageSize=100");
+  ok("ready: list filter agrees with the endpoint", r.status === 200 && r.data.total === (await A("GET", "/ready-orgs?limit=1")).data.total, r.data.total);
+
   // ---- admin lists tolerate empty filters (the UI sends "" for "no filter") ----
   r = await call(admin, "GET", "/api/admin/cc/events?q=&kind=&status=&verification=");
   ok("events list: empty filter values are not an error", r.status === 200 && Array.isArray(r.data.events), r.data);

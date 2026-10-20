@@ -149,6 +149,7 @@ function OrgsTab({ onChanged }: { onChanged: () => void }) {
   const [verification, setVerification] = useState("");
   const [emailStatus, setEmailStatus] = useState("");
   const [group, setGroup] = useState("");
+  const [ready, setReady] = useState(false);
   const [discovery, setDiscovery] = useState("");
   const [excluded, setExcluded] = useState("hide");
   const [uncontacted, setUncontacted] = useState(false);
@@ -159,7 +160,7 @@ function OrgsTab({ onChanged }: { onChanged: () => void }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const query = `q=${encodeURIComponent(q)}&verification=${verification}&emailStatus=${emailStatus}&group=${group}&discovery=${discovery}&excluded=${excluded}&uncontacted=${uncontacted ? 1 : 0}&usable=${usable ? 1 : 0}&page=${page}&pageSize=25`;
+  const query = `q=${encodeURIComponent(q)}&verification=${verification}&emailStatus=${emailStatus}&group=${group}&ready=${ready ? 1 : 0}&discovery=${discovery}&excluded=${excluded}&uncontacted=${uncontacted ? 1 : 0}&usable=${usable ? 1 : 0}&page=${page}&pageSize=25`;
   const { data, loading, error, reload } = useResource<ListResp>(() => cc<ListResp>(`/outreach/orgs?${query}`), query);
 
   const run = async (label: string, fn: () => Promise<string>) => {
@@ -186,6 +187,32 @@ function OrgsTab({ onChanged }: { onChanged: () => void }) {
       return n;
     });
 
+  /** Preview (rebuilds the drafts) → one confirmation → approve + queue + first batch. */
+  const sendFlow = async (orgIds: string[], extra = "") => {
+    const p = await cc<{
+      mode: "test" | "live"; from: { name: string; email: string }; testInbox: string | null; ready: number; fingerprint: string;
+      recipients: { toEmail: string; org: string; activities: string[] }[];
+      blocked: { org: string; toEmail: string | null; reasons: string[] }[];
+      sampleSubject: string | null; sampleText: string | null;
+      pace: { perRun: number; everyMinutes: number; dailyCap: number };
+    }>("/outreach/send-selected/preview", { method: "POST", body: { orgIds } });
+    const blockedTxt = p.blocked.length
+      ? `\n\nNiet verzonden (${p.blocked.length}):\n` + p.blocked.slice(0, 8).map((b) => `• ${b.org}: ${b.reasons[0]}`).join("\n") + (p.blocked.length > 8 ? `\n… en ${p.blocked.length - 8} meer` : "")
+      : "";
+    if (p.ready === 0) return `Niets om te verzenden.${blockedTxt}`;
+    const list = p.recipients.slice(0, 12).map((r) => `• ${r.org} → ${r.toEmail}${r.activities.length ? ` (${r.activities.length} act.)` : ""}`).join("\n");
+    const where = p.mode === "live" ? "ECHT verzenden" : `TEST: gaat naar ${p.testInbox ?? "niemand (dry-run)"}`;
+    const msg = `${where}\nVan: ${p.from.name} <${p.from.email}>\n\n${p.ready} mails:\n${list}${p.ready > 12 ? `\n… en ${p.ready - 12} meer` : ""}${blockedTxt}\n\nOnderwerp: ${p.sampleSubject}\n\nTempo: ${p.pace.perRun} per ${p.pace.everyMinutes} min, max ${p.pace.dailyCap} per dag.\n\nVerzenden starten?${extra}`;
+    if (!window.confirm(msg)) return "Niet verzonden.";
+    const r = await cc<{ queued: number; sent: number; failed: unknown[] }>("/outreach/send-selected", {
+      method: "POST",
+      body: { orgIds, fingerprint: p.fingerprint, expectedCount: p.ready },
+    });
+    setSelected(new Set());
+    return `${r.sent} nu verzonden, ${r.queued - r.sent} volgen op tempo${r.failed.length ? `, ${r.failed.length} geweigerd` : ""}. Zie het tabblad Verzonden.`;
+
+  };
+
   return (
     <>
       <Panel
@@ -203,6 +230,19 @@ function OrgsTab({ onChanged }: { onChanged: () => void }) {
               }
             >
               Aanbieders bijwerken
+            </Btn>
+            <Btn
+              variant="primary"
+              loading={busy === "next"}
+              onClick={() =>
+                run("next", async () => {
+                  const r = await cc<{ orgIds: string[]; total: number }>("/outreach/ready-orgs?limit=25");
+                  if (!r.orgIds.length) return "Geen aanbieders die klaar zijn om te sturen. De adressen worden automatisch verder gezocht.";
+                  return sendFlow(r.orgIds, `\n\n(Er zijn ${r.total} aanbieders klaar; dit zijn de beste ${r.orgIds.length}.)`);
+                })
+              }
+            >
+              Verstuur naar de volgende 25 klare
             </Btn>
             <Btn
               variant="primary"
@@ -281,6 +321,10 @@ function OrgsTab({ onChanged }: { onChanged: () => void }) {
             <option value="only">Alleen uitgesloten</option>
             <option value="all">Alles tonen</option>
           </Select>
+          <label className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-800">
+            <input type="checkbox" checked={ready} onChange={(e) => setF(setReady)(e.target.checked)} />
+            Klaar om te sturen
+          </label>
           <label className="flex items-center gap-1.5 text-[13px] text-slate-700">
             <input type="checkbox" checked={uncontacted} onChange={(e) => setF(setUncontacted)(e.target.checked)} />
             Nog niet gecontacteerd
@@ -315,30 +359,7 @@ function OrgsTab({ onChanged }: { onChanged: () => void }) {
               variant="primary"
               loading={busy === "sendsel"}
               onClick={() =>
-                run("sendsel", async () => {
-                  const orgIds = [...selected].slice(0, 100);
-                  const p = await cc<{
-                    mode: "test" | "live"; from: { name: string; email: string }; testInbox: string | null; ready: number; fingerprint: string;
-                    recipients: { toEmail: string; org: string; activities: string[] }[];
-                    blocked: { org: string; toEmail: string | null; reasons: string[] }[];
-                    sampleSubject: string | null; sampleText: string | null;
-                    pace: { perRun: number; everyMinutes: number; dailyCap: number };
-                  }>("/outreach/send-selected/preview", { method: "POST", body: { orgIds } });
-                  const blockedTxt = p.blocked.length
-                    ? `\n\nNiet verzonden (${p.blocked.length}):\n` + p.blocked.slice(0, 8).map((b) => `• ${b.org}: ${b.reasons[0]}`).join("\n") + (p.blocked.length > 8 ? `\n… en ${p.blocked.length - 8} meer` : "")
-                    : "";
-                  if (p.ready === 0) return `Niets om te verzenden.${blockedTxt}`;
-                  const list = p.recipients.slice(0, 12).map((r) => `• ${r.org} → ${r.toEmail}${r.activities.length ? ` (${r.activities.length} act.)` : ""}`).join("\n");
-                  const where = p.mode === "live" ? "ECHT verzenden" : `TEST: gaat naar ${p.testInbox ?? "niemand (dry-run)"}`;
-                  const msg = `${where}\nVan: ${p.from.name} <${p.from.email}>\n\n${p.ready} mails:\n${list}${p.ready > 12 ? `\n… en ${p.ready - 12} meer` : ""}${blockedTxt}\n\nOnderwerp: ${p.sampleSubject}\n\nTempo: ${p.pace.perRun} per ${p.pace.everyMinutes} min, max ${p.pace.dailyCap} per dag.\n\nVerzenden starten?`;
-                  if (!window.confirm(msg)) return "Niet verzonden.";
-                  const r = await cc<{ queued: number; sent: number; failed: unknown[] }>("/outreach/send-selected", {
-                    method: "POST",
-                    body: { orgIds, fingerprint: p.fingerprint, expectedCount: p.ready },
-                  });
-                  setSelected(new Set());
-                  return `${r.sent} nu verzonden, ${r.queued - r.sent} volgen op tempo${r.failed.length ? `, ${r.failed.length} geweigerd` : ""}. Zie het tabblad Verzonden.`;
-                })
+                run("sendsel", async () => sendFlow([...selected].slice(0, 100)))
               }
             >
               Verstuur naar geselecteerde

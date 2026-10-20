@@ -39,6 +39,26 @@ const app = new Hono<Ctx>();
 const nowSec = () => Math.floor(Date.now() / 1000);
 const PENDING_MESSAGE_STATES = "('draft','approved','queued')";
 
+/**
+ * "Ready to send": nothing left for the owner to fix. A live activity on a working site, a
+ * checked generic address that can receive mail and is not on the do-not-contact list, a group
+ * that is sure (or confirmed), and no mail sent, queued or approved for the organisation yet.
+ * (The send gate re-checks everything again per message.)
+ */
+const READY_WHERE = `o.excluded = 0 AND o.discovery_status = 'found'
+  AND (o.group_confidence IN ('high','medium') OR o.group_confirmed = 1)
+  AND EXISTS (SELECT 1 FROM outreach_org_activities l JOIN activities a ON a.id = l.activity_id
+               WHERE l.org_id = o.id AND l.included = 1 AND a.active = 1
+                 AND (a.web_status IS NULL OR a.web_status IN ('alive','unknown')))
+  AND EXISTS (SELECT 1 FROM outreach_contacts k
+               WHERE k.org_id = o.id AND k.verification = 'checked' AND k.kind = 'generic'
+                 AND k.mx_ok IS NOT 0 AND k.domain_matches = 1
+                 AND NOT EXISTS (SELECT 1 FROM outreach_suppressions s
+                                  WHERE (s.kind = 'email' AND s.value = k.email)
+                                     OR (s.kind = 'domain' AND k.email LIKE '%@' || s.value)))
+  AND NOT EXISTS (SELECT 1 FROM outreach_messages m WHERE m.org_id = o.id AND m.test_mode = 0
+                   AND m.status IN ('sent','queued','sending','approved'))`;
+
 function page(url: URL, def = 25) {
   const p = Math.max(1, Number(url.searchParams.get("page")) || 1);
   const size = Math.min(100, Math.max(5, Number(url.searchParams.get("pageSize")) || def));
@@ -242,11 +262,11 @@ app.post("/sync", async (c) => {
     // Organisations whose every activity has a dead / parked / closed / blocked site are not checked.
     db.prepare(
       `UPDATE outreach_orgs
-          SET discovery_status = 'skipped', discovery_note = 'website niet beschikbaar (dood, geparkeerd of gesloten)'
+          SET discovery_status = 'skipped', discovery_note = 'geen actieve activiteit met werkende website'
         WHERE discovery_status = 'pending'
           AND NOT EXISTS (
             SELECT 1 FROM outreach_org_activities l JOIN activities a ON a.id = l.activity_id
-             WHERE l.org_id = outreach_orgs.id AND (a.web_status IS NULL OR a.web_status IN ('alive','unknown')))`,
+             WHERE l.org_id = outreach_orgs.id AND a.active = 1 AND (a.web_status IS NULL OR a.web_status IN ('alive','unknown')))`,
     ),
     // Many different names under one domain: a platform, a chain or a data error — a human decides.
     db.prepare(
@@ -324,6 +344,7 @@ app.get("/orgs", async (c) => {
   const usable = url.searchParams.get("usable") === "1";
   const sortReq = url.searchParams.get("sort") || "activities";
   const group = url.searchParams.get("group") || "";
+  const ready = url.searchParams.get("ready") === "1";
 
   const where: string[] = [];
   const binds: unknown[] = [];
@@ -360,6 +381,7 @@ app.get("/orgs", async (c) => {
     );
   }
   if (usable) where.push(`c.verification = 'checked' AND c.kind = 'generic'`);
+  if (ready) where.push(`(${READY_WHERE})`);
   if (["high", "medium", "low"].includes(group)) {
     where.push(`o.group_confidence = ?`);
     binds.push(group);
@@ -424,6 +446,19 @@ app.get("/orgs", async (c) => {
     pageSize,
     pageCount: Math.ceil(totalN / pageSize) || 1,
   });
+});
+
+/** The best organisations that are ready to send, most valuable first (ids only; preview/send do the rest). */
+app.get("/ready-orgs", async (c) => {
+  const limit = Math.max(1, Math.min(100, Number(new URL(c.req.url).searchParams.get("limit")) || 25));
+  const [rows, total] = await c.env.DB.batch([
+    c.env.DB.prepare(
+      `SELECT o.id FROM outreach_orgs o WHERE ${READY_WHERE}
+        ORDER BY (o.group_confidence = 'high') DESC, o.activity_count DESC, o.name COLLATE NOCASE ASC LIMIT ?1`,
+    ).bind(limit),
+    c.env.DB.prepare(`SELECT COUNT(*) AS n FROM outreach_orgs o WHERE ${READY_WHERE}`),
+  ]);
+  return c.json({ orgIds: (rows!.results as { id: string }[]).map((r) => r.id), total: (total!.results[0] as { n: number }).n });
 });
 
 app.get("/orgs/:id", async (c) => {
