@@ -676,6 +676,21 @@ export function OutreachSent() {
       title="Verzonden en klaarstaand"
       subtitle={data ? `Afzender: ${data.from || "niet ingesteld"}. Testmails gaan alleen naar je testinbox.` : undefined}
       right={
+        <div className="flex items-center gap-2">
+        <Btn
+          onClick={async () => {
+            if (!window.confirm("Mislukte echte berichten opnieuw in de wachtrij zetten?\n\nDit zijn berichten die mislukten voordat ze bij de mailservice aankwamen (er is niets van verzonden). Ze gaan daarna op het ingestelde tempo weg.")) return;
+            try {
+              const r = await cc<{ requeued: number }>("/outreach/retry-failed", { method: "POST", body: {} });
+              window.alert(r.requeued ? `${r.requeued} berichten staan weer in de wachtrij.` : "Geen mislukte berichten om opnieuw te proberen.");
+              reload();
+            } catch (e) {
+              window.alert(e instanceof Error ? e.message : "Mislukt.");
+            }
+          }}
+        >
+          Mislukte opnieuw proberen
+        </Btn>
         <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
           <option value="">Alles</option>
           <option value="sent">Verzonden</option>
@@ -683,6 +698,7 @@ export function OutreachSent() {
           <option value="approved">Goedgekeurd (nog niet verzonden)</option>
           <option value="failed">Fout</option>
         </Select>
+        </div>
       }
       bodyClassName=""
     >

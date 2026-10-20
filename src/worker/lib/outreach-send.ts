@@ -506,14 +506,21 @@ export async function approveMessage(
 /** Scheduler hook: discovery batch, then drain running campaigns at the configured pace. */
 export async function runOutreachTick(env: Env): Promise<void> {
   const config = await loadConfig(env);
-  // Address discovery runs on every tick (about 10 organisations per 30 minutes), best candidates first.
-  if (config.autoDiscovery) {
+  // One invocation may make at most ~50 outside requests (Workers free plan). Sending comes first;
+  // address discovery (several fetches per organisation) only runs in ticks that sent nothing.
+  const drained = await drainCampaigns(env);
+  if (config.autoDiscovery && drained.sent + drained.blocked === 0) {
     const has = await env.DB.prepare(
       `SELECT 1 AS x FROM outreach_orgs WHERE discovery_status = 'pending' AND excluded = 0 LIMIT 1`,
     ).first();
     if (has) await runDiscoveryBatch(env, config.discoveryPerRun);
   }
-  await drainCampaigns(env);
+}
+
+/** Look up (and cache) the mail domain of a message's contact now, so approval/send need no lookup. */
+export async function warmMx(env: Env, messageId: string): Promise<void> {
+  const row = await loadRow(env, messageId);
+  if (row) await ensureMx(env, row);
 }
 
 /** Send up to `perRun` queued messages from running campaigns. Every message passes the full gate. */

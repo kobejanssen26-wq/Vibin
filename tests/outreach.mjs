@@ -687,6 +687,12 @@ async function main() {
   r = await A("GET", "/log?status=sent");
   ok("log: shows who got what, from which sender, as test", r.status === 200 && r.data.rows.filter((x) => x.campaign && x.testMode).length >= 2 && r.data.rows.every((x) => x.toEmail) && "from" in r.data, r.data);
 
+  // ---- batch size stays within the Worker's request budget ----
+  r = await A("POST", "/send-selected/preview", { orgIds: Array.from({ length: 16 }, (_, i) => `big${i + 1}`) });
+  ok("batch: more than 15 organisations per send is refused (subrequest budget)", r.status === 400 || r.status === 422, r.status);
+  r = await A("POST", "/retry-failed", {});
+  ok("retry-failed: endpoint works (nothing to retry in test data)", r.status === 200 && typeof r.data.requeued === "number", r.data);
+
   // ---- "ready to send" list ----
   r = await A("GET", "/ready-orgs?limit=50");
   ok("ready: endpoint returns ids and a total", r.status === 200 && Array.isArray(r.data.orgIds) && r.data.total >= r.data.orgIds.length, r.data);

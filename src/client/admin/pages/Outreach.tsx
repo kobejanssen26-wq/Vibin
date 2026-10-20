@@ -236,13 +236,13 @@ function OrgsTab({ onChanged }: { onChanged: () => void }) {
               loading={busy === "next"}
               onClick={() =>
                 run("next", async () => {
-                  const r = await cc<{ orgIds: string[]; total: number }>("/outreach/ready-orgs?limit=25");
+                  const r = await cc<{ orgIds: string[]; total: number }>("/outreach/ready-orgs?limit=15");
                   if (!r.orgIds.length) return "Geen aanbieders die klaar zijn om te sturen. De adressen worden automatisch verder gezocht.";
                   return sendFlow(r.orgIds, `\n\n(Er zijn ${r.total} aanbieders klaar; dit zijn de beste ${r.orgIds.length}.)`);
                 })
               }
             >
-              Verstuur naar de volgende 25 klare
+              Verstuur naar de volgende 15 klare
             </Btn>
             <Btn
               variant="primary"
@@ -359,7 +359,7 @@ function OrgsTab({ onChanged }: { onChanged: () => void }) {
               variant="primary"
               loading={busy === "sendsel"}
               onClick={() =>
-                run("sendsel", async () => sendFlow([...selected].slice(0, 100)))
+                run("sendsel", async () => sendFlow([...selected].slice(0, 15)))
               }
             >
               Verstuur naar geselecteerde

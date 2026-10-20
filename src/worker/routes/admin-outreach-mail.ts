@@ -25,6 +25,7 @@ import {
   checkMessage,
   optOutUrl,
   drainCampaigns,
+  warmMx,
   sendTestEmail,
   sendMessageNow,
   type Actor,
@@ -294,7 +295,11 @@ app.post("/bulk-approve", async (c) => {
 
 /* ------------------------- send to a chosen selection ------------------------- */
 
-const SELECT_MAX = 100;
+/**
+ * Workers (free plan) allow ~50 outside requests per invocation and every new mail domain costs up to
+ * two DNS lookups, so a batch is small; the pacing (and the scheduler) does the rest.
+ */
+const SELECT_MAX = 15;
 const selectBody = z.object({ orgIds: z.array(z.string().max(40)).min(1).max(SELECT_MAX) });
 
 /**
@@ -329,6 +334,7 @@ async function selectionCandidates(env: Env, config: Awaited<ReturnType<typeof l
       blocked.push({ orgId, org: name, toEmail: null, reasons: ["Geen concept gevonden."] });
       continue;
     }
+    if (rebuild) await warmMx(env, m.id);
     const reasons = await checkMessage(env, config, m, "approve");
     if (reasons.length) {
       blocked.push({ orgId, org: name, toEmail: m.to_email, reasons: reasons.map((x) => x.message) });
@@ -412,6 +418,41 @@ app.post("/send-selected", async (c) => {
     meta: { queued: approvedIds.length, failed: failed.length, mode: config.mode, firstBatchSent: first.sent },
   });
   return c.json({ campaignId, queued: approvedIds.length, sent: first.sent, failed });
+});
+
+/**
+ * Re-queue live messages that failed BEFORE reaching the provider (retryable: network / limit errors),
+ * in one new campaign. Their approval (pinned to the exact text) is still valid; the gate re-checks all.
+ */
+app.post("/retry-failed", async (c) => {
+  const config = await loadConfig(c.env);
+  const testMode = config.mode === "live" ? 0 : 1;
+  const rows = await c.env.DB.prepare(
+    `SELECT id FROM outreach_messages
+      WHERE status = 'failed' AND test_mode = ?1 AND provider_result = 'retryable'
+        AND provider_message_id IS NULL AND approved_by IS NOT NULL AND approved_hash IS NOT NULL
+      LIMIT 200`,
+  )
+    .bind(testMode)
+    .all<{ id: string }>();
+  const ids = rows.results.map((r) => r.id);
+  if (!ids.length) return c.json({ requeued: 0 });
+  const campaignId = newId();
+  const now = nowSec();
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO outreach_campaigns (id, name, status, test_mode, total, created_by, created_at)
+       VALUES (?1, ?2, 'running', ?3, ?4, ?5, ?6)`,
+    ).bind(campaignId, `Opnieuw proberen ${new Date().toISOString().slice(0, 16).replace("T", " ")}`, testMode, ids.length, c.get("adminUserId"), now),
+    ...ids.map((id) =>
+      c.env.DB.prepare(
+        `UPDATE outreach_messages SET status = 'queued', campaign_id = ?1, queued_at = ?2, error = NULL, updated_at = ?2
+          WHERE id = ?3 AND status = 'failed'`,
+      ).bind(campaignId, now, id),
+    ),
+  ]);
+  await audit(c, { action: "outreach.retry_failed", targetType: "outreach_campaign", targetId: campaignId, meta: { count: ids.length } });
+  return c.json({ requeued: ids.length, campaignId });
 });
 
 /** Everything that was approved, queued, sent or failed: who, to what address, when. */
