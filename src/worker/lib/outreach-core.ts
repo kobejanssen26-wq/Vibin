@@ -569,6 +569,8 @@ export interface SendCheckInput {
     kind: string;
     verification: string;
     mxOk: number | null;
+    /** Research verdict on the address itself: verified | likely | unverified | invalid | not_found | conflict. */
+    evidenceStatus?: string;
   } | null;
   org: { id: string; excluded: number; groupConfidence?: string; groupConfirmed?: number } | null;
   /** Titles named in this message that another open/sent message to the same org already named. */
@@ -614,6 +616,9 @@ export function evaluateSend(i: SendCheckInput): Reason[] {
       add("unverified_contact", "Het adres is niet als betrouwbaar gecontroleerd gemarkeerd.");
     }
     if (contact.mxOk === 0) add("mx_failed", "Het domein van dit adres kan geen e-mail ontvangen.");
+    if (contact.evidenceStatus === "invalid" || contact.evidenceStatus === "conflict" || contact.evidenceStatus === "not_found") {
+      add("contact_evidence", "Het onderzoek markeerde dit adres als onjuist, tegenstrijdig of niet terug te vinden bij de aanbieder.");
+    }
   }
   if (!org) add("org_missing", "De aanbieder bestaat niet meer.");
   else if (org.excluded) add("org_excluded", "Deze aanbieder is uitgesloten van outreach.");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assessActivity, findDuplicateGroups, isBareDescription, QUALITY_RULE, type AuditInput } from "./activity-quality";
+import { allowedStatus, assessActivity, essentialFieldsChanged, findDuplicateGroups, isBareDescription, QUALITY_RULE, type AuditInput } from "./activity-quality";
 
 const BARE = "Chocolate shop in Brussel. From OpenStreetMap — not yet verified by VIBIN.";
 const row = (o: Partial<AuditInput> & { title: string }): AuditInput => ({
@@ -70,11 +70,12 @@ describe("assessActivity — what does NOT belong", () => {
 
 describe("assessActivity — what stays", () => {
   const real = "Indoor climbing hall with 4,000 m² of walls for beginners and experts, open every day.";
-  it("approves a described experience with its own photo and a live site", () => {
-    const a = assessActivity(
-      row({ title: "Klimzaal", subcategory: "Climbing", short_description: real, website_url: "https://k.be", web_status: "alive", image_is_generic: 0, address: "Straat 1" }),
-    );
-    expect(a.outcome).toBe("approved");
+  it("approves a described experience with its own photo and a live site — only when verified against a source", () => {
+    const r = row({ title: "Klimzaal", subcategory: "Climbing", short_description: real, website_url: "https://k.be", web_status: "alive", image_is_generic: 0, address: "Straat 1" });
+    expect(assessActivity({ ...r, verified: true }).outcome).toBe("approved");
+    const unverified = assessActivity(r);
+    expect(unverified.outcome).toBe("fix_data");
+    expect(unverified.issues).toContain("unverified");
   });
   it("keeps a real experience visible but flags the generic photo and bare text", () => {
     const a = assessActivity(row({ title: "Escape Zone", subcategory: "Escape room", website_url: "https://e.be", web_status: "alive" }));
@@ -82,8 +83,9 @@ describe("assessActivity — what stays", () => {
     expect(a.issues).toEqual(expect.arrayContaining(["photo_generic", "description_bare"]));
   });
   it("trusts hand-curated rows unless a hard rule hits", () => {
-    const a = assessActivity(row({ title: "Karting near Antwerp", subcategory: "Karting", source: "web", short_description: real, image_is_generic: 0, website_url: "https://k.be", web_status: "alive" }));
-    expect(a.outcome).toBe("approved");
+    const r = row({ title: "Karting near Antwerp", subcategory: "Karting", source: "web", short_description: real, image_is_generic: 0, website_url: "https://k.be", web_status: "alive" });
+    expect(assessActivity({ ...r, verified: true }).outcome).toBe("approved");
+    expect(assessActivity(r).outcome).toBe("fix_data");
   });
 });
 
@@ -125,5 +127,19 @@ describe("duplicates", () => {
 describe("the quality rule", () => {
   it("states the standard", () => {
     expect(QUALITY_RULE).toMatch(/concrete, relevante ervaring/);
+  });
+});
+
+describe("verification guards", () => {
+  it("a new or edited record can only be 'verified' when the basics exist", () => {
+    expect(allowedStatus("verified", { websiteUrl: "https://x.be", address: "Straat 1", city: "Gent" })).toBe("verified");
+    expect(allowedStatus("verified", { websiteUrl: null, address: "Straat 1", city: "Gent" })).toBe("needs_review");
+    expect(allowedStatus("needs_review", {})).toBe("needs_review");
+    expect(allowedStatus(undefined, {})).toBeUndefined();
+  });
+  it("detects changes to the fields that identify the venue", () => {
+    expect(essentialFieldsChanged({ title: "A", city: "Gent" }, { title: "A", city: "Brugge" })).toEqual(["city"]);
+    expect(essentialFieldsChanged({ title: "A" }, { title: "A", description: "x" })).toEqual([]);
+    expect(essentialFieldsChanged({ website_url: "a" }, { website_url: "b" })).toEqual(["website_url"]);
   });
 });

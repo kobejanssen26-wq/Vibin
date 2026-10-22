@@ -106,6 +106,13 @@
       "when": 1792359688769,
       "tag": "0014_outreach_grouping",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1792655321243,
+      "tag": "0015_activity_research",
+      "breakpoints": true
     }
   ]
 }

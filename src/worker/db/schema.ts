@@ -1219,6 +1219,76 @@ export const providerCommunications = sqliteTable(
   }),
 );
 
+/**
+ * Evidence-based research record per activity (one row, replaced by each newer run).
+ * It never holds a guess: every verified claim carries the source URL and the date it
+ * was checked; anything that could not be verified is stored as such.
+ *
+ *   evidence    JSON [{field, found, verified, sourceUrl, checkedAt, status, note}]
+ *               status: verified | likely | unverified | conflict | not_found | invalid
+ *   sources     JSON [{url, kind, checkedAt}]   kind: official | organisation | register | external
+ *   corrections JSON [{field, from, to, sourceUrl, confidence}]  (applied = corrections_applied)
+ */
+export const activityResearch = sqliteTable(
+  "activity_research",
+  {
+    activityId: text("activity_id")
+      .primaryKey()
+      .references(() => activities.id, { onDelete: "cascade" }),
+    /** Same vocabulary as activity_audits.outcome (approved | fix_data | manual | exclude | duplicate | closed). */
+    verdict: text("verdict").notNull(),
+    /** Does the venue / activity exist right now? confirmed | unconfirmed | closed | unknown */
+    existence: text("existence").notNull().default("unknown"),
+    /** Fit for VIBIN: fit | not_fit | unclear */
+    suitability: text("suitability").notNull().default("unclear"),
+    /** crawl = own-website fact check by script, agent = web research, owner = manual. */
+    method: text("method").notNull(),
+    evidence: text("evidence").notNull().default("[]"),
+    sources: text("sources").notNull().default("[]"),
+    corrections: text("corrections").notNull().default("[]"),
+    correctionsApplied: integer("corrections_applied").notNull().default(0),
+    duplicateOf: text("duplicate_of"),
+    /** Why the verdict was reached (short, factual) and what stays uncertain. */
+    note: text("note").notNull().default(""),
+    runId: text("run_id"),
+    researchedAt: integer("researched_at").notNull().default(now),
+  },
+  (t) => ({
+    verdictIdx: index("activity_research_verdict_idx").on(t.verdict),
+    methodIdx: index("activity_research_method_idx").on(t.method),
+  }),
+);
+
+/**
+ * Explicit, evidenced link between an activity and a contact address. Before this table the
+ * link was implicit (same website domain), so one address could silently cover several
+ * locations. `scope` says what the address is for; `status` says how well that is proven.
+ */
+export const activityContactLinks = sqliteTable(
+  "activity_contact_links",
+  {
+    activityId: text("activity_id")
+      .notNull()
+      .references(() => activities.id, { onDelete: "cascade" }),
+    contactId: text("contact_id")
+      .notNull()
+      .references(() => outreachContacts.id, { onDelete: "cascade" }),
+    /** activity (this activity only) | location (this venue) | organisation (the whole organisation) */
+    scope: text("scope").notNull().default("organisation"),
+    /** verified | likely | unverified | conflict | invalid */
+    status: text("status").notNull().default("unverified"),
+    /** domain (same website) | page (found on the activity's own page) | manual */
+    linkSource: text("link_source").notNull().default("domain"),
+    evidenceUrl: text("evidence_url"),
+    note: text("note"),
+    checkedAt: integer("checked_at"),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.activityId, t.contactId] }),
+    contactIdx: index("activity_contact_links_contact_idx").on(t.contactId),
+  }),
+);
+
 /* -------------------------------------------------------------------------- */
 /*  Owner Command Center — provider outreach                                  */
 /* -------------------------------------------------------------------------- */
@@ -1319,6 +1389,11 @@ export const outreachContacts = sqliteTable(
     isPrimary: integer("is_primary").notNull().default(0),
     /** What the mailbox is for (info@ → general, reservaties@ → reservations …). */
     role: text("role").notNull().default("unknown"),
+    /** How well the address itself is proven: verified | likely | unverified | invalid | not_found | conflict. */
+    evidenceStatus: text("evidence_status").notNull().default("unverified"),
+    evidenceUrl: text("evidence_url"),
+    evidenceNote: text("evidence_note"),
+    evidenceCheckedAt: integer("evidence_checked_at"),
     /** Set when this address belongs to ONE activity only (then only that one is named). */
     activityId: text("activity_id"),
     note: text("note"),

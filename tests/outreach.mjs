@@ -191,6 +191,17 @@ function fixtureSql() {
             ('cg_tick','og_tick','info@zeta-club.be','generic','website_mailto','https://zeta-club.be/contact',1,'checked',1,'general',1000),
             ('cg_two','og_two','info@eta-club.be','generic','website_mailto','https://eta-club.be/contact',1,'checked',1,'general',1000),
             ('cg_two2','og_two','groepen@eta-club.be','generic','website_mailto','https://eta-club.be/groepen',1,'checked',0,'groups',2000);`,
+    // research evidence fixtures: g2/g3/g4 share one address (cg_multi); g2 has a proposed correction
+    `INSERT INTO activity_research (activity_id, verdict, existence, suitability, method, evidence, sources, corrections, note)
+     VALUES ('g2','fix_data','confirmed','fit','agent',
+       '[{"field":"name","found":"Karting Beta","verified":"Karting Beta","status":"verified","sourceUrl":"https://beta-fun.be","quote":"Karting Beta Gent","note":"","machineChecked":true},{"field":"address","found":"x","verified":"","status":"unverified","sourceUrl":"","quote":"","note":"niet gevonden"}]',
+       '[{"url":"https://beta-fun.be","kind":"official","checkedAt":"2026-10-22"}]',
+       '[{"field":"city","from":"Gent","to":"Gent-Centrum","sourceUrl":"https://beta-fun.be","quote":"Gent-Centrum","confidence":"high","verified":true},{"field":"website_url","from":"x","to":"https://beta-fun.be/nieuw","sourceUrl":"https://beta-fun.be","quote":"nieuw","confidence":"high","verified":true}]',
+       'Karting bevestigd op de eigen website.');`,
+    `INSERT INTO activity_contact_links (activity_id, contact_id, scope, status, link_source) VALUES
+       ('g2','cg_multi','organisation','verified','domain'),('g3','cg_multi','organisation','unverified','domain'),('g4','cg_multi','location','likely','domain');`,
+    // contacts the research marked as printed on the official site (READY needs evidence)
+    `UPDATE outreach_contacts SET evidence_status = 'verified', evidence_note = 'fixture' WHERE verification = 'checked';`,
     // large dataset: 5,000 organisations with 5,000 contacts
     `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 5000)
      INSERT INTO outreach_orgs (id, domain, name, website_url, activity_count, discovery_status)
@@ -696,6 +707,46 @@ async function main() {
   r = await A("POST", "/send-selected/preview", { orgIds: ["o_cc", "o_cd"] });
   ok("cap: preview tells how many can still go today", typeof r.data.remainingToday === "number", r.data);
   r = await A("PUT", "/config", { dailyCap: capCfg.dailyCap });
+
+  // ---- audit: research evidence, shared addresses, corrections ----
+  const CC = (m, p2, b) => call(admin, m, `/api/admin/cc${p2}`, b, m === "GET" ? {} : csrf());
+  r = await call(anon, "GET", "/api/admin/cc/quality/research/summary");
+  ok("audit: research summary needs an admin session", r.status === 401, r.status);
+  r = await CC("GET", "/quality/research/summary");
+  ok("audit: summary reports progress, shared addresses and pending corrections", r.status === 200 && r.data.sharedEmails >= 1 && r.data.pendingCorrections >= 1 && r.data.methods.agent >= 1, r.data);
+  r = await CC("GET", "/quality/research/list?filter=shared_email&pageSize=50");
+  ok("audit: filter lists activities that share an address, each as its own record", r.status === 200 && ["g2", "g3", "g4"].every((id) => r.data.rows.some((x) => x.id === id) ) && r.data.rows.every((x) => x.sharedEmail), r.data.rows?.map((x) => x.id));
+  r = await CC("GET", "/quality/research/list?filter=unresearched");
+  ok("audit: not-yet-researched activities are listed as such (never presented as checked)", r.status === 200 && r.data.rows.every((x) => x.verdict === null) && !r.data.rows.some((x) => x.id === "g2"), r.data.rows?.length);
+  r = await CC("GET", "/quality/activity/g3/research");
+  ok("audit: detail shows who else shares the address and the location relation", r.status === 200 && r.data.contacts[0]?.sharedWith.length === 2 && ["same_location", "different_locations", "unknown"].includes(r.data.contacts[0].relation) && r.data.research === null, r.data);
+  r = await CC("GET", "/quality/activity/g2/research");
+  ok("audit: detail separates verified from unverified evidence and lists proposed corrections", r.data.research.evidence.some((e) => e.status === "verified") && r.data.research.evidence.some((e) => e.status === "unverified") && r.data.research.corrections.length === 2, r.data.research);
+  r = await CC("GET", "/quality/shared-emails");
+  ok("audit: shared-address view groups activities per address without merging them", r.status === 200 && r.data.rows.some((x) => x.email === "info@beta-fun.be" && x.n === 3 && x.activities.length === 3), r.data.rows?.map((x) => [x.email, x.n]));
+  r = await CC("POST", "/quality/activity/g2/corrections", { fields: ["website_url"] });
+  ok("audit: a correction is refused when the live value changed since the research", r.status === 409, r.data);
+  r = await CC("POST", "/quality/activity/g2/corrections", { fields: ["city"] });
+  ok("audit: a proposed correction is only applied on request and when still current", r.status === 200 && r.data.applied.includes("city"), r.data);
+  r = await CC("GET", "/quality/activity/g2/research");
+  ok("audit: applied corrections leave the list; the rest stays proposed", r.data.research.corrections.length === 1 && r.data.research.corrections[0].field === "website_url", r.data.research.corrections);
+  r = await CC("POST", "/quality/link/g3/cg_multi", { scope: "location" });
+  ok("audit: the owner can set what an address is for", r.status === 200, r.data);
+  r = await CC("GET", "/quality/activity/g3/research");
+  ok("audit: link scope and manual source are stored", r.data.contacts[0].scope === "location" && r.data.contacts[0].linkSource === "manual", r.data.contacts[0]);
+  r = await CC("POST", "/quality/link/g3/cg_multi", { status: "invalid" });
+  r = await A("POST", "/orgs/og_multi/prepare", { contactId: "cg_multi" });
+  ok("audit: draft is still allowed, approval is the gate", r.status === 200 || r.status === 400 || r.status === 409, r.status);
+  // evidence on the address itself blocks sending
+  await call(admin, "PUT", "/api/admin/cc/outreach/contacts/cg_tick", { note: "test" }, csrf());
+  // new records can never start as approved/verified without the basics
+  r = await C("POST", "/activities", { title: "Verificatietest Klimzaal", categoryId: "sport", subcategory: "Climbing", locationLabel: "Gent", priceBand: "10_25", status: "verified" });
+  ok("preventie: a new record cannot start as 'verified' without website, address and city", r.status === 201, r.data);
+  const newId = r.data.id;
+  r = await C("GET", `/activities/${newId}`);
+  ok("preventie: it was stored as needs_review, not verified", (r.data?.activity ?? r.data)?.status === "needs_review", r.data);
+  r = await CC("GET", `/quality/activity/${newId}/research`);
+  ok("preventie: every new active record gets an audit row, never 'approved' without evidence", r.status === 200 && r.data.audit && r.data.audit.outcome !== "approved", r.data.audit);
 
   // ---- batch size stays within the Worker's request budget ----
   r = await A("POST", "/send-selected/preview", { orgIds: Array.from({ length: 16 }, (_, i) => `big${i + 1}`) });

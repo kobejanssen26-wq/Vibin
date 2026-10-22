@@ -12,6 +12,9 @@
  * anything it is unsure about becomes `manual`, never an automatic deletion.
  */
 
+/** Data gaps that are about trust, not about content. */
+export const UNVERIFIED_ISSUE = "unverified";
+
 export type AuditOutcome =
   | "approved" // real, relevant experience with enough reliable information
   | "fix_data" // suitable, but data is wrong or incomplete (see issues)
@@ -39,6 +42,12 @@ export interface AuditInput {
   city?: string | null;
   price_confidence?: string | null;
   price_cents?: number | null;
+  /**
+   * True only when the record's existence and basics were verified against a source (research
+   * evidence, or status 'verified' set after such a check). Without it a record can never be
+   * "approved": a description and a live website do not prove anything.
+   */
+  verified?: boolean;
 }
 
 /** What the venue's own website says (from the crawl), when we have it. */
@@ -298,20 +307,36 @@ export function assessActivity(a: AuditInput, ev: AuditEvidence = {}): Assessmen
   }
 
   /* 6. what remains is an experience-type: approved vs data to fix ------- */
+  // "approved" means: exists AND verified against a source. Without evidence it is at best fix_data.
   const fixable = issues.filter((i) => i === "description_bare" || i === "photo_generic" || i === "website_unreliable");
+  const proven = a.verified === true;
+  const allIssues = proven ? issues : [...issues, UNVERIFIED_ISSUE];
   if (curated && !issues.includes("website_unreliable")) {
-    return build(issues.includes("photo_generic") ? "fix_data" : "approved", "curated_experience", "Handmatig opgenomen ervaring; ontbrekende gegevens zijn verbeterpunten.", "medium", issues);
+    const ok = proven && !issues.includes("photo_generic");
+    return build(ok ? "approved" : "fix_data", "curated_experience", proven ? "Handmatig opgenomen ervaring; ontbrekende gegevens zijn verbeterpunten." : "Handmatig opgenomen ervaring, nog niet aan een bron geverifieerd.", "medium", allIssues);
   }
-  if (!bare && !issues.includes("website_unreliable") && !issues.includes("photo_generic")) {
-    return build("approved", "experience_verified", "Concrete ervaring met omschrijving en bruikbare bronnen.", "medium", issues);
+  if (!bare && !issues.includes("website_unreliable") && !issues.includes("photo_generic") && proven) {
+    return build("approved", "experience_verified", "Concrete ervaring, aan een bron geverifieerd.", "medium", allIssues);
   }
   return build(
     "fix_data",
     "experience_needs_data",
-    `Geschikt type (${a.subcategory ?? a.category_id ?? "onbekend"}); te verbeteren: ${fixable.join(", ") || "gegevens"}.`,
+    `Geschikt type (${a.subcategory ?? a.category_id ?? "onbekend"}); te verbeteren: ${[...fixable, ...(proven ? [] : [UNVERIFIED_ISSUE])].join(", ") || "gegevens"}.`,
     "medium",
-    issues,
+    allIssues,
   );
+}
+
+/** Fields that identify the venue: if one changes, an earlier verification no longer applies. */
+export const ESSENTIAL_FIELDS = ["title", "provider", "address", "city", "lat", "lng", "website_url"] as const;
+export function essentialFieldsChanged(before: Record<string, unknown>, after: Record<string, unknown>): string[] {
+  return ESSENTIAL_FIELDS.filter((f) => f in after && after[f] !== undefined && String(after[f] ?? "") !== String(before[f] ?? ""));
+}
+
+/** A record may only be stored as "verified" when the basics that could be verified exist. */
+export function allowedStatus(status: string | undefined, r: { websiteUrl?: string | null; address?: string | null; city?: string | null }): string | undefined {
+  if (status !== "verified") return status;
+  return r.websiteUrl && r.address && r.city ? "verified" : "needs_review";
 }
 
 /* -------------------------------------------------------------------------- */

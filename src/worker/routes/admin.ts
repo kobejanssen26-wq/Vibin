@@ -16,7 +16,7 @@ import { badRequest, notFound } from "../lib/errors";
 import { newId } from "../lib/id";
 import { ACTIVITY_CATEGORIES } from "@shared/constants";
 import { activityInput, ensureAdminProvider, scaleLatLng } from "../lib/activity-input";
-import { assessActivity, QUALITY_RULE } from "../lib/activity-quality";
+import { allowedStatus, assessActivity, essentialFieldsChanged, QUALITY_RULE } from "../lib/activity-quality";
 
 type Ctx = { Bindings: Env; Variables: Vars };
 const app = new Hono<Ctx>();
@@ -179,20 +179,30 @@ app.post("/activities", async (c) => {
   const providerId = await ensureAdminProvider(c.env);
   const now = Math.floor(Date.now() / 1000);
   const id = newId();
+  // "verified" needs the basics to exist; everything else starts as needs_review.
+  const status = (allowedStatus(body.status, body) ?? "needs_review") as typeof body.status;
   await db.insert(activities).values({
     id,
     providerId,
     externalId: `admin-${id}`,
     ...body,
+    status,
     lat: scaleLatLng(body.lat) ?? null,
     lng: scaleLatLng(body.lng) ?? null,
     tags: JSON.stringify(body.tags),
     openingHours: JSON.stringify(body.openingHours),
-    lastVerifiedAt: body.status === "verified" ? now : null,
+    lastVerifiedAt: status === "verified" ? now : null,
     active: body.active ? 1 : 0,
     createdAt: now,
     updatedAt: now,
   });
+  // Every active record gets an audit row; without evidence it can never start out "approved".
+  await c.env.DB.prepare(
+    `INSERT OR IGNORE INTO activity_audits (activity_id, outcome, rule, reason, confidence, issues, hidden, source, audited_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, 'rules', ?7)`,
+  )
+    .bind(id, verdict.outcome === "exclude" ? "manual" : verdict.outcome, verdict.rule, verdict.reason, verdict.confidence, JSON.stringify(verdict.issues), now)
+    .run();
   return c.json({ id }, 201);
 });
 
@@ -204,6 +214,16 @@ app.put("/activities/:id", async (c) => {
   });
   if (!existing) throw notFound();
   const now = Math.floor(Date.now() / 1000);
+  // Changing what identifies the venue voids an earlier verification (re-verify explicitly afterwards).
+  const changed = essentialFieldsChanged(
+    { title: existing.title, provider: existing.provider, address: existing.address, city: existing.city, lat: existing.lat, lng: existing.lng, website_url: existing.websiteUrl },
+    { title: body.title, provider: body.provider, address: body.address, city: body.city, lat: scaleLatLng(body.lat), lng: scaleLatLng(body.lng), website_url: body.websiteUrl },
+  );
+  const demote = changed.length > 0 && existing.status === "verified" && new URL(c.req.url).searchParams.get("reverified") !== "1";
+  if (demote) body.status = "needs_review";
+  else if (body.status === "verified") {
+    body.status = allowedStatus("verified", { websiteUrl: body.websiteUrl ?? existing.websiteUrl, address: body.address ?? existing.address, city: body.city ?? existing.city }) as typeof body.status;
+  }
   await db
     .update(activities)
     .set({
@@ -214,11 +234,11 @@ app.put("/activities/:id", async (c) => {
       openingHours: body.openingHours ? JSON.stringify(body.openingHours) : undefined,
       active: body.active == null ? undefined : body.active ? 1 : 0,
       // marking an activity "verified" stamps the verification date
-      lastVerifiedAt: body.status === "verified" ? now : undefined,
+      lastVerifiedAt: body.status === "verified" ? now : demote ? null : undefined,
       updatedAt: now,
     })
     .where(eq(activities.id, c.req.param("id")));
-  return c.json({ ok: true });
+  return c.json({ ok: true, ...(demote ? { demoted: changed, note: "De verificatie is vervallen omdat gegevens van de locatie zijn gewijzigd." } : {}) });
 });
 
 /** Quick "I checked this and it's still current" action (§27). */

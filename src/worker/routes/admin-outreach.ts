@@ -52,7 +52,7 @@ const READY_WHERE = `o.excluded = 0 AND o.discovery_status = 'found'
                  AND (a.web_status IS NULL OR a.web_status IN ('alive','unknown')))
   AND EXISTS (SELECT 1 FROM outreach_contacts k
                WHERE k.org_id = o.id AND k.verification = 'checked' AND k.kind = 'generic'
-                 AND k.mx_ok IS NOT 0 AND k.domain_matches = 1
+                 AND k.mx_ok IS NOT 0 AND k.domain_matches = 1 AND k.evidence_status IN ('verified','likely')
                  AND NOT EXISTS (SELECT 1 FROM outreach_suppressions s
                                   WHERE (s.kind = 'email' AND s.value = k.email)
                                      OR (s.kind = 'domain' AND k.email LIKE '%@' || s.value)))

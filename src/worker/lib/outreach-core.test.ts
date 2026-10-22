@@ -372,3 +372,21 @@ describe("send gate: grouping", () => {
     expect(codes(base({ alreadyMentioned: [] }))).not.toContain("activities_already_mentioned");
   });
 });
+
+describe("send gate: address evidence", () => {
+  const codes = (i: SendCheckInput) => evaluateSend(i).map((r) => r.code);
+  it("blocks an address the research marked invalid, conflicting or not found", () => {
+    for (const evidenceStatus of ["invalid", "conflict", "not_found"]) {
+      const b = base();
+      b.contact = { ...b.contact!, evidenceStatus };
+      expect(codes(b)).toContain("contact_evidence");
+    }
+  });
+  it("does not block verified, likely or merely unverified addresses", () => {
+    for (const evidenceStatus of ["verified", "likely", "unverified"]) {
+      const b = base();
+      b.contact = { ...b.contact!, evidenceStatus };
+      expect(codes(b)).not.toContain("contact_evidence");
+    }
+  });
+});

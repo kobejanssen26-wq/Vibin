@@ -16,7 +16,7 @@ import { badRequest, notFound } from "../lib/errors";
 import { newId } from "../lib/id";
 import { parseBody } from "../lib/validate";
 import { audit } from "../lib/audit";
-import { assessActivity } from "../lib/activity-quality";
+import { allowedStatus, assessActivity } from "../lib/activity-quality";
 import { parseCsvToRecords } from "../lib/csv";
 import {
   ACTIVITY_CSV_COLUMNS,
@@ -243,12 +243,14 @@ app.post("/activities/import/confirm", async (c) => {
       };
       if (op.kind === "insert") {
         created++;
+        const status = (allowedStatus(d.status, d) ?? "needs_review") as typeof d.status;
         return db.insert(activities).values({
           id: op.id,
           providerId,
           externalId: `admin-import-${op.id}`,
           ...common,
-          lastVerifiedAt: d.status === "verified" ? now : null,
+          status,
+          lastVerifiedAt: status === "verified" ? now : null,
           createdAt: now,
         });
       }
@@ -263,6 +265,20 @@ app.post("/activities/import/confirm", async (c) => {
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic batch length; Drizzle's batch() only needs the tuple shape for compile-time inference
     if (batch.length) await db.batch(batch as any);
+    // Every new record gets an audit row; without evidence it can never start out "approved".
+    const rows = ops.slice(i, i + BATCH_SIZE).filter((op) => op.kind === "insert");
+    if (rows.length) {
+      await c.env.DB.batch(
+        rows.map((op) => {
+          const d = op.data;
+          const v = assessActivity({ title: d.title, provider: d.provider, category_id: d.categoryId, subcategory: d.subcategory, source: "web", description: d.description, website_url: d.websiteUrl });
+          return c.env.DB.prepare(
+            `INSERT OR IGNORE INTO activity_audits (activity_id, outcome, rule, reason, confidence, issues, hidden, source, audited_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, 'rules', ?7)`,
+          ).bind(op.id, v.outcome === "exclude" ? "manual" : v.outcome, v.rule, v.reason, v.confidence, JSON.stringify(v.issues), now);
+        }),
+      );
+    }
   }
 
   await c.env.KV.delete(`import:${importId}`);

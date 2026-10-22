@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { AdminApiError, cc } from "../api";
 import { useDebounced, useResource } from "../lib";
+import { ResearchTab, SharedEmailsTab } from "./QualityResearch";
 import {
   Badge,
   Btn,
@@ -78,6 +79,7 @@ const ISSUE_LABEL: Record<string, string> = {
 };
 
 export function Quality() {
+  const [tab, setTab] = useState<"rules" | "research" | "shared">("research");
   const summary = useResource<Summary>(() => cc<Summary>("/quality/summary"), "quality-summary");
   const [outcome, setOutcome] = useState("exclude");
   const [rule, setRule] = useState("");
@@ -117,6 +119,21 @@ export function Quality() {
   return (
     <>
       <PageTitle title="Kwaliteit van de catalogus" />
+      <div className="mb-3 flex gap-1 border-b border-slate-200">
+        {([["research", "Onderzoek per activiteit"], ["shared", "Gedeelde e-mailadressen"], ["rules", "Regels en uitkomsten"]] as const).map(([k, label]) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setTab(k)}
+            className={`-mb-px border-b-2 px-3 py-2 text-[13px] font-medium ${tab === k ? "border-brand-500 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab === "research" && <ResearchTab />}
+      {tab === "shared" && <SharedEmailsTab />}
+      {tab === "rules" && (<>
       <p className="mb-3 max-w-3xl text-[13px] text-slate-600">
         {s?.rule ??
           "Een bedrijf wordt niet toegelaten alleen omdat het een fysieke locatie, website of commerciële activiteit heeft."}{" "}
@@ -253,6 +270,7 @@ export function Quality() {
           </>
         )}
       </Panel>
+    </>)}
     </>
   );
 }

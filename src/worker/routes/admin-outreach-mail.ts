@@ -61,6 +61,7 @@ interface MsgRow {
   c_ver: string | null;
   c_mx: number | null;
   c_src: string | null;
+  c_evid: string | null;
   o_id: string | null;
   o_excl: number | null;
   o_name: string | null;
@@ -73,7 +74,7 @@ async function loadMsg(env: Env, id: string): Promise<MsgRow | null> {
     `SELECT m.id, m.org_id, m.contact_id, m.campaign_id, m.to_email, m.subject, m.body_text,
             m.status, m.test_mode, m.approved_by, m.approved_at, m.approved_hash, m.attempts,
             c.id AS c_id, c.org_id AS c_org, c.email AS c_email, c.kind AS c_kind,
-            c.verification AS c_ver, c.mx_ok AS c_mx, c.source_url AS c_src,
+            c.verification AS c_ver, c.mx_ok AS c_mx, c.source_url AS c_src, c.evidence_status AS c_evid,
             o.id AS o_id, o.excluded AS o_excl, o.name AS o_name,
             o.group_confidence AS o_gconf, o.group_confirmed AS o_gok
        FROM outreach_messages m
