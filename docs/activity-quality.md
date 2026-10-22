@@ -72,3 +72,36 @@ npx tsx scripts/audit/make-sql.mts    # guarded SQL batches in data/audit/sql/
 
 D1 free tier bills every row read (5 M / day for the whole site) — keep exports
 paged and avoid per-row subqueries on large tables.
+
+## Evidence audit (2026-10-22): research per activity, e-mail evidence, shared addresses
+
+The rule audit above only judged *type* (shop vs experience). The evidence audit checks that
+records are **real and correct**, field by field, and keeps the proof.
+
+**Data model (migration 0015, additive).** `activity_research` (one row per activity: verdict,
+existence, suitability, method `crawl|agent|owner`, per-field `evidence` with source URL, verbatim
+quote and status, `sources`, proposed `corrections`), `activity_contact_links` (explicit
+activity↔address link with `scope` activity/location/organisation, status and source) and
+`outreach_contacts.evidence_status` (`verified|likely|unverified|invalid|not_found|conflict`).
+Activity, location and contact group stay separate: a shared address never merges activities.
+
+**Pipeline (`scripts/audit/`).** `crawl-evidence.mjs` (polite, robots-aware fetch of the venue's own
+site + one contact page) → `analyze.py` (name/city/postcode match, closure signal, e-mail on site,
+shared-address and same-place clusters, research queue) → `make-batches.py` (cluster-aware batches) →
+research agents following `RESEARCH_RULES.md` (every verified claim needs a source and a verbatim
+quote) → `validate-research.mjs` (fetches each source, renders JS pages with Chromium, and
+**downgrades any claim whose quote is not on the page**; `approved` needs proof, `closed` needs a
+source, `exclude` needs a machine-verified source) → `make-research-sql.py` (guarded SQL:
+owner decisions never overwritten, hiding is soft and reversible, only a verified website
+correction is auto-applied; address/city/title corrections stay proposals) → `process-new.py`.
+Rollback: D1 Time Travel bookmark taken before the audit plus per-table exports.
+
+**Admin.** Kwaliteit → *Onderzoek per activiteit* (existing vs verified vs uncertain vs proposed
+corrections, sources, apply on request) and *Gedeelde e-mailadressen* (each activity its own record,
+same/different location).
+
+**Prevention.** `assessActivity` can only return `approved` when `verified: true`; a record can only
+be stored as `verified` with website + address + city; editing identity fields voids an earlier
+verification; every new active record gets an audit row; `invalid`/`conflict`/`not_found` addresses
+block outreach and the READY pool needs verified/likely address evidence; an address linked to one
+activity/location names only that activity in a mail.

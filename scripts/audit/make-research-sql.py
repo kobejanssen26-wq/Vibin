@@ -21,6 +21,7 @@ import glob, json, math, os, re, sqlite3, sys, time
 from collections import Counter, defaultdict
 
 db_path, an_dir, ev_path, val_dir, out_dir = sys.argv[1:6]
+ONLY_AGENT = "--only-agent" in sys.argv  # write statements only for activities with an agent result
 os.makedirs(out_dir, exist_ok=True)
 for f in glob.glob(os.path.join(out_dir, "*.sql")):
     os.remove(f)
@@ -133,6 +134,8 @@ def agent_record(aid):
 
 recs = {}
 for aid in acts:
+    if ONLY_AGENT and aid not in agent:
+        continue
     rec = agent_record(aid) or crawl_record(aid)
     if rec:
         recs[aid] = rec
@@ -213,6 +216,8 @@ def merge(cid, status, url, note):
 
 link_rows = {}
 for aid, a in acts.items():
+    if ONLY_AGENT and aid not in agent:
+        continue
     e = ev.get(aid) or {}
     site_emails = {x["email"]: x.get("page") for x in (e.get("emails") or [])} if e.get("ok") else None
     ag = {c["contactId"]: c for c in (agent.get(aid, {}).get("contacts") or [])}
