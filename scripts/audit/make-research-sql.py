@@ -208,7 +208,9 @@ contact_state = {}  # contact id -> (status, url, note)
 
 
 def merge(cid, status, url, note):
-    order = ["invalid", "conflict", "verified", "likely", "not_found", "unverified"]
+    # The address itself is as good as its BEST link: one venue's verified link outweighs another venue's
+    # "does not belong here" (that is a property of the link, which stays per activity).
+    order = ["verified", "likely", "unverified", "not_found", "conflict", "invalid"]
     cur = contact_state.get(cid)
     if cur is None or order.index(status) < order.index(cur[0]):
         contact_state[cid] = (status, url, note)
@@ -246,10 +248,12 @@ for (aid, cid), (scope, status, src, url, note) in link_rows.items():
     )
     rep["links"] += 1
 for cid, (status, url, note) in contact_state.items():
-    stmts.append(f"UPDATE outreach_contacts SET evidence_status={q(status)}, evidence_url={q(url)}, evidence_note={q(note)}, evidence_checked_at={NOW} WHERE id={q(cid)};")
+    # A weaker verdict never overwrites support the address already has from another activity's link.
+    guard = "" if status in ("verified", "likely") else f" AND NOT EXISTS (SELECT 1 FROM activity_contact_links l WHERE l.contact_id={q(cid)} AND l.status IN ('verified','likely'))"
+    stmts.append(f"UPDATE outreach_contacts SET evidence_status={q(status)}, evidence_url={q(url)}, evidence_note={q(note)}, evidence_checked_at={NOW} WHERE id={q(cid)}{guard};")
     rep["contact_" + status] += 1
     if status in ("invalid", "conflict"):
-        stmts.append(f"UPDATE outreach_contacts SET verification='uncertain' WHERE id={q(cid)} AND verification='checked';")
+        stmts.append(f"UPDATE outreach_contacts SET verification='uncertain' WHERE id={q(cid)} AND verification='checked' AND evidence_status IN ('invalid','conflict');")
         rep["contact_blocked_for_outreach"] += 1
 
 PER = 400

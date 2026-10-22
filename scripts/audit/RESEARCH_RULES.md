@@ -102,3 +102,15 @@ characters): what you found and what stays uncertain. Never leave an activity ou
 research one (blocked, timeout, no source), return it with `verdict: "manual"`,
 `existence: "unknown"` and a note saying what stopped you.
 Then reply with one line: `done <batch> <n> results`.
+
+## Never decode protected addresses
+
+If a site hides its e-mail address (Cloudflare e-mail protection, JavaScript assembly, "[at]" spelling), the
+site chose not to publish it: do NOT decode it and do not put it in `contacts` or `corrections`. Say in `note`
+that the venue publishes no plain address.
+
+## `INVALID` is about the address; scope problems are about the activity
+
+Use `INVALID` only when the address itself is wrong or unused. If an address is correct but belongs to another
+venue or to the organisation, say so for THIS activity with `scope` and a `note` (e.g. `scope: "organisation"`),
+not `INVALID`.
