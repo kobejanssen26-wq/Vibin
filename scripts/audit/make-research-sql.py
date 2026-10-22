@@ -140,15 +140,28 @@ for aid in acts:
     if rec:
         recs[aid] = rec
 
+# Coordinates shared by >= 3 differently named active records are placeholders (e.g. a city centre), not real
+# positions: "within 150 m" proves nothing there, so a duplicate verdict cannot rest on distance.
+_coord = defaultdict(set)
+for _a in acts.values():
+    if _a["lat"] is not None:
+        _coord[(_a["lat"], _a["lng"])].add(_a["title"])
+PLACEHOLDER = {k for k, v in _coord.items() if len(v) >= 3}
+
+
+def placeholder(a):
+    return a["lat"] is not None and (a["lat"], a["lng"]) in PLACEHOLDER
+
+
 # ---------- duplicates: only same-location, visible targets, no cycles ----------
 for aid, rec in list(recs.items()):
     if rec["verdict"] != "duplicate":
         continue
     t = rec["duplicate_of"]
-    ok = t in acts and t != aid and (recs.get(t, {}).get("verdict") not in ("duplicate", "exclude", "closed")) and (dist_m(acts[aid], acts[t]) or 1e9) < 150
+    ok = t in acts and t != aid and (recs.get(t, {}).get("verdict") not in ("duplicate", "exclude", "closed")) and (dist_m(acts[aid], acts[t]) or 1e9) < 150 and not placeholder(acts[aid]) and not placeholder(acts[t])
     if not ok:
         rec["verdict"] = "manual"
-        rec["note"] += " [duplicaat niet bevestigd: doel niet zichtbaar of niet op dezelfde locatie]"
+        rec["note"] += " [duplicaat niet toegepast: doel niet zichtbaar, niet op dezelfde locatie of kaartpositie is een placeholder]"
         rec["duplicate_of"] = None
         rep["duplicate_rejected"] += 1
 
