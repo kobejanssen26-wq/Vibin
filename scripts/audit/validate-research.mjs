@@ -106,13 +106,15 @@ async function pageText(url) {
 /** true | false | null (page not readable here: cannot be machine-checked) */
 async function quoteOnPage(url, quote) {
   const q = norm(quote);
-  if (q.split(" ").length < 2 || q.length < 8) return false;
+  const isAddress = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(q);
+  if (!isAddress && (q.split(" ").length < 2 || q.length < 8)) return false;
   if (NOFETCH) return null;
   const page = await pageText(url);
   if (page != null && page.length < 40) return null; // nothing readable even when rendered: cannot be machine-checked
   if (process.env.DEBUG_QUOTES) console.error(`[quote] ${url} pageLen=${page == null ? "null" : page.length} q="${q.slice(0, 90)}"`);
   if (page == null) return null;
   if (page.includes(q)) return true;
+  if (isAddress) return false;
   const w = q.split(" ");
   if (w.length < 5) return false;
   let hit = 0;
