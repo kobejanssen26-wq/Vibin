@@ -19,6 +19,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { createRequire } from "node:module";
 
 const [INDIR, OUTDIR, VALDIR] = process.argv.slice(2, 5);
 const NOFETCH = process.argv.includes("--no-fetch");
@@ -45,6 +46,25 @@ const norm = (s) =>
     .replace(/[^a-z0-9@.]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+/* Pages that only show their text after JavaScript runs are rendered with Chromium (shared, lazy). */
+let browser = null;
+async function renderedText(url) {
+  try {
+    if (!browser) {
+      const { chromium } = createRequire(import.meta.url)("playwright");
+      browser = await chromium.launch({ executablePath: fs.existsSync("/opt/pw-browsers/chromium") ? "/opt/pw-browsers/chromium" : undefined });
+    }
+    const ctx = await browser.newContext({ userAgent: UA, locale: "nl-BE" });
+    const pg = await ctx.newPage();
+    await pg.goto(url, { waitUntil: "networkidle", timeout: 25000 }).catch(() => {});
+    const t = await pg.evaluate(() => document.body?.innerText ?? "").catch(() => "");
+    const hrefs = await pg.evaluate(() => [...document.querySelectorAll('a[href^="mailto:"]')].map((a) => a.getAttribute("href"))).catch(() => []);
+    await ctx.close();
+    return `${t} ${hrefs.join(" ")}`;
+  } catch {
+    return null;
+  }
+}
 const pageCache = new Map();
 const lastHit = new Map();
 async function pageText(url) {
@@ -72,6 +92,10 @@ async function pageText(url) {
       // mailto: targets are not visible text but are what a visitor sees as the address
       const mails = [...html.matchAll(/mailto:([^"'?#\s>]+)/gi)].map((m) => norm(decodeURIComponent(m[1])));
       text += " " + mails.join(" ");
+      if (text.length < 400) {
+        const r = await renderedText(url);
+        if (r && norm(r).length > text.length) text = norm(r);
+      }
     }
   } catch {
     text = null;
@@ -85,6 +109,8 @@ async function quoteOnPage(url, quote) {
   if (q.split(" ").length < 2 || q.length < 8) return false;
   if (NOFETCH) return null;
   const page = await pageText(url);
+  if (page != null && page.length < 40) return null; // nothing readable even when rendered: cannot be machine-checked
+  if (process.env.DEBUG_QUOTES) console.error(`[quote] ${url} pageLen=${page == null ? "null" : page.length} q="${q.slice(0, 90)}"`);
   if (page == null) return null;
   if (page.includes(q)) return true;
   const w = q.split(" ");
@@ -124,6 +150,8 @@ for (const f of files) {
   }
   report.batches++;
   const known = new Map(input.activities.map((a) => [a.id, a]));
+  // duplicates may point at a sibling that was given as context (same site / same place), not only at batch members
+  const dupTargets = new Set([...known.keys(), ...input.activities.flatMap((a) => (a.siblings_same_site_or_place ?? []).map((x) => x.id))]);
   const byId = new Map();
   for (const r of out.results ?? []) if (known.has(r?.id) && !byId.has(r.id)) byId.set(r.id, r);
   const final = [];
@@ -141,7 +169,7 @@ for (const f of files) {
       verdict: VERDICTS.includes(r.verdict) ? r.verdict : "manual",
       existence: EXIST.includes(r.existence) ? r.existence : "unknown",
       suitability: SUIT.includes(r.suitability) ? r.suitability : "unclear",
-      duplicateOf: r.duplicateOf && known.has(r.duplicateOf) && r.duplicateOf !== a.id ? r.duplicateOf : null,
+      duplicateOf: r.duplicateOf && dupTargets.has(r.duplicateOf) && r.duplicateOf !== a.id ? r.duplicateOf : null,
       note: str(r.note, 400),
       sources: [],
       evidence: [],
@@ -236,5 +264,6 @@ for (const f of files) {
   fs.writeFileSync(path.join(VALDIR, `${name}.json`), JSON.stringify({ batch: name, runAt: input.runAt ?? null, results: final }));
   console.log(`${name}: ${final.length} results`);
 }
+if (browser) await browser.close();
 console.log(JSON.stringify(report));
 fs.writeFileSync(path.join(VALDIR, "_report.json"), JSON.stringify(report, null, 1));

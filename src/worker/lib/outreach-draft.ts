@@ -174,11 +174,22 @@ export interface Selection {
 export async function selectActivities(
   env: Env,
   orgId: string,
-  contact: { activity_id?: string | null },
+  contact: { id?: string; activity_id?: string | null },
   testMode: number,
   selfMessageId?: string,
 ): Promise<Selection> {
-  const rows = (await loadLinks(env, [orgId])).filter((r) => r.included === 1 || (contact.activity_id && r.id === contact.activity_id));
+  let rows = (await loadLinks(env, [orgId])).filter((r) => r.included === 1 || (contact.activity_id && r.id === contact.activity_id));
+  // Explicit links (audit): an address the owner/research tied to ONE activity or location names only that,
+  // and a link marked invalid never names the activity. Without links the whole selection applies.
+  if (contact.id) {
+    const links = await env.DB.prepare(`SELECT activity_id AS id, scope, status FROM activity_contact_links WHERE contact_id = ?1`)
+      .bind(contact.id)
+      .all<{ id: string; scope: string; status: string }>();
+    const bad = new Set(links.results.filter((l) => l.status === "invalid").map((l) => l.id));
+    const narrow = new Set(links.results.filter((l) => l.scope !== "organisation" && l.status !== "invalid").map((l) => l.id));
+    if (bad.size) rows = rows.filter((r) => !bad.has(r.id));
+    if (narrow.size) rows = rows.filter((r) => narrow.has(r.id));
+  }
   const all = await env.DB.prepare(`SELECT COUNT(*) AS n FROM outreach_org_activities WHERE org_id = ?1`)
     .bind(orgId)
     .first<{ n: number }>();
@@ -384,7 +395,7 @@ export async function refreshOrgDrafts(env: Env, orgId: string): Promise<{ refre
 export async function messageContext(env: Env, messageId: string, orgId: string) {
   const [acts, prior, group, src] = await Promise.all([
     env.DB.prepare(
-      `SELECT x.activity_id AS id, x.title, a.website_url AS websiteUrl, a.city
+      `SELECT x.activity_id AS id, x.title, a.website_url AS websiteUrl, a.city, a.lat, a.lng
          FROM outreach_message_activities x LEFT JOIN activities a ON a.id = x.activity_id
         WHERE x.message_id = ?1 ORDER BY x.title`,
     )
@@ -407,8 +418,23 @@ export async function messageContext(env: Env, messageId: string, orgId: string)
       .bind(messageId)
       .first<{ contactSource: string | null; role: string | null; orgSite: string | null }>(),
   ]);
+  const list = acts.results as { id: string; title: string; city: string | null; lat: number | null; lng: number | null }[];
+  let maxD = 0;
+  let known = false;
+  for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+    const a = list[i]!, b = list[j]!;
+    if (a.lat == null || b.lat == null || a.lng == null || b.lng == null) continue;
+    known = true;
+    const dLat = ((a.lat - b.lat) / 1e6) * 111_000;
+    const dLng = ((a.lng - b.lng) / 1e6) * 111_000 * Math.cos((a.lat / 1e6) * (Math.PI / 180));
+    maxD = Math.max(maxD, Math.hypot(dLat, dLng));
+  }
+  // What this mail is about: one activity, several activities at one place, or several locations.
+  const scope = list.length <= 1 ? "one_activity" : !known ? "several_unknown_location" : maxD < 150 ? "several_activities_one_location" : "several_locations";
+  const cities = [...new Set(list.map((a) => a.city).filter(Boolean))];
   return {
-    activities: acts.results,
+    scope: { kind: scope, activities: list.length, cities },
+    activities: list.map(({ lat, lng, ...rest }) => { void lat; void lng; return rest; }),
     priorMessages: prior.results,
     group,
     sources: { contact: src?.contactSource ?? null, website: src?.orgSite ?? null, role: src?.role ?? null },

@@ -199,7 +199,7 @@ function fixtureSql() {
        '[{"field":"city","from":"Gent","to":"Gent-Centrum","sourceUrl":"https://beta-fun.be","quote":"Gent-Centrum","confidence":"high","verified":true},{"field":"website_url","from":"x","to":"https://beta-fun.be/nieuw","sourceUrl":"https://beta-fun.be","quote":"nieuw","confidence":"high","verified":true}]',
        'Karting bevestigd op de eigen website.');`,
     `INSERT INTO activity_contact_links (activity_id, contact_id, scope, status, link_source) VALUES
-       ('g2','cg_multi','organisation','verified','domain'),('g3','cg_multi','organisation','unverified','domain'),('g4','cg_multi','location','likely','domain');`,
+       ('g2','cg_multi','organisation','verified','domain'),('g3','cg_multi','organisation','unverified','domain'),('g4','cg_multi','organisation','likely','domain');`,
     // contacts the research marked as printed on the official site (READY needs evidence)
     `UPDATE outreach_contacts SET evidence_status = 'verified', evidence_note = 'fixture' WHERE verification = 'checked';`,
     // large dataset: 5,000 organisations with 5,000 contacts
@@ -734,9 +734,19 @@ async function main() {
   ok("audit: the owner can set what an address is for", r.status === 200, r.data);
   r = await CC("GET", "/quality/activity/g3/research");
   ok("audit: link scope and manual source are stored", r.data.contacts[0].scope === "location" && r.data.contacts[0].linkSource === "manual", r.data.contacts[0]);
+  // an address tied to ONE location names only that activity (g3 was set to 'location' above)
+  r = await A("POST", "/orgs/og_multi/prepare", { contactId: "cg_multi" });
+  ok("audit: an address linked to one location only names that activity", r.status === 200, r.data);
+  r = await A("GET", `/messages/${r.data.messageId}`);
+  ok("audit: the mail names just that activity and says it is about one activity", r.data.bodyText.includes('"Lasergame Beta"') && !r.data.bodyText.includes("Karting Beta") && r.data.context.scope.kind === "one_activity", r.data.bodyText?.slice(300, 500));
+  r = await CC("POST", "/quality/link/g3/cg_multi", { scope: "organisation" });
+  r = await A("POST", "/orgs/og_multi/prepare", { contactId: "cg_multi" });
+  r = await A("GET", `/messages/${r.data.messageId}`);
+  ok("audit: with an organisation-wide address all selected activities are named again", r.data.bodyText.includes("- Karting Beta") && r.data.context.scope.kind !== "one_activity", r.data.context.scope);
   r = await CC("POST", "/quality/link/g3/cg_multi", { status: "invalid" });
   r = await A("POST", "/orgs/og_multi/prepare", { contactId: "cg_multi" });
-  ok("audit: draft is still allowed, approval is the gate", r.status === 200 || r.status === 400 || r.status === 409, r.status);
+  r = await A("GET", `/messages/${r.data.messageId}`);
+  ok("audit: an activity whose address link was marked invalid is not named", !r.data.bodyText.includes("Lasergame Beta") && r.data.bodyText.includes("Karting Beta"), r.data.bodyText?.slice(300, 500));
   // evidence on the address itself blocks sending
   await call(admin, "PUT", "/api/admin/cc/outreach/contacts/cg_tick", { note: "test" }, csrf());
   // new records can never start as approved/verified without the basics

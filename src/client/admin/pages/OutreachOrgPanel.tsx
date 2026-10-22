@@ -73,6 +73,7 @@ interface Preview {
   blockers: { code: string; message: string }[];
   canApprove: boolean;
   context?: {
+    scope?: { kind: string; activities: number; cities: string[] };
     activities: { id: string; title: string; websiteUrl: string | null; city: string | null }[];
     priorMessages: { id: string; toEmail: string; status: string; testMode: number; sentAt: number | null; createdAt: number }[];
     group: { confidence: string; confirmed: boolean; reasons: { code: string; message: string }[] } | null;
@@ -656,6 +657,17 @@ function MessageContext({ ctx }: { ctx: NonNullable<Preview["context"]> }) {
         Dit bericht noemt {ctx.activities.length === 0 ? "geen specifieke activiteiten" : `${ctx.activities.length} activiteit${ctx.activities.length === 1 ? "" : "en"}`}
       </summary>
       <div className="mt-2 space-y-2 text-slate-700">
+        {ctx.scope && (
+          <p className="font-medium text-slate-800">
+            Deze mail gaat over:{" "}
+            {({
+              one_activity: "één activiteit",
+              several_activities_one_location: `${ctx.scope.activities} activiteiten op dezelfde locatie`,
+              several_locations: `${ctx.scope.activities} activiteiten op verschillende locaties (${ctx.scope.cities.join(", ")})`,
+              several_unknown_location: `${ctx.scope.activities} activiteiten (locaties onbekend)`,
+            } as Record<string, string>)[ctx.scope.kind] ?? "—"}
+          </p>
+        )}
         {ctx.activities.length > 0 && (
           <ul>
             {ctx.activities.map((a) => (

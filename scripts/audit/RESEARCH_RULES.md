@@ -26,7 +26,8 @@ activity. Judge the concrete experience and justify the decision.
 4. Official registers or other primary sources.
 5. Reliable external sources as a supplement.
 
-A search result snippet is NOT evidence. Open the page (WebFetch) and read it. Check
+If WebFetch returns an empty page (for example a redirect to another host), fetch the final URL with
+`curl -sL` in Bash and read the HTML text yourself. A search result snippet is NOT evidence. Open the page (WebFetch) and read it. Check
 important facts (address, existence, e-mail) with a second source when the first is not the
 venue's own site. Respect robots/access limits; do not hammer a site; do not send any e-mail;
 do not try to guess or probe mailboxes.
