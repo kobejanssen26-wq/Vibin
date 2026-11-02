@@ -132,6 +132,11 @@ async function main() {
   await page.screenshot({ path: path.join(SHOTS, "01-desktop-start.png") });
 
   console.log("\nscherm");
+  {
+    const keep = await page.getByRole("button", { name: /Bewaren/ }).boundingBox();
+    const cardBox = await page.locator("article").last().boundingBox();
+    ok("desktop: kaart én knoppen zijn samen in beeld (zonder scrollen)", !!keep && !!cardBox && keep.y + keep.height <= 950 && cardBox.y + cardBox.height <= keep.y + 1, { keep, cardBox });
+  }
   ok("pagina 'Swipe Manager' met echte voortgang uit de database", (await page.getByText("12", { exact: false }).count()) > 0 && (await page.getByText("activiteiten totaal").count()) > 0);
   const front = () => page.locator("article").last();
   ok("grote kaart met titel, adres en e-mail", (await front().innerText()).includes("Klimhal Alpha") && (await front().innerText()).includes("Teststraat 1") && (await front().innerText()).includes("info@klimhal-alpha.be"));
@@ -159,6 +164,10 @@ async function main() {
   await page.waitForFunction(() => document.body.innerText.includes("Trampoline Lambda"), null, { timeout: 8000 });
   ok("pijl omhoog = later bekijken (activiteit zelf ongemoeid)", dbq("SELECT decision FROM owner_activity_decisions WHERE activity_id='s10'")[0].decision === "later" && dbq("SELECT active FROM activities WHERE id='s10'")[0].active === 1);
 
+  // filters sit behind one button (collapsed by default so card + buttons fit on screen)
+  ok("filters zijn standaard ingeklapt", (await page.getByLabel("Zoeken").count()) === 0);
+  await page.getByRole("button", { name: /Filters/ }).click();
+  ok("de knop 'Filters' klapt ze open", (await page.getByLabel("Zoeken").count()) === 1);
   // typing in a field must never trigger a decision
   await page.getByLabel("Zoeken").fill("");
   await page.getByLabel("Zoeken").focus();
@@ -195,7 +204,8 @@ async function main() {
   await page.keyboard.press("i");
   await page.waitForSelector('[role="dialog"][aria-label="Details"]', { timeout: 5000 });
   await page.screenshot({ path: path.join(SHOTS, "04-details.png") });
-  ok("details openen met 'i': volledige informatie", (await page.locator('[role="dialog"]').innerText()).includes("Omschrijving") && (await page.locator('[role="dialog"]').innerText()).includes("Onderzoek"));
+  const detailText = (await page.locator('[role="dialog"]').innerText()).toLowerCase();
+  ok("details openen met 'i': volledige informatie", detailText.includes("omschrijving") && detailText.includes("onderzoek") && detailText.includes("locatie") && detailText.includes("website"), detailText.slice(0, 200));
   await page.keyboard.press("Escape");
   await sleep(300);
   ok("Escape sluit de details", (await page.locator('[role="dialog"][aria-label="Details"]').count()) === 0);
@@ -246,6 +256,11 @@ async function main() {
   await sleep(800);
   await mp.screenshot({ path: path.join(SHOTS, "08-telefoon.png"), fullPage: false });
   ok("op een telefoon past de pagina in de breedte (geen horizontaal scrollen)", await mp.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+  {
+    const kb = await mp.getByRole("button", { name: /Bewaren/ }).boundingBox();
+    const cb = await mp.locator("article").last().boundingBox();
+    ok("telefoon: kaart én knoppen zijn samen in beeld (zonder scrollen)", !!kb && !!cb && kb.y + kb.height <= 844 && cb.y >= 0 && cb.y + cb.height <= kb.y + 1, { kb, cb });
+  }
   ok("de knoppen staan onder de kaart en zijn zichtbaar", (await mp.getByRole("button", { name: /Bewaren/ }).isVisible()) && (await mp.getByRole("button", { name: /Verwijderen/ }).first().isVisible()));
   await mp.getByRole("button", { name: /Bewaren/ }).click();
   await mp.waitForFunction(() => document.body.innerText.includes("opgeslagen ✓"), null, { timeout: 8000 });

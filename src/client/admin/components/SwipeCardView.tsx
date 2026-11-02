@@ -157,7 +157,7 @@ export function SwipeCardView({
       aria-label={card.title}
     >
       {/* image */}
-      <div className="relative h-[46%] min-h-[170px] shrink-0 bg-gradient-to-br from-brand-500 to-navy-800">
+      <div className="relative h-[42%] min-h-[140px] shrink-0 bg-gradient-to-br from-brand-500 to-navy-800">
         {showImage ? (
           <img
             src={card.imageUrl!}

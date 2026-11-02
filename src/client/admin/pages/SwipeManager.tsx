@@ -64,6 +64,7 @@ export function SwipeManager() {
   /** open "delete for good" dialog; ids = specific activities, undefined = the whole trash */
   const [purge, setPurge] = useState<{ ids?: string[] } | null>(null);
   const [nonce, setNonce] = useState(0);
+  const [showFilters, setShowFilters] = useState(false);
   const [toast, setToast] = useState<{ id: number; text: string; undoKey?: number; tone?: "error" } | null>(null);
   const [citySugg, setCitySugg] = useState<string[]>([]);
   const [orgSugg, setOrgSugg] = useState<{ value: string; label: string }[]>([]);
@@ -373,6 +374,7 @@ export function SwipeManager() {
     else if (!v) setFilters((f) => ({ ...f, org: "", orgLabel: "" }));
   };
 
+  const activeFilters = [filters.research !== "any", filters.visibility !== "active", !!filters.category, !!filters.city, !!filters.org, !!filters.email.trim(), !!filters.q.trim()].filter(Boolean).length;
   const remaining = total == null ? null : Math.max(0, total - removed);
   const tabCount = (id: SwipeFilters["review"]): number | null => {
     if (!summary) return null;
@@ -388,38 +390,37 @@ export function SwipeManager() {
   };
 
   const statusBanner = useMemo(() => {
-    if (unsaved.length) return { tone: "bg-rose-50 text-rose-800 ring-rose-300", text: `${unsaved.length} beslissing(en) NIET opgeslagen — controleer de lijst rechts.` };
+    if (unsaved.length) return { tone: "bg-rose-50 text-rose-800 ring-rose-300", text: `${unsaved.length} beslissing(en) NIET opgeslagen` };
     if (saving) return { tone: "bg-amber-50 text-amber-800 ring-amber-300", text: `Opslaan… (${saving})` };
-    if (savedCount) return { tone: "bg-emerald-50 text-emerald-800 ring-emerald-300", text: `Alles opgeslagen in de database ✓ (${savedCount} beslissing${savedCount === 1 ? "" : "en"} deze sessie)` };
-    return { tone: "bg-slate-50 text-slate-600 ring-slate-200", text: "Nog geen beslissingen deze sessie." };
+    if (savedCount) return { tone: "bg-emerald-50 text-emerald-800 ring-emerald-300", text: `Alles opgeslagen in de database ✓ (${savedCount})` };
+    return { tone: "bg-slate-50 text-slate-600 ring-slate-200", text: "Nog geen beslissingen" };
   }, [saving, savedCount, unsaved.length]);
 
   return (
     <>
       <PageTitle
         title="Swipe Manager"
-        crumbs="Beoordeel alle activiteiten: links = verwijderen, rechts = behouden, omhoog = later"
         right={
           <div className="flex gap-2">
-            <Btn onClick={() => void loadSummary()}>↻ Vernieuwen</Btn>
-            <Btn variant="primary" onClick={() => setEditor({ id: null })}>＋ Activiteit toevoegen</Btn>
+            <Btn onClick={() => void loadSummary()} aria-label="Vernieuwen"><span aria-hidden>↻</span><span className="hidden sm:inline">Vernieuwen</span></Btn>
+            <Btn variant="primary" onClick={() => setEditor({ id: null })}>＋<span className="hidden sm:inline">&nbsp;Activiteit toevoegen</span><span className="sm:hidden">&nbsp;Toevoegen</span></Btn>
           </div>
         }
       />
 
       {/* progress */}
-      <Panel className="mb-3" bodyClassName="p-4">
+      <Panel className="mb-3" bodyClassName="p-3 sm:p-4">
         {summary ? (
           <>
-            <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-[13px] text-slate-700">
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5 text-[12.5px] text-slate-700 sm:gap-x-5 sm:text-[13px]">
               <span><b className="text-slate-900">{summary.total.toLocaleString("nl-BE")}</b> activiteiten totaal</span>
               <span><b className="text-slate-900">{summary.unreviewed.toLocaleString("nl-BE")}</b> nog te beoordelen</span>
               <span className="text-emerald-700"><b>{summary.keep.toLocaleString("nl-BE")}</b> behouden</span>
               <span className="text-rose-700"><b>{summary.deleted.toLocaleString("nl-BE")}</b> in de prullenbak</span>
               <span className="text-amber-700"><b>{summary.later.toLocaleString("nl-BE")}</b> later bekijken</span>
-              <span className="text-slate-500">{summary.unresearched.toLocaleString("nl-BE")} nog niet onderzocht · {summary.manual.toLocaleString("nl-BE")} handmatige controle{summary.purged > 0 ? ` · ${summary.purged.toLocaleString("nl-BE")} definitief gewist` : ""}</span>
+              <span className="hidden text-slate-500 sm:inline">{summary.unresearched.toLocaleString("nl-BE")} nog niet onderzocht · {summary.manual.toLocaleString("nl-BE")} handmatige controle{summary.purged > 0 ? ` · ${summary.purged.toLocaleString("nl-BE")} definitief gewist` : ""}</span>
             </div>
-            <div className="mt-2.5 flex h-2.5 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={summary.total - summary.unreviewed} aria-valuemax={summary.total}>
+            <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={summary.total - summary.unreviewed} aria-valuemax={summary.total}>
               <div className="bg-emerald-500 transition-all" style={{ width: `${(summary.keep / Math.max(1, summary.total)) * 100}%` }} />
               <div className="bg-rose-500 transition-all" style={{ width: `${(summary.deleted / Math.max(1, summary.total)) * 100}%` }} />
               <div className="bg-amber-400 transition-all" style={{ width: `${(summary.later / Math.max(1, summary.total)) * 100}%` }} />
@@ -430,9 +431,10 @@ export function SwipeManager() {
         )}
       </Panel>
 
-      {/* filters */}
-      <Panel className="mb-4" bodyClassName="p-3">
-        <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Beoordeling">
+      {/* filters: the review tabs are always visible, the rest sits behind one button */}
+      <Panel className="mb-3" bodyClassName="p-2.5 sm:p-3">
+        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-0.5" role="tablist" aria-label="Beoordeling">
           {REVIEW_TABS.map((t) => {
             const on = filters.review === t.id;
             const n = tabCount(t.id);
@@ -442,7 +444,7 @@ export function SwipeManager() {
                 role="tab"
                 aria-selected={on}
                 onClick={() => set("review", t.id)}
-                className={`rounded-full px-3 py-1.5 text-[13px] font-semibold transition ${on ? "bg-brand-500 text-white shadow" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
+                className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-[13px] font-semibold transition ${on ? "bg-brand-500 text-white shadow" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
               >
                 {t.label}
                 {n != null && <span className={`ml-1.5 text-[11px] ${on ? "text-white/80" : "text-slate-500"}`}>{n.toLocaleString("nl-BE")}</span>}
@@ -450,6 +452,11 @@ export function SwipeManager() {
             );
           })}
         </div>
+          <Btn onClick={() => setShowFilters((v) => !v)} aria-expanded={showFilters} className="shrink-0">
+            ⚙ Filters{activeFilters > 0 && <span className="ml-1 rounded-full bg-brand-500 px-1.5 text-[11px] font-bold text-white">{activeFilters}</span>}
+          </Btn>
+        </div>
+        {showFilters && (
         <div className="mt-2.5 grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-7">
           <Select value={filters.research} onChange={(e) => set("research", e.target.value as SwipeFilters["research"])} aria-label="Onderzoek">
             <option value="any">Onderzoek: alle</option>
@@ -479,11 +486,8 @@ export function SwipeManager() {
           <Input placeholder="E-mailadres" value={filters.email} onChange={(e) => set("email", e.target.value)} aria-label="E-mailadres" />
           <Input placeholder="Zoek op naam…" value={filters.q} onChange={(e) => set("q", e.target.value)} aria-label="Zoeken" />
         </div>
+        )}
       </Panel>
-
-      <div className={`mb-3 rounded-lg px-3 py-2 text-[13px] font-medium ring-1 ring-inset ${statusBanner.tone}`} role="status" aria-live="polite">
-        {statusBanner.text}
-      </div>
 
       {filters.review === "delete" && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-[13px] text-rose-950">
@@ -499,15 +503,17 @@ export function SwipeManager() {
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         {/* ------------------------------ card area ----------------------------- */}
         <div>
-          <div className="mb-2 flex items-center justify-between text-[12px] text-slate-500">
-            <span>
+          <div className="mx-auto mb-2 flex max-w-xl items-center justify-between gap-2 text-[12px] text-slate-500">
+            <span className="shrink-0">
               {remaining != null ? <><b className="text-slate-800">{remaining.toLocaleString("nl-BE")}</b> in deze lijst</> : "…"}
               {loadingMore && <span className="ml-2">meer laden…</span>}
             </span>
-            <span className="hidden sm:inline">← verwijderen · → behouden · ↑ later · Backspace terug · i details · e bewerken</span>
+            <span className={`min-w-0 truncate rounded-full px-2.5 py-1 text-[12px] font-semibold ring-1 ring-inset ${statusBanner.tone}`} role="status" aria-live="polite" title={statusBanner.text}>
+              {statusBanner.text}
+            </span>
           </div>
 
-          <div className="relative mx-auto h-[min(72vh,660px)] min-h-[540px] w-full max-w-xl">
+          <div className="relative mx-auto h-[clamp(420px,calc(100dvh-21rem),680px)] w-full max-w-xl">
             {loading && <div className="absolute inset-0 grid place-items-center rounded-3xl bg-white ring-1 ring-slate-200"><Loading label="Activiteiten laden…" /></div>}
             {!loading && loadErr && <div className="absolute inset-0 grid place-items-center rounded-3xl bg-white p-6 ring-1 ring-slate-200"><div className="space-y-3"><ErrorNote message={loadErr} /><Btn onClick={() => setFilters((f) => ({ ...f }))}>Opnieuw proberen</Btn></div></div>}
             {!loading && !loadErr && !current && !leaving && (
@@ -559,6 +565,7 @@ export function SwipeManager() {
             <Btn disabled={!current} onClick={() => current && setDetails(current.id)} className="justify-center py-2.5" title="i">ⓘ Details</Btn>
             <Btn disabled={!current} onClick={() => current && setEditor({ id: current.id })} className="justify-center py-2.5" title="e">✎ Bewerken</Btn>
           </div>
+          <p className="mx-auto mt-2 hidden max-w-xl text-center text-[11.5px] text-slate-400 sm:block">← verwijderen · → behouden · ↑ later · Backspace terug · i details · e bewerken</p>
         </div>
 
         {/* -------------------------------- ledger ------------------------------- */}
