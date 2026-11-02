@@ -37,6 +37,31 @@ function leavesList(review: SwipeFilters["review"], decision: DecideDecision): b
   return review !== decision;
 }
 
+function ActionBtn({
+  icon,
+  label,
+  variant,
+  title,
+  disabled,
+  hideOnPhone,
+  onClick,
+}: {
+  icon: string;
+  label: string;
+  variant?: "primary" | "danger";
+  title: string;
+  disabled?: boolean;
+  hideOnPhone?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Btn variant={variant} disabled={disabled} onClick={onClick} title={title} aria-label={label} className={`justify-center py-2.5 text-base sm:text-[13px] ${hideOnPhone ? "hidden sm:inline-flex" : ""}`}>
+      <span aria-hidden>{icon}</span>
+      <span className="ml-1 hidden sm:inline">{label}</span>
+    </Btn>
+  );
+}
+
 function isTypingTarget(t: EventTarget | null): boolean {
   const el = t as HTMLElement | null;
   if (!el) return false;
@@ -513,7 +538,7 @@ export function SwipeManager() {
             </span>
           </div>
 
-          <div className="relative mx-auto h-[clamp(420px,calc(100dvh-21rem),680px)] w-full max-w-xl">
+          <div className="relative mx-auto h-[clamp(420px,calc(100dvh-26rem),680px)] w-full max-w-xl">
             {loading && <div className="absolute inset-0 grid place-items-center rounded-3xl bg-white ring-1 ring-slate-200"><Loading label="Activiteiten laden…" /></div>}
             {!loading && loadErr && <div className="absolute inset-0 grid place-items-center rounded-3xl bg-white p-6 ring-1 ring-slate-200"><div className="space-y-3"><ErrorNote message={loadErr} /><Btn onClick={() => setFilters((f) => ({ ...f }))}>Opnieuw proberen</Btn></div></div>}
             {!loading && !loadErr && !current && !leaving && (
@@ -552,18 +577,18 @@ export function SwipeManager() {
             )}
           </div>
 
-          {/* buttons */}
-          <div className="mx-auto mt-4 grid max-w-xl grid-cols-3 gap-2 sm:grid-cols-6">
-            <Btn onClick={() => void undoLast()} className="justify-center py-2.5" title="Backspace">↶ Terug</Btn>
-            <Btn variant="danger" disabled={!current || current.deleted} onClick={() => current && decideCard(current, "delete")} className="justify-center py-2.5" title="Pijl links">🗑 Verwijderen</Btn>
+          {/* buttons: one row of icons on a phone, icons + words from sm up */}
+          <div className="mx-auto mt-3 grid max-w-xl grid-cols-5 gap-2 sm:mt-4 sm:grid-cols-6">
+            <ActionBtn icon="↶" label="Terug" title="Backspace" onClick={() => void undoLast()} />
+            <ActionBtn icon="🗑" label="Verwijderen" variant="danger" title="Pijl links" disabled={!current || current.deleted} onClick={() => current && decideCard(current, "delete")} />
             {current?.deleted ? (
-              <Btn variant="danger" onClick={() => setPurge({ ids: [current.id] })} className="justify-center py-2.5" title="Definitief verwijderen">🔥 Definitief</Btn>
+              <ActionBtn icon="🔥" label="Definitief" variant="danger" title="Definitief verwijderen" onClick={() => setPurge({ ids: [current.id] })} />
             ) : (
-              <Btn disabled={!current} onClick={() => current && decideCard(current, "later")} className="justify-center py-2.5" title="Pijl omhoog">⏭ Later</Btn>
+              <ActionBtn icon="⏭" label="Later" title="Pijl omhoog" disabled={!current} onClick={() => current && decideCard(current, "later")} />
             )}
-            <Btn variant="primary" disabled={!current} onClick={() => current && decideCard(current, "keep")} className="justify-center py-2.5" title="Pijl rechts">{current?.deleted ? "↩ Herstellen" : "✓ Bewaren"}</Btn>
-            <Btn disabled={!current} onClick={() => current && setDetails(current.id)} className="justify-center py-2.5" title="i">ⓘ Details</Btn>
-            <Btn disabled={!current} onClick={() => current && setEditor({ id: current.id })} className="justify-center py-2.5" title="e">✎ Bewerken</Btn>
+            <ActionBtn icon={current?.deleted ? "↩" : "✓"} label={current?.deleted ? "Herstellen" : "Bewaren"} variant="primary" title="Pijl rechts" disabled={!current} onClick={() => current && decideCard(current, "keep")} />
+            <ActionBtn icon="ⓘ" label="Details" title="i" disabled={!current} onClick={() => current && setDetails(current.id)} />
+            <ActionBtn icon="✎" label="Bewerken" title="e" disabled={!current} hideOnPhone onClick={() => current && setEditor({ id: current.id })} />
           </div>
           <p className="mx-auto mt-2 hidden max-w-xl text-center text-[11.5px] text-slate-400 sm:block">← verwijderen · → behouden · ↑ later · Backspace terug · i details · e bewerken</p>
         </div>
