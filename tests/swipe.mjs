@@ -289,8 +289,10 @@ async function main() {
   r = await M("GET", `/groups/${gid}/swipe`);
   const deckIds = r.data.queue.map((c) => c.activity.id);
   ok("groep heeft een lopend deck met activiteiten", deckIds.length >= 5, deckIds);
-  const victim = deckIds[0];
-  const voted = deckIds[1];
+  // cards that earlier scenarios already gave a verdict (s1, s7) are skipped: this one must start at version 0
+  const fresh0 = deckIds.filter((x) => !["s1", "s7"].includes(x));
+  const victim = fresh0[0];
+  const voted = fresh0[1];
   await M("POST", `/groups/${gid}/swipe`, { activityId: voted, value: "like" });
   const votesBefore = dbq(`SELECT COUNT(*) AS n FROM activity_votes WHERE activity_id='${voted}'`)[0].n;
   r = await M2("POST", `/groups/${gid}/swipe`, { activityId: victim, value: "like" });
