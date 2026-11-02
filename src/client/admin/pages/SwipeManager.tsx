@@ -55,7 +55,7 @@ function ActionBtn({
   onClick: () => void;
 }) {
   return (
-    <Btn variant={variant} disabled={disabled} onClick={onClick} title={title} aria-label={label} className={`justify-center py-2.5 text-base sm:text-[13px] ${hideOnPhone ? "hidden sm:inline-flex" : ""}`}>
+    <Btn variant={variant} disabled={disabled} onClick={onClick} title={title} aria-label={label} className={`justify-center !px-2 py-2.5 text-base sm:text-[13px] ${hideOnPhone ? "hidden sm:inline-flex" : ""}`}>
       <span aria-hidden>{icon}</span>
       <span className="ml-1 hidden sm:inline">{label}</span>
     </Btn>
@@ -578,7 +578,7 @@ export function SwipeManager() {
           </div>
 
           {/* buttons: one row of icons on a phone, icons + words from sm up */}
-          <div className="mx-auto mt-3 grid max-w-xl grid-cols-5 gap-2 sm:mt-4 sm:grid-cols-6">
+          <div className="mx-auto mt-3 grid max-w-xl grid-cols-5 gap-2 sm:mt-4 sm:max-w-2xl sm:grid-cols-6">
             <ActionBtn icon="↶" label="Terug" title="Backspace" onClick={() => void undoLast()} />
             <ActionBtn icon="🗑" label="Verwijderen" variant="danger" title="Pijl links" disabled={!current || current.deleted} onClick={() => current && decideCard(current, "delete")} />
             {current?.deleted ? (
@@ -590,7 +590,7 @@ export function SwipeManager() {
             <ActionBtn icon="ⓘ" label="Details" title="i" disabled={!current} onClick={() => current && setDetails(current.id)} />
             <ActionBtn icon="✎" label="Bewerken" title="e" disabled={!current} hideOnPhone onClick={() => current && setEditor({ id: current.id })} />
           </div>
-          <p className="mx-auto mt-2 hidden max-w-xl text-center text-[11.5px] text-slate-400 sm:block">← verwijderen · → behouden · ↑ later · Backspace terug · i details · e bewerken</p>
+          <p className="mx-auto mt-2 hidden max-w-2xl text-center text-[11.5px] text-slate-400 sm:block">← verwijderen · → behouden · ↑ later · Backspace terug · i details · e bewerken</p>
         </div>
 
         {/* -------------------------------- ledger ------------------------------- */}
