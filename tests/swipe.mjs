@@ -488,7 +488,7 @@ async function main() {
   const rulesSql = fs.readFileSync(path.join(ROOT, "scripts/audit/make-sql.mts"), "utf8");
   ok("(9) ook het regel-gebaseerde auditscript overschrijft geen eigenaarsbesluiten meer", !/INSERT OR REPLACE INTO activity_audits/.test(rulesSql) && rulesSql.includes("source != 'owner'") && rulesSql.includes("owner_activity_decisions"));
   const seedApply = fs.readFileSync(path.join(ROOT, "seed/apply-seed.mjs"), "utf8");
-  ok("(9) een herimport van de seed zet verwijderde activiteiten daarna opnieuw uit", seedApply.includes("owner_activity_decisions") && seedApply.includes("decision = 'delete'"));
+  ok("(9) een herimport van de seed zet verwijderde activiteiten daarna opnieuw uit", seedApply.includes("owner_activity_decisions") && seedApply.includes("decision IN ('delete', 'purged')"));
 
   /* ---- 11. survives refresh ---- */
   console.log("\n11 · beslissingen blijven na een refresh en na een herstart van de server");
