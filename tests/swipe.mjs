@@ -276,18 +276,28 @@ async function main() {
   const GROUP_SETTINGS = { categories: [], allActivities: true, locationLabel: "Gent", lat: null, lng: null, radiusKm: 50, budgetBand: "any", dateMode: "unknown", dateSpecific: null, timeBand: "unknown", timeSpecific: null };
   r = await M("PUT", `/groups/${gid}/settings`, GROUP_SETTINGS);
   ok("groepsinstellingen opgeslagen", r.status === 200, { status: r.status, data: r.data });
+  // a second member, who will hold a vote on the activity the owner deletes (a relation that must survive)
+  const member2 = jar();
+  await call(member2, "POST", "/api/auth/signup", { displayName: "Lid2", email: `lid2${Date.now()}@example.com`, password: "supersecret123" });
+  const m2csrf = () => ({ "x-vibin-csrf": member2.get("vibin_csrf") ?? "" });
+  const M2 = (m, p, b) => call(member2, m, `/api/${p.replace(/^\//, "")}`, b, m === "GET" ? {} : m2csrf());
+  const invite = (await M("GET", `/groups/${gid}`)).data.group.inviteCode;
+  r = await M2("POST", `/invites/${invite}/join`, {});
+  ok("tweede lid doet mee via uitnodiging", r.status === 200, r.data);
   r = await M("POST", `/groups/${gid}/start`, {});
   ok("groep gestart", r.status === 200, { status: r.status, data: r.data });
   r = await M("GET", `/groups/${gid}/swipe`);
   const deckIds = r.data.queue.map((c) => c.activity.id);
   ok("groep heeft een lopend deck met activiteiten", deckIds.length >= 5, deckIds);
-  const victim = deckIds.find((x) => !["s1", "s7"].includes(x));
-  const voted = deckIds.find((x) => x !== victim && !["s1", "s7"].includes(x));
+  const victim = deckIds[0];
+  const voted = deckIds[1];
   await M("POST", `/groups/${gid}/swipe`, { activityId: voted, value: "like" });
   const votesBefore = dbq(`SELECT COUNT(*) AS n FROM activity_votes WHERE activity_id='${voted}'`)[0].n;
-  // vote on the victim first so the relation exists on the activity we delete
-  await M("POST", `/groups/${gid}/swipe`, { activityId: victim, value: "like" });
+  r = await M2("POST", `/groups/${gid}/swipe`, { activityId: victim, value: "like" });
+  ok("lid 2 stemt op de kaart die straks verwijderd wordt", r.status === 200, r.data);
   const victimVotes = dbq(`SELECT COUNT(*) AS n FROM activity_votes WHERE activity_id='${victim}'`)[0].n;
+  ok("lid 1 heeft de kaart nog in de wachtrij vóór de verwijdering", (await M("GET", `/groups/${gid}/swipe`)).data.queue.some((c) => c.activity.id === victim));
+  const queueBefore = (await M("GET", `/groups/${gid}/swipe`)).data.queue.length;
 
   r = await decide(victim, "delete", 0);
   ok("verwijderen wordt opgeslagen", r.status === 200 && r.data.decision === "delete" && r.data.active === false && r.data.status === "inactive", r.data);
@@ -303,7 +313,7 @@ async function main() {
   r = await call(member, "GET", `/api/activities/${victim}`);
   ok("detailpagina geeft 404", r.status === 404, r.status);
   r = await M("GET", `/groups/${gid}/swipe`);
-  ok("lopend swipe-deck: kaart verdwijnt uit de wachtrij", !r.data.queue.some((c) => c.activity.id === victim) && r.data.queue.some((c) => c.activity.id === voted), r.data.queue.map((c) => c.activity.id));
+  ok("lopend swipe-deck: de verwijderde kaart verdwijnt uit de wachtrij, de rest blijft", !r.data.queue.some((c) => c.activity.id === victim) && r.data.queue.length === queueBefore - 1, { before: queueBefore, after: r.data.queue.map((c) => c.activity.id), victim });
   r = await M("POST", `/groups/${gid}/swipe`, { activityId: victim, value: "like" });
   ok("een oude kaart kan geen stem/match meer opleveren (409)", r.status === 409, r.data);
   ok("relaties blijven bewaard: bestaande stemmen niet gewist", dbq(`SELECT COUNT(*) AS n FROM activity_votes WHERE activity_id='${victim}'`)[0].n === victimVotes && dbq(`SELECT COUNT(*) AS n FROM activity_votes WHERE activity_id='${voted}'`)[0].n === votesBefore);
