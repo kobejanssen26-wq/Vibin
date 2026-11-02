@@ -95,7 +95,7 @@ async function call(j, method, p, body, extra = {}) {
 
 /* ------------------------------ fixtures ------------------------------ */
 const ACT = (id, title, city, extra = {}) => {
-  const e = { website: `https://www.${id}.be`, status: "needs_review", active: 1, cat: "sport", lat: "NULL", lng: "NULL", provider: title, ...extra };
+  const e = { website: `https://www.${id}.be`, status: "needs_review", active: 1, cat: "sport", lat: 51050000, lng: 3720000, provider: title, ...extra }; // near Gent: a group with a location only deals activities that have coordinates
   return `INSERT INTO activities (id, provider_id, title, category_id, location_label, city, address, price_band, provider, website_url, status, active, lat, lng, description)
           VALUES ('${id}','p-test','${title}','${e.cat}','${city}','${city}','Teststraat 1','10_25','${e.provider}','${e.website}','${e.status}',${e.active},${e.lat},${e.lng},'Beschrijving van ${title}.');`;
 };
