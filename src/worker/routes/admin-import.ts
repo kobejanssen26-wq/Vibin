@@ -61,7 +61,7 @@ const normUrl = (s: string | null | undefined) =>
  */
 async function loadOwnerDeleted(env: Env) {
   const r = await env.DB.prepare(
-    `SELECT activity_id AS id, title_key AS tk, url_key AS uk FROM owner_activity_decisions WHERE decision = 'delete'`,
+    `SELECT activity_id AS id, title_key AS tk, url_key AS uk FROM owner_activity_decisions WHERE decision IN ('delete', 'purged')`,
   ).all<{ id: string; tk: string | null; uk: string | null }>();
   const ids = new Set<string>();
   const titles = new Set<string>();

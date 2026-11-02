@@ -3,7 +3,7 @@ import { AdminApiError, cc } from "../api";
 import { Badge, Btn, ErrorNote, Input, Loading, PageTitle, Panel, Select } from "../ui";
 import { useDebounced } from "../lib";
 import { SwipeCardView, type SwipeDir } from "../components/SwipeCardView";
-import { ActivityEditorModal, DetailsDrawer } from "../components/SwipePanels";
+import { ActivityEditorModal, DetailsDrawer, PurgeDialog } from "../components/SwipePanels";
 import {
   DEFAULT_FILTERS,
   filtersToQuery,
@@ -23,7 +23,7 @@ interface QueueRes {
 const REVIEW_TABS: { id: SwipeFilters["review"]; label: string }[] = [
   { id: "unreviewed", label: "Nog niet beoordeeld" },
   { id: "keep", label: "Behouden" },
-  { id: "delete", label: "Verwijderd" },
+  { id: "delete", label: "Prullenbak" },
   { id: "later", label: "Later bekijken" },
   { id: "all", label: "Alles" },
 ];
@@ -61,6 +61,9 @@ export function SwipeManager() {
   const [leaving, setLeaving] = useState<{ card: SwipeCardData; dir: SwipeDir; from: { x: number; y: number }; key: number } | null>(null);
   const [details, setDetails] = useState<string | null>(null);
   const [editor, setEditor] = useState<{ id: string | null } | null>(null);
+  /** open "delete for good" dialog; ids = specific activities, undefined = the whole trash */
+  const [purge, setPurge] = useState<{ ids?: string[] } | null>(null);
+  const [nonce, setNonce] = useState(0);
   const [toast, setToast] = useState<{ id: number; text: string; undoKey?: number; tone?: "error" } | null>(null);
   const [citySugg, setCitySugg] = useState<string[]>([]);
   const [orgSugg, setOrgSugg] = useState<{ value: string; label: string }[]>([]);
@@ -117,7 +120,7 @@ export function SwipeManager() {
         if (gen === reqGen.current) setLoading(false);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterKey]);
+  }, [filterKey, nonce]);
 
   const loadMore = useCallback(async () => {
     if (!next || loadingMore) return;
@@ -172,7 +175,7 @@ export function SwipeManager() {
               .map((e) => (e.key === key ? { ...e, status: "saved" as const, version: r.version, error: undefined } : e)),
           );
           scheduleLight();
-          if (decision === "delete") showToast(`“${card.title}” verwijderd`, { undoKey: key });
+          if (decision === "delete") showToast(`“${card.title}” staat nu in de prullenbak`, { undoKey: key });
         } catch (e) {
           if (e instanceof AdminApiError && e.status === 409 && (e.details as { code?: string } | undefined)?.code === "version_conflict") {
             patchEntry(key, { status: "conflict", error: e.message });
@@ -282,9 +285,17 @@ export function SwipeManager() {
     void loadSummary();
   };
 
+  const afterPurge = (n: number) => {
+    setPurge(null);
+    setDetails(null);
+    setNonce((x) => x + 1); // reload the list: the purged cards are gone
+    void loadSummary();
+    if (n > 0) showToast(`${n} ${n === 1 ? "activiteit" : "activiteiten"} definitief verwijderd`);
+  };
+
   /* ------------------------------ keyboard ------------------------------ */
   const current = cards[0] ?? null;
-  const modalOpen = details !== null || editor !== null;
+  const modalOpen = details !== null || editor !== null || purge !== null;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target) || modalOpen) return;
@@ -404,9 +415,9 @@ export function SwipeManager() {
               <span><b className="text-slate-900">{summary.total.toLocaleString("nl-BE")}</b> activiteiten totaal</span>
               <span><b className="text-slate-900">{summary.unreviewed.toLocaleString("nl-BE")}</b> nog te beoordelen</span>
               <span className="text-emerald-700"><b>{summary.keep.toLocaleString("nl-BE")}</b> behouden</span>
-              <span className="text-rose-700"><b>{summary.deleted.toLocaleString("nl-BE")}</b> verwijderd</span>
+              <span className="text-rose-700"><b>{summary.deleted.toLocaleString("nl-BE")}</b> in de prullenbak</span>
               <span className="text-amber-700"><b>{summary.later.toLocaleString("nl-BE")}</b> later bekijken</span>
-              <span className="text-slate-500">{summary.unresearched.toLocaleString("nl-BE")} nog niet onderzocht · {summary.manual.toLocaleString("nl-BE")} handmatige controle</span>
+              <span className="text-slate-500">{summary.unresearched.toLocaleString("nl-BE")} nog niet onderzocht · {summary.manual.toLocaleString("nl-BE")} handmatige controle{summary.purged > 0 ? ` · ${summary.purged.toLocaleString("nl-BE")} definitief gewist` : ""}</span>
             </div>
             <div className="mt-2.5 flex h-2.5 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={summary.total - summary.unreviewed} aria-valuemax={summary.total}>
               <div className="bg-emerald-500 transition-all" style={{ width: `${(summary.keep / Math.max(1, summary.total)) * 100}%` }} />
@@ -474,6 +485,17 @@ export function SwipeManager() {
         {statusBanner.text}
       </div>
 
+      {filters.review === "delete" && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-[13px] text-rose-950">
+          <span>
+            🗑 <b>Prullenbak.</b> Wat je verwijdert staat hier en kan altijd hersteld worden. <b>Legen wist het definitief.</b>
+          </span>
+          <Btn variant="danger" disabled={(summary?.deleted ?? 0) === 0} onClick={() => setPurge({})}>
+            Prullenbak legen…
+          </Btn>
+        </div>
+      )}
+
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         {/* ------------------------------ card area ----------------------------- */}
         <div>
@@ -499,7 +521,7 @@ export function SwipeManager() {
                     <p className="mt-1 text-sm text-slate-500">Er zijn geen activiteiten meer voor deze filters.</p>
                     <div className="mt-4 flex flex-wrap justify-center gap-2">
                       <Btn onClick={() => set("review", "later")}>Bekijk “Later bekijken”</Btn>
-                      <Btn onClick={() => set("review", "delete")}>Bekijk “Verwijderd”</Btn>
+                      <Btn onClick={() => set("review", "delete")}>Bekijk “Prullenbak”</Btn>
                       <Btn onClick={() => set("review", "keep")}>Bekijk “Behouden”</Btn>
                     </div>
                   </div>
@@ -528,7 +550,11 @@ export function SwipeManager() {
           <div className="mx-auto mt-4 grid max-w-xl grid-cols-3 gap-2 sm:grid-cols-6">
             <Btn onClick={() => void undoLast()} className="justify-center py-2.5" title="Backspace">↶ Terug</Btn>
             <Btn variant="danger" disabled={!current || current.deleted} onClick={() => current && decideCard(current, "delete")} className="justify-center py-2.5" title="Pijl links">🗑 Verwijderen</Btn>
-            <Btn disabled={!current || current.deleted} onClick={() => current && decideCard(current, "later")} className="justify-center py-2.5" title="Pijl omhoog">⏭ Later</Btn>
+            {current?.deleted ? (
+              <Btn variant="danger" onClick={() => setPurge({ ids: [current.id] })} className="justify-center py-2.5" title="Definitief verwijderen">🔥 Definitief</Btn>
+            ) : (
+              <Btn disabled={!current} onClick={() => current && decideCard(current, "later")} className="justify-center py-2.5" title="Pijl omhoog">⏭ Later</Btn>
+            )}
             <Btn variant="primary" disabled={!current} onClick={() => current && decideCard(current, "keep")} className="justify-center py-2.5" title="Pijl rechts">{current?.deleted ? "↩ Herstellen" : "✓ Bewaren"}</Btn>
             <Btn disabled={!current} onClick={() => current && setDetails(current.id)} className="justify-center py-2.5" title="i">ⓘ Details</Btn>
             <Btn disabled={!current} onClick={() => current && setEditor({ id: current.id })} className="justify-center py-2.5" title="e">✎ Bewerken</Btn>
@@ -547,7 +573,7 @@ export function SwipeManager() {
                   <div className="min-w-0 flex-1">
                     <p className={`truncate font-medium ${e.undone ? "text-slate-400 line-through" : "text-slate-800"}`}>{e.title}</p>
                     <p className="text-[11.5px] text-slate-500">
-                      {e.decision === "keep" ? (e.card.deleted ? "hersteld" : "behouden") : e.decision === "delete" ? "verwijderd" : "later bekijken"}
+                      {e.decision === "keep" ? (e.card.deleted ? "hersteld" : "behouden") : e.decision === "delete" ? "naar de prullenbak" : "later bekijken"}
                       {" · "}
                       {e.status === "saving" && <span className="text-amber-700">opslaan…</span>}
                       {e.status === "saved" && !e.undone && <span className="text-emerald-700">opgeslagen ✓</span>}
@@ -569,7 +595,7 @@ export function SwipeManager() {
             </ul>
           )}
           <div className="border-t border-slate-100 px-3 py-2 text-[11.5px] text-slate-500">
-            <Badge tone="blue">Tip</Badge> Behouden is jouw keuze, niet de technische verificatie. Verwijderde activiteiten verdwijnen overal en worden door geen enkel proces teruggezet.
+            <Badge tone="blue">Tip</Badge> Behouden is jouw keuze, niet de technische verificatie. Wat in de prullenbak staat verdwijnt overal en wordt door geen enkel proces teruggezet. Pas "Prullenbak legen" wist het definitief.
           </div>
         </Panel>
       </div>
@@ -596,8 +622,10 @@ export function SwipeManager() {
           onDecide={decideFromDrawer}
           onEdit={(c) => { setDetails(null); setEditor({ id: c.id }); }}
           onReresearch={toggleReresearch}
+          onPurge={(c) => setPurge({ ids: [c.id] })}
         />
       )}
+      {purge && <PurgeDialog ids={purge.ids} onClose={() => setPurge(null)} onDone={afterPurge} />}
       {editor && (
         <ActivityEditorModal
           activityId={editor.id}

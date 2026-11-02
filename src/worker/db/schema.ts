@@ -1300,6 +1300,8 @@ export const activityContactLinks = sqliteTable(
  *   delete — must be gone from all of VIBIN; every import/audit/research process skips it
  *   later  — skipped for now, no verdict
  *   none   — decision undone, back to "not reviewed yet"
+ *   purged — emptied from the trash: the activity row is GONE for good; this row stays as a tombstone
+ *            (title_key/url_key + a small JSON snapshot in `note`) so nothing can quietly re-add it
  * Deleting is a soft state (activities.active=0, status='inactive'): the row, its id and every
  * relation (votes, matches, plans, statistics) stay intact. `prev_*` is the visible state to
  * return to when the activity is restored. `title_key`/`url_key` let an import recognise a
@@ -1312,7 +1314,7 @@ export const ownerActivityDecisions = sqliteTable(
   "owner_activity_decisions",
   {
     activityId: text("activity_id").primaryKey(),
-    decision: text("decision", { enum: ["keep", "delete", "later", "none"] }).notNull(),
+    decision: text("decision", { enum: ["keep", "delete", "later", "none", "purged"] }).notNull(),
     /** Optimistic-lock counter: a change is only accepted when the caller saw the current version. */
     version: integer("version").notNull().default(1),
     prevActive: integer("prev_active"),

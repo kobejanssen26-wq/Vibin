@@ -42,13 +42,28 @@ for n in new:
 r = subprocess.run(["node", os.path.join(root, "scripts/audit/validate-research.mjs"), tmp_in, tmp_out, os.path.join(work, "validated")], capture_output=True, text=True)
 print(r.stdout.strip().splitlines()[-1] if r.stdout.strip() else r.stderr[-300:])
 
+# Activities the owner emptied from the trash (Swipe Manager) no longer exist in production: skip them.
+skip_file = os.path.join(tempfile.mkdtemp(), "purged-ids.txt")
+purged_ids = []
+q = subprocess.run(
+    ["npx", "wrangler", "d1", "execute", "vibin-db", "--remote", "--json", "--command", "SELECT activity_id FROM owner_activity_decisions WHERE decision = 'purged'"],
+    capture_output=True, text=True, cwd=root,
+)
+try:
+    purged_ids = [r["activity_id"] for r in json.loads(q.stdout[q.stdout.index("["):])[0]["results"]]
+except Exception:
+    print("note: could not read the purged ids (migration 0016 not applied yet?); continuing without")
+open(skip_file, "w").write("\n".join(purged_ids))
+if purged_ids:
+    print(f"skipping {len(purged_ids)} activities the owner deleted for good")
+
 # SQL for the new batches only
 tmp_val = tempfile.mkdtemp()
 for n in new:
     shutil.copy(os.path.join(work, "validated", f"{n}.json"), tmp_val)
 sql_dir = os.path.join(work, "sql-new")
 shutil.rmtree(sql_dir, ignore_errors=True)
-r = subprocess.run(["python3", "-I", os.path.join(root, "scripts/audit/make-research-sql.py"), db, an, ev, tmp_val, sql_dir, "--only-agent"], capture_output=True, text=True)
+r = subprocess.run(["python3", "-I", os.path.join(root, "scripts/audit/make-research-sql.py"), db, an, ev, tmp_val, sql_dir, "--only-agent", "--skip-ids", skip_file], capture_output=True, text=True)
 rep = json.load(open(os.path.join(sql_dir, "report.json")))
 print({k: v for k, v in rep.items() if k in ("research_rows", "verdict_approved", "verdict_fix_data", "verdict_manual", "verdict_exclude", "verdict_duplicate", "verdict_closed", "hidden_by_research_closed", "hidden_by_research_exclude", "hidden_by_research_duplicate", "marked_verified", "website_corrections_applied", "duplicate_rejected", "exclude_unproven", "statements")})
 if dry:

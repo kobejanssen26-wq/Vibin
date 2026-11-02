@@ -39,7 +39,7 @@ try:
     owner = {r["activity_id"]: dict(r) for r in db.execute("select activity_id, decision, reresearch from owner_activity_decisions")}
 except sqlite3.OperationalError:
     pass  # snapshot from before migration 0016: no owner decisions exist yet
-skipped_by_owner = [a for a in acts if owner.get(a, {}).get("decision") in ("delete", "later")]
+skipped_by_owner = [a for a in acts if owner.get(a, {}).get("decision") in ("delete", "later", "purged")]
 for a in skipped_by_owner:
     del acts[a]
 if skipped_by_owner:

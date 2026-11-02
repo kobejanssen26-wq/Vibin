@@ -92,9 +92,9 @@ export async function findLookalikes(env: Env, a: { title: string; city: string 
     }
   }
   const del = await env.DB.prepare(
-    `SELECT d.activity_id AS id, coalesce(a.title, '(onbekend)') AS title, d.title_key AS tk, d.url_key AS uk
+    `SELECT d.activity_id AS id, coalesce(a.title, json_extract(d.note, '$.title'), '(onbekend)') AS title, d.title_key AS tk, d.url_key AS uk
        FROM owner_activity_decisions d LEFT JOIN activities a ON a.id = d.activity_id
-      WHERE d.decision = 'delete' AND ((?1 IS NOT NULL AND d.title_key = ?1) OR (?2 IS NOT NULL AND d.url_key = ?2)) LIMIT 5`,
+      WHERE d.decision IN ('delete', 'purged') AND ((?1 IS NOT NULL AND d.title_key = ?1) OR (?2 IS NOT NULL AND d.url_key = ?2)) LIMIT 5`,
   ).bind(tKey, uKey).all<{ id: string; title: string; tk: string | null; uk: string | null }>();
   for (const r of del.results) deleted.push({ id: r.id, title: r.title, reason: r.tk === tKey ? "Eerder verwijderd: zelfde naam en plaats" : "Eerder verwijderd: zelfde website" });
   return { duplicates, deleted };

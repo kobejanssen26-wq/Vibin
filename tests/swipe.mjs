@@ -180,6 +180,7 @@ async function main() {
   const S = (method, p, body) => call(admin, method, `/api/admin/cc/swipe${p}`, body, method === "GET" ? {} : csrf());
   const CC = (method, p, body) => call(admin, method, `/api/admin/cc${p}`, body, method === "GET" ? {} : csrf());
   const decide = (id, decision, expectedVersion) => S("POST", "/decide", { activityId: id, decision, expectedVersion });
+  const anonPurge = () => call(jar(), "POST", "/api/admin/cc/swipe/trash/purge", { confirm: "x", mode: "all", expectedCount: 0 });
   const act = (id) => dbq(`SELECT active, status FROM activities WHERE id='${id}'`)[0];
   const dec = (id) => dbq(`SELECT decision, version, prev_active, prev_status FROM owner_activity_decisions WHERE activity_id='${id}'`)[0];
 
@@ -516,6 +517,92 @@ async function main() {
   ok("opnieuw laten onderzoeken (alleen voor behouden activiteiten)", r.status === 200 && dec("s1") && dbq("SELECT reresearch FROM owner_activity_decisions WHERE activity_id='s1'")[0].reresearch === 1, r.data);
   r = await S("POST", "/reresearch", { activityId: "s8", expectedVersion: 1, on: true });
   ok("…niet voor een verwijderde activiteit", r.status === 409, r.data);
+
+  /* ---- the trash: emptying it deletes for good ---- */
+  console.log("\nprullenbak · legen = definitief verwijderen");
+  const countActs = () => dbq("SELECT COUNT(*) AS n FROM activities")[0].n;
+  const trashRows = () => dbq("SELECT d.activity_id AS id FROM owner_activity_decisions d JOIN activities a ON a.id = d.activity_id WHERE d.decision = 'delete' AND a.active = 0").map((x) => x.id);
+  // a group really uses one activity: both members like it → a match; then the owner deletes it
+  r = await M("GET", `/groups/${gid}/swipe`);
+  const usedId = r.data.queue.map((c) => c.activity.id).find((id) => !dec(id));
+  ok("er is een kaart zonder eerdere beslissing voor de match-test", !!usedId, r.data.queue.map((c) => c.activity.id));
+  await M("POST", `/groups/${gid}/swipe`, { activityId: usedId, value: "like" });
+  r = await M2("POST", `/groups/${gid}/swipe`, { activityId: usedId, value: "like" });
+  ok("beide leden liken → de groep heeft een match", !!r.data.newMatch, r.data);
+  const usedV = (await S("GET", `/activity/${usedId}`)).data.card.version;
+  r = await decide(usedId, "delete", usedV);
+  ok("de eigenaar verwijdert een activiteit waar een groep een match voor heeft (naar de prullenbak)", r.status === 200, r.data);
+  ok("de match van de groep bestaat nog (soft delete)", dbq(`SELECT COUNT(*) AS n FROM matches WHERE activity_id='${usedId}'`)[0].n === 1);
+
+  const inTrash = trashRows();
+  r = await anonPurge();
+  ok("zonder sessie: legen → 401", r.status === 401, r.status);
+  r = await S("GET", "/trash");
+  ok("voorbeeld: aantal in de prullenbak klopt met de database", r.status === 200 && r.data.total === inTrash.length, { got: r.data.total, db: inTrash.length });
+  ok("voorbeeld: de activiteit met een match wordt als 'in gebruik' gemeld", r.data.inUse === 1 && r.data.deletable === inTrash.length - 1 && r.data.impact.matches >= 1, r.data);
+  const actsBefore = countActs();
+  ok("voorbeeld wijzigt niets (read-only)", actsBefore === countActs() && trashRows().length === inTrash.length);
+  const phrase = r.data.phrase;
+  const deletable = r.data.deletable;
+  r = await S("POST", "/trash/purge", { confirm: "ja", mode: "all", expectedCount: deletable });
+  ok("zonder de exacte bevestigingszin wordt er niets verwijderd (400)", r.status === 400 && r.data.details?.code === "confirm_phrase" && countActs() === actsBefore, r.data);
+  r = await S("POST", "/trash/purge", { confirm: phrase, mode: "all", expectedCount: deletable + 3 });
+  ok("andere telling dan de eigenaar zag → 409 en niets verwijderd", r.status === 409 && r.data.details?.code === "count_changed" && r.data.details.count === deletable && countActs() === actsBefore, r.data);
+  r = await S("POST", "/trash/purge", { confirm: phrase, mode: "selected", activityIds: ["s2", "s3"], expectedCount: 0 });
+  ok("een actieve/behouden activiteit kan nooit definitief verwijderd worden (0 verwijderd)", r.status === 200 && r.data.purged === 0 && countActs() === actsBefore && act("s2") && act("s3"), r.data);
+
+  const kept = dbq("SELECT COUNT(*) AS n FROM owner_activity_decisions WHERE decision IN ('keep','later')")[0].n;
+  const votesOfTrash = dbq(`SELECT COUNT(*) AS n FROM activity_votes WHERE activity_id IN (${inTrash.filter((x) => x !== usedId).map((x) => `'${x}'`).join(",") || "''"})`)[0].n;
+  r = await S("POST", "/trash/purge", { confirm: phrase, mode: "all", expectedCount: deletable });
+  ok("prullenbak legen: alles zonder match/plan is definitief weg", r.status === 200 && r.data.purged === deletable && r.data.remaining === 0, r.data);
+  const purgedIds = inTrash.filter((x) => x !== usedId);
+  ok("database: die rijen bestaan niet meer", purgedIds.every((id) => dbq(`SELECT COUNT(*) AS n FROM activities WHERE id='${id}'`)[0].n === 0));
+  ok("database: de rest is ongemoeid (actief/behouden/later + de activiteit met match)", countActs() === actsBefore - deletable && dbq("SELECT COUNT(*) AS n FROM owner_activity_decisions WHERE decision IN ('keep','later')")[0].n === kept && act(usedId));
+  ok("database: hun stemmen/afhankelijke gegevens zijn mee verdwenen", dbq(`SELECT COUNT(*) AS n FROM activity_votes WHERE activity_id IN (${purgedIds.map((x) => `'${x}'`).join(",")})`)[0].n === 0 && votesOfTrash >= 0);
+  const tomb = dbq(`SELECT decision, note, title_key FROM owner_activity_decisions WHERE activity_id='${purgedIds[0]}'`)[0];
+  ok("tombstone blijft: besluit 'purged' + kleine momentopname + sleutels", tomb?.decision === "purged" && JSON.parse(tomb.note).title && tomb.title_key, tomb);
+  ok("logboek bewaart elke definitieve verwijdering", dbq("SELECT COUNT(*) AS n FROM owner_decision_log WHERE kind = 'purge'")[0].n === deletable);
+  r = await S("GET", "/summary");
+  ok("voortgang: 1 in de prullenbak (de activiteit met match), de rest definitief gewist", r.data.deleted === 1 && r.data.purged === deletable, r.data);
+  r = await S("GET", "/queue?review=delete&visibility=all");
+  ok("prullenbak toont nog alleen de activiteit met een match", r.data.cards.length === 1 && r.data.cards[0].id === usedId);
+  r = await S("GET", `/activity/${purgedIds[0]}`);
+  ok("een definitief verwijderde activiteit bestaat nergens meer (404)", r.status === 404);
+  r = await call(member, "GET", `/api/activities/${purgedIds[0]}`);
+  ok("ook niet in de gewone VIBIN-app (404)", r.status === 404);
+
+  // nothing may bring a purged venue back by accident
+  const purgedTitle = JSON.parse(tomb.note);
+  r = await S("POST", "/activities", fresh({ title: purgedTitle.title, city: purgedTitle.city ?? "Gent", websiteUrl: purgedTitle.website ?? "https://x-niet-bestaand.be" }));
+  ok("opnieuw toevoegen van een definitief gewiste activiteit → 409 'previously_deleted'", r.status === 409 && r.data.details?.code === "previously_deleted", r.data);
+  const csv2 = `title,city,category,location_label,price_band,description,website_url\n${purgedTitle.title},${purgedTitle.city ?? ""},sport,Gent,10_25,Leuk,${purgedTitle.website ?? ""}\n`;
+  r = await CC("POST", "/activities/import/preview", { csv: csv2 });
+  ok("CSV-import herkent een definitief gewiste activiteit en neemt hem niet opnieuw op", r.status === 200 && (r.data.errors ?? []).some((e) => /eigenaar verwijderd/i.test(e.message)), r.data);
+  // the research pipeline: a result made BEFORE the purge must not break on an activity that no longer exists
+  const skipFile = path.join(work, "purged.txt");
+  fs.writeFileSync(skipFile, purgedIds.join("\n"));
+  fs.rmSync(path.join(work, "sql2"), { recursive: true, force: true });
+  execFileSync("python3", ["-I", path.join(ROOT, "scripts/audit/make-research-sql.py"), snap, path.join(work, "an"), path.join(work, "ev.jsonl"), path.join(work, "val"), path.join(work, "sql2"), "--only-agent", "--skip-ids", skipFile], { stdio: "pipe" });
+  const regenerated = fs.readdirSync(path.join(work, "sql2")).filter((f) => f.endsWith(".sql")).map((f) => fs.readFileSync(path.join(work, "sql2", f), "utf8")).join("\n");
+  ok("onderzoeks-SQL slaat definitief gewiste activiteiten over (geen verwijzing naar hun id)", purgedIds.every((id) => !regenerated.includes(`'${id}'`)), purgedIds);
+  let applied = true;
+  try {
+    for (const f of fs.readdirSync(path.join(work, "sql2")).filter((x) => x.endsWith(".sql"))) sqlFile(path.join(work, "sql2", f));
+  } catch (e) {
+    applied = false;
+  }
+  ok("…en die SQL kan zonder fouten op de database worden toegepast", applied);
+
+  // the activity a group has a match for: only with explicit permission, and then its match goes too
+  r = await S("GET", "/trash");
+  ok("de activiteit met match staat nog in de prullenbak (standaard beschermd)", r.data.total === 1 && r.data.inUse === 1 && r.data.deletable === 0, r.data);
+  r = await S("POST", "/trash/purge", { confirm: phrase, mode: "all", expectedCount: 0 });
+  ok("standaard legen laat de activiteit met match staan (0 verwijderd)", r.status === 200 && r.data.purged === 0 && !!act(usedId));
+  r = await S("POST", "/trash/purge", { confirm: phrase, mode: "all", expectedCount: 1, includeInUse: true });
+  ok("met expliciete toestemming (includeInUse) gaat ook die weg", r.status === 200 && r.data.purged === 1, r.data);
+  ok("…en de match van de groep verdwijnt daarmee (cascade), tombstone blijft", dbq(`SELECT COUNT(*) AS n FROM matches WHERE activity_id='${usedId}'`)[0].n === 0 && dec(usedId).decision === "purged");
+  r = await S("POST", "/trash/purge", { confirm: phrase, mode: "all", expectedCount: 0 });
+  ok("nogmaals legen is onschadelijk (idempotent)", r.status === 200 && r.data.purged === 0);
 
   console.log(`\n${pass} geslaagd, ${fail} mislukt`);
   await stop();

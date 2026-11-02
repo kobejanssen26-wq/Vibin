@@ -75,7 +75,19 @@ export interface SwipeSummary {
   unresearched: number;
   manual: number;
   reresearch: number;
+  /** emptied from the trash: gone for good */
+  purged: number;
   categories: { id: string; label: string }[];
+}
+
+/** What emptying the trash would take along (read-only preview). */
+export interface TrashPreview {
+  total: number;
+  inUse: number;
+  deletable: number;
+  impact: { votes: number; deckSlots: number; matches: number; plans: number };
+  sample: { id: string; title: string; city: string | null; inUse: boolean }[];
+  phrase: string;
 }
 
 export interface SwipeFilters {

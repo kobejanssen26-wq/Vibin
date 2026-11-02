@@ -40,6 +40,11 @@ def q(v):
 
 
 acts = {r["id"]: dict(r) for r in db.execute("select * from activities where active=1")}
+# Activities the owner emptied from the trash no longer exist in production: any INSERT for them would break a
+# foreign key. process-new.py fetches the purged ids right before applying and passes them here.
+if "--skip-ids" in sys.argv:
+    for _skip in open(sys.argv[sys.argv.index("--skip-ids") + 1]).read().split():
+        acts.pop(_skip, None)
 audit = {r["activity_id"]: dict(r) for r in db.execute("select * from activity_audits")}
 profile = json.load(open(os.path.join(an_dir, "profile.json")))
 queue = json.load(open(os.path.join(an_dir, "queue.json")))

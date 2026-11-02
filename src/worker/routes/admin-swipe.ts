@@ -227,7 +227,7 @@ app.get("/swipe/summary", async (c) => {
   if (new URL(c.req.url).searchParams.get("light") === "1") {
     const r = await c.env.DB.prepare(`SELECT decision AS k, COUNT(*) AS n FROM owner_activity_decisions GROUP BY decision`).all<{ k: string; n: number }>();
     const m = Object.fromEntries(r.results.map((x) => [x.k, x.n]));
-    return c.json({ keep: m.keep ?? 0, deleted: m.delete ?? 0, later: m.later ?? 0 });
+    return c.json({ keep: m.keep ?? 0, deleted: m.delete ?? 0, later: m.later ?? 0, purged: m.purged ?? 0 });
   }
   const row = await c.env.DB.prepare(
     `SELECT COUNT(*) AS total,
@@ -238,7 +238,8 @@ app.get("/swipe/summary", async (c) => {
             SUM(r.activity_id IS NOT NULL) AS researched,
             SUM(r.activity_id IS NULL) AS unresearched,
             SUM(u.outcome = 'manual' OR r.verdict = 'manual') AS manual,
-            SUM(d.reresearch = 1) AS reresearch
+            SUM(d.reresearch = 1) AS reresearch,
+            (SELECT COUNT(*) FROM owner_activity_decisions WHERE decision = 'purged') AS purged
        FROM activities a
        LEFT JOIN owner_activity_decisions d ON d.activity_id = a.id
        LEFT JOIN activity_audits u ON u.activity_id = a.id
@@ -257,6 +258,7 @@ app.get("/swipe/summary", async (c) => {
     unresearched: n("unresearched"),
     manual: n("manual"),
     reresearch: n("reresearch"),
+    purged: n("purged"),
     categories: ACTIVITY_CATEGORIES.map((x) => ({ id: x.id, label: x.label })),
   });
 });
@@ -566,6 +568,121 @@ app.post("/swipe/reresearch", async (c) => {
   }
   await audit(c, { action: b.on ? "swipe.reresearch" : "swipe.reresearch_off", targetType: "activity", targetId: row.id });
   return c.json({ ok: true, version: cur.version + 1, reresearch: b.on });
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Trash: emptying it deletes for good                                        */
+/* -------------------------------------------------------------------------- */
+
+/** The sentence the owner has to type before anything is deleted for good. */
+export const PURGE_PHRASE = "DEFINITIEF VERWIJDEREN";
+const PURGE_CHUNK = 40; // ids per batch (D1 allows 100 bound values per statement)
+const PURGE_MAX_PER_CALL = 600; // keeps one request well under the Worker's query limit; the screen repeats the call
+
+const IN_USE = `(EXISTS (SELECT 1 FROM matches m WHERE m.activity_id = a.id) OR EXISTS (SELECT 1 FROM plans p WHERE p.activity_id = a.id))`;
+
+/** What is in the trash, and exactly what emptying it would take along. Read-only. */
+async function trashPreview(env: Env, ids?: string[]) {
+  const scope = ids?.length ? `AND a.id IN (${ph(ids.length)})` : "";
+  const binds = ids?.length ? ids : [];
+  const base = `FROM owner_activity_decisions d JOIN activities a ON a.id = d.activity_id WHERE d.decision = 'delete' AND a.active = 0 ${scope}`;
+  const [tot, impact, sample] = await env.DB.batch([
+    env.DB.prepare(`SELECT COUNT(*) AS total, COALESCE(SUM(${IN_USE}), 0) AS inUse ${base}`).bind(...binds),
+    env.DB.prepare(
+      `SELECT
+         (SELECT COUNT(*) FROM activity_votes v WHERE v.activity_id IN (SELECT a.id ${base})) AS votes,
+         (SELECT COUNT(*) FROM group_activity_pool g WHERE g.activity_id IN (SELECT a.id ${base})) AS deckSlots,
+         (SELECT COUNT(*) FROM matches m WHERE m.activity_id IN (SELECT a.id ${base})) AS matches,
+         (SELECT COUNT(*) FROM plans p WHERE p.activity_id IN (SELECT a.id ${base})) AS plans`,
+    ).bind(...binds), // numbered placeholders (?1…) are reused inside the statement: bind each value once
+    env.DB.prepare(`SELECT a.id, a.title, a.city, ${IN_USE} AS inUse ${base} ORDER BY d.decided_at DESC LIMIT 8`).bind(...binds),
+  ]);
+  const t = tot!.results[0] as { total: number; inUse: number };
+  return {
+    total: t.total ?? 0,
+    inUse: t.inUse ?? 0,
+    /** emptied by default: everything that no group has a match or plan for */
+    deletable: (t.total ?? 0) - (t.inUse ?? 0),
+    impact: impact!.results[0] as { votes: number; deckSlots: number; matches: number; plans: number },
+    sample: (sample!.results as Row[]).map((r) => ({ id: r.id, title: r.title, city: r.city, inUse: !!r.inUse })),
+    phrase: PURGE_PHRASE,
+  };
+}
+
+app.get("/swipe/trash", async (c) => {
+  const ids = (new URL(c.req.url).searchParams.get("ids") ?? "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 200);
+  return c.json(await trashPreview(c.env, ids));
+});
+
+const purgeBody = z.object({
+  /** must equal PURGE_PHRASE exactly */
+  confirm: z.string(),
+  mode: z.enum(["all", "selected"]),
+  activityIds: z.array(z.string().min(1).max(80)).max(500).optional(),
+  /** how many the owner saw in the preview — if the trash changed since, nothing is deleted */
+  expectedCount: z.number().int().min(0),
+  /** also delete activities a group has a match or plan for (those matches/plans disappear with them) */
+  includeInUse: z.boolean().default(false),
+});
+
+app.post("/swipe/trash/purge", async (c) => {
+  const b = await parseBody(c, purgeBody);
+  const owner = c.get("adminUserId");
+  if (b.confirm !== PURGE_PHRASE) {
+    throw badRequest(`Typ exact “${PURGE_PHRASE}” om te bevestigen.`, { code: "confirm_phrase" });
+  }
+  if (b.mode === "selected" && !b.activityIds?.length) throw badRequest("Geen activiteiten gekozen.", { code: "no_ids" });
+
+  const selected = b.mode === "selected" ? b.activityIds! : [];
+  const scope = selected.length ? `AND a.id IN (${ph(selected.length)})` : "";
+  const inUseClause = b.includeInUse ? "" : `AND NOT ${IN_USE}`;
+  // ONLY what is in the trash: owner verdict 'delete' and not visible. Active/kept/later activities can never match.
+  const eligible = `FROM owner_activity_decisions d JOIN activities a ON a.id = d.activity_id
+                     WHERE d.decision = 'delete' AND a.active = 0 ${scope} ${inUseClause}`;
+
+  const count = (await c.env.DB.prepare(`SELECT COUNT(*) AS n ${eligible}`).bind(...selected).first<{ n: number }>())?.n ?? 0;
+  if (count !== b.expectedCount) {
+    throw conflict("De prullenbak is veranderd sinds je de telling zag. Er is niets verwijderd; bekijk het opnieuw.", { code: "count_changed", count });
+  }
+  const idRows = await c.env.DB.prepare(`SELECT a.id ${eligible} ORDER BY d.decided_at LIMIT ?${selected.length + 1}`)
+    .bind(...selected, PURGE_MAX_PER_CALL)
+    .all<{ id: string }>();
+  const ids = idRows.results.map((r) => r.id);
+
+  const now = nowSec();
+  let purged = 0;
+  for (let i = 0; i < ids.length; i += PURGE_CHUNK) {
+    const chunk = ids.slice(i, i + PURGE_CHUNK);
+    const inList = ph(chunk.length);
+    const pn = chunk.length;
+    const res = await c.env.DB.batch([
+      // 1. the trace first: log + tombstone (a snapshot small enough to recognise the venue later)
+      c.env.DB.prepare(
+        `INSERT INTO owner_decision_log (activity_id, kind, from_decision, to_decision, version, note, decided_by, decided_at)
+         SELECT d.activity_id, 'purge', 'delete', 'purged', d.version + 1,
+                (SELECT json_object('title', a.title, 'city', a.city, 'website', coalesce(a.website_url, a.provider_website), 'category', a.category_id) FROM activities a WHERE a.id = d.activity_id),
+                ?${pn + 1}, ?${pn + 2}
+           FROM owner_activity_decisions d WHERE d.decision = 'delete' AND d.activity_id IN (${inList})
+            AND EXISTS (SELECT 1 FROM activities x WHERE x.id = d.activity_id AND x.active = 0)`,
+      ).bind(...chunk, owner, now),
+      c.env.DB.prepare(
+        `UPDATE owner_activity_decisions
+            SET decision = 'purged', version = version + 1, decided_by = ?${pn + 1}, decided_at = ?${pn + 2},
+                note = (SELECT json_object('title', a.title, 'city', a.city, 'website', coalesce(a.website_url, a.provider_website), 'category', a.category_id) FROM activities a WHERE a.id = owner_activity_decisions.activity_id)
+          WHERE decision = 'delete' AND activity_id IN (${inList})
+            AND EXISTS (SELECT 1 FROM activities x WHERE x.id = owner_activity_decisions.activity_id AND x.active = 0)`,
+      ).bind(...chunk, owner, now),
+      // 2. then the activity itself; votes, deck slots, matches, plans, research, audit and links go with it (ON DELETE CASCADE)
+      c.env.DB.prepare(
+        `DELETE FROM activities WHERE active = 0 AND id IN (SELECT activity_id FROM owner_activity_decisions WHERE decision = 'purged' AND activity_id IN (${inList}))`,
+      ).bind(...chunk),
+    ]);
+    purged += res[1]?.meta.changes ?? 0;
+  }
+
+  const left = (await c.env.DB.prepare(`SELECT COUNT(*) AS n ${eligible}`).bind(...selected).first<{ n: number }>())?.n ?? 0;
+  await audit(c, { action: "swipe.purge", targetType: "activity", meta: { purged, includeInUse: b.includeInUse, mode: b.mode, ids: ids.slice(0, 50) } });
+  return c.json({ ok: true, purged, remaining: left });
 });
 
 /* -------------------------------------------------------------------------- */

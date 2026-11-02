@@ -9,7 +9,7 @@ import {
   dbRowToFormValues,
   type ActivityFormValues,
 } from "./ActivityForm";
-import type { SwipeCardData } from "./swipe-types";
+import type { SwipeCardData, TrashPreview } from "./swipe-types";
 
 const DAY_LABEL: Record<string, string> = { mon: "ma", tue: "di", wed: "wo", thu: "do", fri: "vr", sat: "za", sun: "zo" };
 const EVIDENCE_LABEL: Record<string, string> = {
@@ -32,12 +32,14 @@ export function DetailsDrawer({
   onDecide,
   onEdit,
   onReresearch,
+  onPurge,
 }: {
   id: string;
   onClose: () => void;
   onDecide: (card: SwipeCardData, decision: "keep" | "delete" | "later") => void;
   onEdit: (card: SwipeCardData) => void;
   onReresearch: (card: SwipeCardData, on: boolean) => void;
+  onPurge: (card: SwipeCardData) => void;
 }) {
   const [card, setCard] = useState<SwipeCardData | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -78,7 +80,10 @@ export function DetailsDrawer({
             {card.imageUrl && <img src={card.imageUrl} alt="" className="h-52 w-full rounded-xl object-cover" />}
             <div className="flex flex-wrap gap-2">
               {card.deleted ? (
-                <Btn variant="primary" onClick={() => onDecide(card, "keep")}>↩ Herstellen</Btn>
+                <>
+                  <Btn variant="primary" onClick={() => onDecide(card, "keep")}>↩ Herstellen</Btn>
+                  <Btn variant="danger" onClick={() => onPurge(card)}>🔥 Definitief verwijderen…</Btn>
+                </>
               ) : (
                 <>
                   <Btn variant="primary" onClick={() => onDecide(card, "keep")}>✓ Behouden</Btn>
@@ -97,7 +102,7 @@ export function DetailsDrawer({
             <Section title="Beslissing">
               <p>
                 {card.decision === "keep" && "Behouden door de eigenaar."}
-                {card.decision === "delete" && "Verwijderd door de eigenaar (kan hersteld worden)."}
+                {card.decision === "delete" && "In de prullenbak: verwijderd door de eigenaar (kan hersteld worden)."}
                 {card.decision === "later" && "Uitgesteld: nog geen definitieve beslissing."}
                 {(!card.decision || card.decision === "none") && "Nog niet beoordeeld."}
                 {card.decidedAt ? ` Laatst gewijzigd: ${date(card.decidedAt)}.` : ""}
@@ -389,6 +394,153 @@ export function ActivityEditorModal({
           )}
           {!form && err && <ErrorNote message={err} />}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Emptying the trash = deleting for good                                    */
+/* -------------------------------------------------------------------------- */
+
+const nl = (n: number) => n.toLocaleString("nl-BE");
+
+export function PurgeDialog({
+  ids,
+  onClose,
+  onDone,
+}: {
+  /** the activities to delete for good; undefined = the whole trash */
+  ids?: string[];
+  onClose: () => void;
+  onDone: (purged: number) => void;
+}) {
+  const [p, setP] = useState<TrashPreview | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [phrase, setPhrase] = useState("");
+  const [withInUse, setWithInUse] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<number | null>(null);
+
+  const load = () => {
+    setP(null);
+    cc<TrashPreview>(`/swipe/trash${ids?.length ? `?ids=${encodeURIComponent(ids.join(","))}` : ""}`)
+      .then(setP)
+      .catch((e) => setErr(e instanceof Error ? e.message : "Kon de prullenbak niet lezen."));
+  };
+  useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !busy) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose, busy]);
+
+  const count = p ? (withInUse ? p.total : p.deletable) : 0;
+  const ready = !!p && phrase === p.phrase && count > 0 && !busy;
+
+  const run = async () => {
+    if (!p) return;
+    setBusy(true);
+    setErr(null);
+    let total = 0;
+    let expected = count;
+    try {
+      // one request deletes at most a few hundred; repeat until the trash is empty
+      for (let i = 0; i < 60; i++) {
+        const r = await cc<{ purged: number; remaining: number }>("/swipe/trash/purge", {
+          method: "POST",
+          body: { confirm: phrase, mode: ids?.length ? "selected" : "all", activityIds: ids, expectedCount: expected, includeInUse: withInUse },
+        });
+        total += r.purged;
+        setDone(total);
+        if (r.remaining <= 0 || r.purged === 0) break;
+        expected = r.remaining;
+      }
+      onDone(total);
+    } catch (e) {
+      if (e instanceof AdminApiError && (e.details as { code?: string } | undefined)?.code === "count_changed") {
+        setErr(`${e.message} Nu staan er ${(e.details as { count: number }).count}.`);
+        setPhrase("");
+        load();
+      } else {
+        setErr(e instanceof Error ? e.message : "Verwijderen mislukt.");
+      }
+      if (total > 0) onDone(total); // part of it was already gone: refresh the screen
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center overflow-y-auto bg-slate-900/60 p-4">
+      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl" role="alertdialog" aria-label="Definitief verwijderen">
+        <header className="rounded-t-2xl bg-rose-600 px-5 py-3 text-white">
+          <h2 className="text-base font-bold">🔥 {ids?.length === 1 ? "Activiteit definitief verwijderen" : "Prullenbak legen"}</h2>
+          <p className="text-[12.5px] text-rose-100">Dit kan niet ongedaan worden gemaakt.</p>
+        </header>
+        <div className="space-y-3 p-5 text-[13px] text-slate-700">
+          {!p && !err && <Loading />}
+          {p && p.total === 0 && <p>De prullenbak is leeg. Er valt niets te verwijderen.</p>}
+          {p && p.total > 0 && (
+            <>
+              <p>
+                <b className="text-slate-900">{nl(count)}</b> {count === 1 ? "activiteit wordt" : "activiteiten worden"} gewist
+                {p.impact.votes + p.impact.deckSlots > 0 && (
+                  <>, samen met {nl(p.impact.votes)} stemmen en {nl(p.impact.deckSlots)} plaatsen in groepsdecks</>
+                )}
+                . Ook hun onderzoeksresultaten, audit en e-mailkoppelingen verdwijnen. Verstuurde mails blijven in het logboek staan.
+              </p>
+              {p.sample.length > 0 && (
+                <ul className="max-h-32 overflow-y-auto rounded-lg bg-slate-50 p-2 text-[12.5px]">
+                  {p.sample.map((x) => (
+                    <li key={x.id}>
+                      {x.title}
+                      {x.city ? ` (${x.city})` : ""} {x.inUse && <Badge tone="amber">match/plan</Badge>}
+                    </li>
+                  ))}
+                  {p.total > p.sample.length && <li className="text-slate-500">… en {nl(p.total - p.sample.length)} andere</li>}
+                </ul>
+              )}
+              {p.inUse > 0 && (
+                <label className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-950">
+                  <input type="checkbox" className="mt-0.5" checked={withInUse} onChange={(e) => setWithInUse(e.target.checked)} disabled={busy} />
+                  <span>
+                    <b>{nl(p.inUse)}</b> {p.inUse === 1 ? "activiteit heeft" : "activiteiten hebben"} een match of plan bij een groep ({nl(p.impact.matches)} matches, {nl(p.impact.plans)} plannen).
+                    Die blijven standaard in de prullenbak. Vink aan om ze ook te wissen: die matches en plannen verdwijnen dan voor die groepen.
+                  </span>
+                </label>
+              )}
+              <p className="text-slate-500">
+                Een definitief gewiste activiteit komt nooit meer terug via import of onderzoek, tenzij je hem zelf opnieuw toevoegt met toestemming.
+              </p>
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold text-slate-700">
+                  Typ <code className="rounded bg-slate-100 px-1">{p.phrase}</code> om te bevestigen
+                </span>
+                <input
+                  className="w-full rounded-md border border-slate-300 px-2.5 py-2 text-[13px] focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+                  value={phrase}
+                  onChange={(e) => setPhrase(e.target.value)}
+                  disabled={busy}
+                  autoComplete="off"
+                  spellCheck={false}
+                  aria-label="Bevestigingszin"
+                />
+              </label>
+            </>
+          )}
+          {err && <ErrorNote message={err} />}
+          {busy && <p className="text-slate-600">Bezig… {done != null ? `${nl(done)} verwijderd` : ""}</p>}
+        </div>
+        <footer className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+          <Btn onClick={onClose} disabled={busy}>Annuleren</Btn>
+          <Btn variant="danger" disabled={!ready} loading={busy} onClick={() => void run()}>
+            {count > 0 ? `Definitief verwijderen (${nl(count)})` : "Definitief verwijderen"}
+          </Btn>
+        </footer>
       </div>
     </div>
   );

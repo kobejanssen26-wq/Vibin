@@ -37,7 +37,7 @@ for (let i = 0; i < statements.length; i += CHUNK_SIZE) {
 // activity back on. Re-assert the owner's verdict (Swipe Manager) and the audit's hidden rows as the
 // very last step. Requires migration 0016 (owner_activity_decisions).
 chunks.push([
-  "UPDATE activities SET active = 0, status = 'inactive' WHERE id IN (SELECT activity_id FROM owner_activity_decisions WHERE decision = 'delete');",
+  "UPDATE activities SET active = 0, status = 'inactive' WHERE id IN (SELECT activity_id FROM owner_activity_decisions WHERE decision IN ('delete', 'purged'));",
   "UPDATE activities SET active = 0 WHERE active = 1 AND id IN (SELECT activity_id FROM activity_audits WHERE hidden = 1);",
 ]);
 
