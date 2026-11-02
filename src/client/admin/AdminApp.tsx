@@ -16,6 +16,7 @@ import { Events } from "./pages/Events";
 import { Providers } from "./pages/Providers";
 import { Outreach } from "./pages/Outreach";
 import { Quality } from "./pages/Quality";
+import { SwipeManager } from "./pages/SwipeManager";
 import { ProviderDetail } from "./pages/ProviderDetail";
 import { Analytics } from "./pages/Analytics";
 import { Funnel } from "./pages/Funnel";
@@ -72,6 +73,7 @@ function AdminRoutes() {
         <Route path="/providers" element={<Providers />} />
         <Route path="/outreach" element={<Outreach />} />
         <Route path="/quality" element={<Quality />} />
+        <Route path="/swipe" element={<SwipeManager />} />
         <Route path="/providers/:id" element={<ProviderDetail />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/funnel" element={<Funnel />} />

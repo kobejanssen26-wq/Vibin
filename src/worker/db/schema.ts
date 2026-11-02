@@ -1290,6 +1290,83 @@ export const activityContactLinks = sqliteTable(
 );
 
 /* -------------------------------------------------------------------------- */
+/*  Owner Swipe Manager — the owner's own verdict on every activity           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The owner's decision per activity. One row per activity (never deleted, so the
+ * `version` only ever goes up and a stale screen can always be detected).
+ *   keep   — may stay in VIBIN (says nothing about whether its data is verified)
+ *   delete — must be gone from all of VIBIN; every import/audit/research process skips it
+ *   later  — skipped for now, no verdict
+ *   none   — decision undone, back to "not reviewed yet"
+ * Deleting is a soft state (activities.active=0, status='inactive'): the row, its id and every
+ * relation (votes, matches, plans, statistics) stay intact. `prev_*` is the visible state to
+ * return to when the activity is restored. `title_key`/`url_key` let an import recognise a
+ * deleted venue that comes back under a new id.
+ *
+ * No foreign key on purpose: the seed pipeline refreshes activity rows with INSERT OR REPLACE,
+ * and a cascading FK would let a reseed wipe the owner's verdict. An orphan row is harmless.
+ */
+export const ownerActivityDecisions = sqliteTable(
+  "owner_activity_decisions",
+  {
+    activityId: text("activity_id").primaryKey(),
+    decision: text("decision", { enum: ["keep", "delete", "later", "none"] }).notNull(),
+    /** Optimistic-lock counter: a change is only accepted when the caller saw the current version. */
+    version: integer("version").notNull().default(1),
+    prevActive: integer("prev_active"),
+    prevStatus: text("prev_status"),
+    titleKey: text("title_key"),
+    urlKey: text("url_key"),
+    /** The owner asked for this activity to be researched (again). */
+    reresearch: integer("reresearch").notNull().default(0),
+    note: text("note"),
+    decidedBy: text("decided_by"),
+    decidedAt: integer("decided_at").notNull().default(now),
+  },
+  (t) => ({
+    decisionIdx: index("owner_activity_decisions_decision_idx").on(t.decision),
+    titleKeyIdx: index("owner_activity_decisions_title_key_idx").on(t.titleKey),
+    urlKeyIdx: index("owner_activity_decisions_url_key_idx").on(t.urlKey),
+  }),
+);
+
+/**
+ * Append-only log of every owner decision. No foreign key on purpose: the log must outlive
+ * anything. `prev_*` + `prev_audit` hold the exact state before the change so "undo" restores
+ * it precisely.
+ */
+export const ownerDecisionLog = sqliteTable(
+  "owner_decision_log",
+  {
+    seq: integer("seq").primaryKey({ autoIncrement: true }),
+    activityId: text("activity_id").notNull(),
+    /** decide | restore | undo | create | reresearch */
+    kind: text("kind").notNull(),
+    fromDecision: text("from_decision"),
+    toDecision: text("to_decision"),
+    /** The version of the decision row AFTER this change. */
+    version: integer("version").notNull(),
+    /** The activity's active/status before the change. */
+    prevActive: integer("prev_active"),
+    prevStatus: text("prev_status"),
+    /** The decision row's own restore target (prev_active/prev_status) before the change. */
+    prevDecActive: integer("prev_dec_active"),
+    prevDecStatus: text("prev_dec_status"),
+    /** JSON of the activity_audits row before the change (null = there was none). */
+    prevAudit: text("prev_audit"),
+    undone: integer("undone").notNull().default(0),
+    note: text("note"),
+    decidedBy: text("decided_by"),
+    decidedAt: integer("decided_at").notNull().default(now),
+  },
+  (t) => ({
+    activityIdx: index("owner_decision_log_activity_idx").on(t.activityId, t.seq),
+  }),
+);
+
+/* -------------------------------------------------------------------------- */
 /*  Owner Command Center — provider outreach                                  */
 /* -------------------------------------------------------------------------- */
 

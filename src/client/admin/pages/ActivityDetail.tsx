@@ -5,6 +5,7 @@ import { useResource } from "../lib";
 import {
   ActivityForm,
   activityFormToBody,
+  dbRowToFormValues,
   type ActivityFormValues,
 } from "../components/ActivityForm";
 import {
@@ -22,64 +23,6 @@ import {
   fmtNum,
   fmtPct,
 } from "../ui";
-
-function safeJsonArray(s: unknown): string[] {
-  if (typeof s !== "string") return [];
-  try {
-    const v = JSON.parse(s);
-    return Array.isArray(v) ? v : [];
-  } catch {
-    return [];
-  }
-}
-function safeJsonObject(s: unknown): Record<string, string> {
-  if (typeof s !== "string") return {};
-  try {
-    const v = JSON.parse(s);
-    return v && typeof v === "object" ? v : {};
-  } catch {
-    return {};
-  }
-}
-
-function dbRowToFormValues(a: Record<string, unknown>): ActivityFormValues {
-  const s = (v: unknown) => (v == null ? "" : String(v));
-  return {
-    title: s(a.title),
-    description: s(a.description),
-    categoryId: s(a.category_id),
-    subcategory: s(a.subcategory),
-    provider: s(a.provider),
-    providerWebsite: s(a.provider_website),
-    locationLabel: s(a.location_label),
-    address: s(a.address),
-    city: s(a.city),
-    country: s(a.country) || "BE",
-    lat: a.lat != null ? String((a.lat as number) / 1e6) : "",
-    lng: a.lng != null ? String((a.lng as number) / 1e6) : "",
-    priceType: s(a.price_type) || "per_person",
-    priceCents: a.price_cents != null ? String(a.price_cents) : "",
-    priceBand: s(a.price_band) || "free",
-    durationMin: a.duration_min != null ? String(a.duration_min) : "",
-    minParticipants: a.min_participants != null ? String(a.min_participants) : "",
-    maxParticipants: a.max_participants != null ? String(a.max_participants) : "",
-    minAge: a.min_age != null ? String(a.min_age) : "",
-    indoorOutdoor: s(a.indoor_outdoor),
-    accessibility: s(a.accessibility),
-    hours: safeJsonObject(a.opening_hours),
-    websiteUrl: s(a.website_url),
-    bookingUrl: s(a.booking_url),
-    ticketUrl: s(a.ticket_url),
-    imageUrl: s(a.image_url),
-    imageSource: s(a.image_source),
-    imageAttribution: s(a.image_attribution),
-    tags: safeJsonArray(a.tags).join(", "),
-    source: s(a.source) || "admin",
-    sourceUrl: s(a.source_url),
-    status: s(a.status) || "needs_review",
-    active: a.active !== 0,
-  };
-}
 
 const STATUS_TONE: Record<string, string> = {
   verified: "green",

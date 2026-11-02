@@ -30,6 +30,20 @@ queue = json.load(open(os.path.join(an_dir, "queue.json")))
 clusters = json.load(open(os.path.join(an_dir, "clusters.json")))
 acts = {r["id"]: dict(r) for r in db.execute("select * from activities where active=1")}
 audit = {r["activity_id"]: dict(r) for r in db.execute("select * from activity_audits")}
+
+# Owner scope (Swipe Manager). The owner's verdict outranks the queue:
+#   delete -> never researched, later -> not researched until decided, keep -> first (re-research requests before that).
+# Everything else (no verdict yet) is still researched, but after the activities the owner kept.
+owner = {}
+try:
+    owner = {r["activity_id"]: dict(r) for r in db.execute("select activity_id, decision, reresearch from owner_activity_decisions")}
+except sqlite3.OperationalError:
+    pass  # snapshot from before migration 0016: no owner decisions exist yet
+skipped_by_owner = [a for a in acts if owner.get(a, {}).get("decision") in ("delete", "later")]
+for a in skipped_by_owner:
+    del acts[a]
+if skipped_by_owner:
+    print(f"owner scope: {len(skipped_by_owner)} activities skipped (deleted or postponed by the owner)")
 ev = {}
 for line in open(ev_path):
     try:
@@ -76,7 +90,7 @@ for aid in acts:
 groups = []
 seen = set()
 for aid in sorted(queue):
-    if aid in seen or aid in done:
+    if aid in seen or aid in done or aid not in acts:
         continue
     root = find(aid)
     grp = sorted(members.get(root, {aid}) | {aid})
@@ -92,7 +106,9 @@ def priority(grp):
     dup = any("duplicate_candidate" in queue.get(a, []) for a in grp)
     site = any(any(f.startswith("site_") or f in ("closed_signal", "name_mismatch") for f in profile[a]["flags"]) for a in grp)
     nosite = all("no_website" in profile[a]["flags"] for a in grp)
-    return (0 if reach else 1, 0 if (shared or dup) else 1, 0 if site else 1, 1 if nosite else 0, -len(grp))
+    again = any(owner.get(a, {}).get("reresearch") for a in grp)
+    kept = any(owner.get(a, {}).get("decision") == "keep" for a in grp)
+    return (0 if again else 1, 0 if kept else 1, 0 if reach else 1, 0 if (shared or dup) else 1, 0 if site else 1, 1 if nosite else 0, -len(grp))
 
 
 groups.sort(key=priority)

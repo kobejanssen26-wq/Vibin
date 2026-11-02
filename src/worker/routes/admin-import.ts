@@ -18,6 +18,7 @@ import { parseBody } from "../lib/validate";
 import { audit } from "../lib/audit";
 import { allowedStatus, assessActivity } from "../lib/activity-quality";
 import { parseCsvToRecords } from "../lib/csv";
+import { reliableUrlKey, titleKey } from "../lib/owner-swipe";
 import {
   ACTIVITY_CSV_COLUMNS,
   REQUIRED_CSV_HEADERS,
@@ -53,6 +54,33 @@ const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
 const normUrl = (s: string | null | undefined) =>
   (s ?? "").trim().toLowerCase().replace(/\/+$/, "");
 
+/**
+ * Everything the owner deleted in the Swipe Manager. An import must never bring such an activity
+ * back (not by id, not as a "new" row for the same venue) — that needs the owner's explicit
+ * "Activiteit toevoegen" in the Swipe Manager.
+ */
+async function loadOwnerDeleted(env: Env) {
+  const r = await env.DB.prepare(
+    `SELECT activity_id AS id, title_key AS tk, url_key AS uk FROM owner_activity_decisions WHERE decision = 'delete'`,
+  ).all<{ id: string; tk: string | null; uk: string | null }>();
+  const ids = new Set<string>();
+  const titles = new Set<string>();
+  const urls = new Set<string>();
+  for (const x of r.results) {
+    ids.add(x.id);
+    if (x.tk) titles.add(x.tk);
+    if (x.uk) urls.add(x.uk);
+  }
+  const matches = (d: { title: string; city: string | null; websiteUrl: string | null; providerWebsite: string | null }) => {
+    const tk = titleKey(d.title, d.city);
+    const uk = reliableUrlKey(d.websiteUrl) ?? reliableUrlKey(d.providerWebsite);
+    return (!!tk && titles.has(tk)) || (!!uk && urls.has(uk));
+  };
+  return { ids, matches };
+}
+const DELETED_ROW_MSG =
+  "Eerder door de eigenaar verwijderd (Swipe Manager) en wordt niet opnieuw geïmporteerd. Voeg hem zo nodig handmatig toe via de Swipe Manager.";
+
 /* ------------------------------- preview -------------------------------- */
 app.post("/activities/import/preview", async (c) => {
   const { csv } = await parseBody(c, z.object({ csv: z.string().min(1).max(30_000_000) }));
@@ -86,6 +114,8 @@ app.post("/activities/import/preview", async (c) => {
     }
   }
 
+  const ownerDeleted = await loadOwnerDeleted(c.env);
+
   const errors: { row: number; message: string }[] = [];
   const duplicates: {
     row: number;
@@ -114,6 +144,11 @@ app.post("/activities/import/preview", async (c) => {
       return;
     }
     const data = parsed.data;
+
+    if ((idCell && ownerDeleted.ids.has(idCell)) || ownerDeleted.matches(data)) {
+      if (errors.length < PREVIEW_LIST_CAP) errors.push({ row, message: DELETED_ROW_MSG });
+      return;
+    }
 
     if (idCell) {
       const target = byId.get(idCell);
@@ -227,6 +262,17 @@ app.post("/activities/import/confirm", async (c) => {
     }
   }
 
+  // The owner may have deleted something since the preview was made: check again at write time.
+  const delNow = await loadOwnerDeleted(c.env);
+  let skippedDeleted = 0;
+  for (let k = ops.length - 1; k >= 0; k--) {
+    const op = ops[k]!;
+    if (delNow.ids.has(op.id) || delNow.matches(op.data)) {
+      ops.splice(k, 1);
+      skippedDeleted++;
+    }
+  }
+
   let created = 0;
   let updated = 0;
   for (let i = 0; i < ops.length; i += BATCH_SIZE) {
@@ -284,9 +330,9 @@ app.post("/activities/import/confirm", async (c) => {
   await c.env.KV.delete(`import:${importId}`);
   await audit(c, {
     action: "activities.imported",
-    meta: { created, updated, skipped, total: prepared.length },
+    meta: { created, updated, skipped, skippedDeleted, total: prepared.length },
   });
-  return c.json({ created, updated, skipped });
+  return c.json({ created, updated, skipped, skippedDeleted });
 });
 
 export default app;

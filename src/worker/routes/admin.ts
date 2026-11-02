@@ -12,11 +12,12 @@ import {
   users,
 } from "../db/schema";
 import { parseBody } from "../lib/validate";
-import { badRequest, notFound } from "../lib/errors";
-import { newId } from "../lib/id";
+import { badRequest, conflict, notFound } from "../lib/errors";
 import { ACTIVITY_CATEGORIES } from "@shared/constants";
-import { activityInput, ensureAdminProvider, scaleLatLng } from "../lib/activity-input";
-import { allowedStatus, assessActivity, essentialFieldsChanged, QUALITY_RULE } from "../lib/activity-quality";
+import { activityInput, scaleLatLng } from "../lib/activity-input";
+import { allowedStatus, essentialFieldsChanged, QUALITY_RULE } from "../lib/activity-quality";
+import { assessInput, findLookalikes, insertAdminActivity } from "../lib/activity-create";
+import { audit } from "../lib/audit";
 
 type Ctx = { Bindings: Env; Variables: Vars };
 const app = new Hono<Ctx>();
@@ -162,49 +163,28 @@ app.get("/activities", async (c) => {
 });
 
 app.post("/activities", async (c) => {
-  const db = createDb(c.env);
   const body = await parseBody(c, activityInput);
-  const verdict = assessActivity({
-    title: body.title,
-    provider: body.provider,
-    category_id: body.categoryId,
-    subcategory: body.subcategory,
-    source: "web",
-    description: body.description,
-    website_url: body.websiteUrl,
-  });
-  if (verdict.outcome === "exclude" && verdict.confidence !== "low" && new URL(c.req.url).searchParams.get("force") !== "1") {
+  const verdict = assessInput(body);
+  const url = new URL(c.req.url);
+  if (verdict.outcome === "exclude" && verdict.confidence !== "low" && url.searchParams.get("force") !== "1") {
     throw badRequest(`${verdict.reason} ${QUALITY_RULE} (regel: ${verdict.rule}; voeg ?force=1 toe om als eigenaar toch toe te voegen.)`);
   }
-  const providerId = await ensureAdminProvider(c.env);
-  const now = Math.floor(Date.now() / 1000);
-  const id = newId();
-  // "verified" needs the basics to exist; everything else starts as needs_review.
-  const status = (allowedStatus(body.status, body) ?? "needs_review") as typeof body.status;
-  await db.insert(activities).values({
-    id,
-    providerId,
-    externalId: `admin-${id}`,
-    ...body,
-    status,
-    lat: scaleLatLng(body.lat) ?? null,
-    lng: scaleLatLng(body.lng) ?? null,
-    tags: JSON.stringify(body.tags),
-    openingHours: JSON.stringify(body.openingHours),
-    lastVerifiedAt: status === "verified" ? now : null,
-    active: body.active ? 1 : 0,
-    createdAt: now,
-    updatedAt: now,
-  });
-  // Every active record gets an audit row; without evidence it can never start out "approved".
-  await c.env.DB.prepare(
-    `INSERT OR IGNORE INTO activity_audits (activity_id, outcome, rule, reason, confidence, issues, hidden, source, audited_at)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, 'rules', ?7)`,
-  )
-    .bind(id, verdict.outcome === "exclude" ? "manual" : verdict.outcome, verdict.rule, verdict.reason, verdict.confidence, JSON.stringify(verdict.issues), now)
-    .run();
+  // The owner's earlier "delete" in the Swipe Manager must never be undone by a form submit.
+  const { deleted } = await findLookalikes(c.env, body);
+  if (deleted.length && url.searchParams.get("allowExcluded") !== "1") {
+    throw conflict("Een gelijkaardige activiteit heb je eerder verwijderd (Swipe Manager). Herstel die, of voeg toch toe met ?allowExcluded=1.", { code: "previously_deleted", deleted });
+  }
+  const { id } = await insertAdminActivity(c.env, body, verdict);
+  await audit(c, { action: "activity.create", targetType: "activity", targetId: id });
   return c.json({ id }, 201);
 });
+
+/** True when the owner deleted this activity in the Swipe Manager (only the Swipe Manager may bring it back). */
+async function ownerDeleted(env: Env, id: string): Promise<boolean> {
+  const r = await env.DB.prepare(`SELECT 1 AS x FROM owner_activity_decisions WHERE activity_id = ?1 AND decision = 'delete'`).bind(id).first();
+  return !!r;
+}
+const DELETED_MSG = "Deze activiteit is door de eigenaar verwijderd. Herstel hem eerst in de Swipe Manager.";
 
 app.put("/activities/:id", async (c) => {
   const db = createDb(c.env);
@@ -213,6 +193,7 @@ app.put("/activities/:id", async (c) => {
     where: eq(activities.id, c.req.param("id")),
   });
   if (!existing) throw notFound();
+  if (body.active === true && (await ownerDeleted(c.env, existing.id))) throw conflict(DELETED_MSG, { code: "deleted" });
   const now = Math.floor(Date.now() / 1000);
   // Changing what identifies the venue voids an earlier verification (re-verify explicitly afterwards).
   const changed = essentialFieldsChanged(
@@ -238,12 +219,14 @@ app.put("/activities/:id", async (c) => {
       updatedAt: now,
     })
     .where(eq(activities.id, c.req.param("id")));
+  await audit(c, { action: "activity.update", targetType: "activity", targetId: existing.id, meta: { fields: Object.keys(body) } });
   return c.json({ ok: true, ...(demote ? { demoted: changed, note: "De verificatie is vervallen omdat gegevens van de locatie zijn gewijzigd." } : {}) });
 });
 
 /** Quick "I checked this and it's still current" action (§27). */
 app.post("/activities/:id/verify", async (c) => {
   const db = createDb(c.env);
+  if (await ownerDeleted(c.env, c.req.param("id"))) throw conflict(DELETED_MSG, { code: "deleted" });
   const now = Math.floor(Date.now() / 1000);
   await db
     .update(activities)

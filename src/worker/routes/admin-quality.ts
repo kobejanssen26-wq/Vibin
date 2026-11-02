@@ -109,6 +109,11 @@ app.post("/quality/activity/:id", async (c) => {
     .bind(id)
     .first<{ active: number; status: string; hidden: number | null; pa: number | null; ps: string | null }>();
   if (!cur) throw notFound("Activiteit niet gevonden.");
+  // The Swipe Manager verdict wins: a deleted activity only comes back through "Behouden/Herstellen" there.
+  const swiped = await c.env.DB.prepare(`SELECT decision FROM owner_activity_decisions WHERE activity_id = ?1`).bind(id).first<{ decision: string }>();
+  if (swiped?.decision === "delete" && b.decision !== "exclude") {
+    throw conflict("Deze activiteit is door de eigenaar verwijderd (Swipe Manager). Herstel hem daar eerst.", { code: "deleted" });
+  }
   const now = nowSec();
   const owner = c.get("adminUserId");
   const outcome = b.decision === "exclude" ? "exclude" : b.decision === "manual" ? "manual" : "approved";
@@ -158,12 +163,14 @@ app.post("/quality/restore-rule", async (c) => {
           SET active = COALESCE((SELECT previous_active FROM activity_audits u WHERE u.activity_id = activities.id), 1),
               status = COALESCE((SELECT previous_status FROM activity_audits u WHERE u.activity_id = activities.id), 'needs_review'),
               updated_at = ?2
-        WHERE id IN (SELECT activity_id FROM activity_audits WHERE rule = ?1 AND hidden = 1 AND source = 'rules')`,
+        WHERE id IN (SELECT activity_id FROM activity_audits WHERE rule = ?1 AND hidden = 1 AND source = 'rules')
+          AND id NOT IN (SELECT activity_id FROM owner_activity_decisions WHERE decision = 'delete')`,
     ).bind(b.rule, now),
     c.env.DB.prepare(
       `UPDATE activity_audits SET outcome = 'manual', hidden = 0, source = 'owner', decided_by = ?2,
               reason = 'Hersteld door de eigenaar (regel ' || rule || ' ongedaan gemaakt).', audited_at = ?3
-        WHERE rule = ?1 AND hidden = 1 AND source = 'rules'`,
+        WHERE rule = ?1 AND hidden = 1 AND source = 'rules'
+          AND activity_id NOT IN (SELECT activity_id FROM owner_activity_decisions WHERE decision = 'delete')`,
     ).bind(b.rule, c.get("adminUserId"), now),
   ]);
   const restored = res[0]?.meta.changes ?? 0;

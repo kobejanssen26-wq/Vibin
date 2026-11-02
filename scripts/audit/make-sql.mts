@@ -4,6 +4,8 @@
  *  2. hide excluded / duplicate / closed activities (soft: active=0, status inactive|outdated),
  *     only when the row was not edited since the export (admin edits win)
  *  3. mark the audit rows whose activity really got hidden
+ * The owner's verdict outranks all of this: owner-sourced audit rows are never overwritten and an
+ * activity the owner kept/deleted in the Swipe Manager is never hidden by a rule.
  * Nothing is deleted. Apply with: wrangler d1 execute vibin-db --remote --file data/audit/sql/NN.sql
  */
 import fs from "node:fs";
@@ -23,8 +25,10 @@ for (let i = 0; i < ids.length; i += 40) {
     const a = byId.get(id);
     return `(${q(id)},${q(d.outcome)},${q(d.rule)},${q(d.reason)},${q(d.confidence)},${q(JSON.stringify(d.issues))},${q(d.duplicateOf ?? null)},0,${a.active},${q(a.status)},'rules',NULL,${now})`;
   });
+  // Upsert, never REPLACE: an owner verdict (source='owner', e.g. from the Swipe Manager) must survive a re-run.
   stmts.push(
-    `INSERT OR REPLACE INTO activity_audits (activity_id,outcome,rule,reason,confidence,issues,duplicate_of,hidden,previous_active,previous_status,source,decided_by,audited_at) VALUES\n${vals.join(",\n")};`,
+    `INSERT INTO activity_audits (activity_id,outcome,rule,reason,confidence,issues,duplicate_of,hidden,previous_active,previous_status,source,decided_by,audited_at) VALUES\n${vals.join(",\n")}\n` +
+      `ON CONFLICT(activity_id) DO UPDATE SET outcome=excluded.outcome, rule=excluded.rule, reason=excluded.reason, confidence=excluded.confidence, issues=excluded.issues, duplicate_of=excluded.duplicate_of, hidden=excluded.hidden, previous_active=excluded.previous_active, previous_status=excluded.previous_status, source=excluded.source, decided_by=excluded.decided_by, audited_at=excluded.audited_at WHERE activity_audits.source != 'owner';`,
   );
 }
 for (const id of ids) {
@@ -32,7 +36,7 @@ for (const id of ids) {
   if (!HIDE.has(d.outcome)) continue;
   const a = byId.get(id);
   const status = d.outcome === "closed" ? "outdated" : "inactive";
-  stmts.push(`UPDATE activities SET active=0, status=${q(status)}, updated_at=${now} WHERE id=${q(id)} AND active=1 AND updated_at<=${a.updated_at};`);
+  stmts.push(`UPDATE activities SET active=0, status=${q(status)}, updated_at=${now} WHERE id=${q(id)} AND active=1 AND updated_at<=${a.updated_at} AND NOT EXISTS (SELECT 1 FROM owner_activity_decisions od WHERE od.activity_id=${q(id)} AND od.decision IN ('keep','delete'));`);
 }
 stmts.push(
   `UPDATE activity_audits SET hidden=1 WHERE outcome IN ('exclude','duplicate','closed') AND activity_id IN (SELECT id FROM activities WHERE active=0 AND status IN ('inactive','outdated'));`,

@@ -174,6 +174,18 @@ for aid, rec in recs.items():
 
 # ---------- statements ----------
 HIDE = {"exclude": "inactive", "duplicate": "inactive", "closed": "outdated"}
+
+
+def not_deleted(aid):
+    """The owner deleted it in the Swipe Manager: no research result may touch the activity itself."""
+    return f"NOT EXISTS (SELECT 1 FROM owner_activity_decisions od WHERE od.activity_id={q(aid)} AND od.decision='delete')"
+
+
+def owner_decided(aid):
+    """The owner kept or deleted it: research may inform, but never hides or re-activates it."""
+    return f"NOT EXISTS (SELECT 1 FROM owner_activity_decisions od WHERE od.activity_id={q(aid)} AND od.decision IN ('keep','delete'))"
+
+
 for aid, rec in recs.items():
     a = acts[aid]
     au = audit.get(aid, {})
@@ -189,7 +201,7 @@ for aid, rec in recs.items():
     rep["method_" + rec["method"]] += 1
     rep["verdict_" + rec["verdict"]] += 1
     for c in auto:
-        stmts.append(f"UPDATE activities SET website_url={q(c['to'])}, updated_at={NOW} WHERE id={q(aid)} AND website_url={q(c['from'])};")
+        stmts.append(f"UPDATE activities SET website_url={q(c['to'])}, updated_at={NOW} WHERE id={q(aid)} AND website_url={q(c['from'])} AND {not_deleted(aid)};")
         rep["website_corrections_applied"] += 1
     owner = au.get("source") == "owner"
     if rec["verdict"] in HIDE and not owner and a["active"] == 1:
@@ -201,7 +213,7 @@ for aid, rec in recs.items():
             f"previous_active=CASE WHEN activity_audits.hidden=1 THEN activity_audits.previous_active ELSE 1 END, previous_status=CASE WHEN activity_audits.hidden=1 THEN activity_audits.previous_status ELSE {q(a['status'])} END, "
             f"source='research', audited_at={NOW} WHERE activity_audits.source != 'owner';"
         )
-        stmts.append(f"UPDATE activities SET active=0, status={q(HIDE[rec['verdict']])}, updated_at={NOW} WHERE id={q(aid)} AND active=1 AND updated_at<={a['updated_at']} AND NOT EXISTS (SELECT 1 FROM activity_audits u WHERE u.activity_id={q(aid)} AND u.source='owner');")
+        stmts.append(f"UPDATE activities SET active=0, status={q(HIDE[rec['verdict']])}, updated_at={NOW} WHERE id={q(aid)} AND active=1 AND updated_at<={a['updated_at']} AND NOT EXISTS (SELECT 1 FROM activity_audits u WHERE u.activity_id={q(aid)} AND u.source='owner') AND {owner_decided(aid)};")
         stmts.append(f"UPDATE activity_audits SET hidden=1 WHERE activity_id={q(aid)} AND source='research' AND EXISTS (SELECT 1 FROM activities x WHERE x.id={q(aid)} AND x.active=0);")
         rep["hidden_by_research_" + rec["verdict"]] += 1
     elif not owner and rec["verdict"] in ("approved", "fix_data", "manual") and au and (au.get("outcome") != rec["verdict"] or rec["method"] == "agent"):
@@ -212,7 +224,7 @@ for aid, rec in recs.items():
         )
         rep["audit_updated"] += 1
     if rec["verdict"] in ("approved", "fix_data") and rec["existence"] == "confirmed" and rec["suitability"] == "fit" and a["status"] == "needs_review":
-        stmts.append(f"UPDATE activities SET status='verified', last_verified_at={NOW}, web_status='alive', web_checked_at={NOW} WHERE id={q(aid)} AND status='needs_review' AND active=1;")
+        stmts.append(f"UPDATE activities SET status='verified', last_verified_at={NOW}, web_status='alive', web_checked_at={NOW} WHERE id={q(aid)} AND status='needs_review' AND active=1 AND {not_deleted(aid)};")
         rep["marked_verified"] += 1
 
 # ---------- contacts + links ----------

@@ -33,6 +33,14 @@ for (let i = 0; i < statements.length; i += CHUNK_SIZE) {
   chunks.push(statements.slice(i, i + CHUNK_SIZE));
 }
 
+// The seed refreshes activity rows with INSERT OR REPLACE, which would switch a deleted/hidden
+// activity back on. Re-assert the owner's verdict (Swipe Manager) and the audit's hidden rows as the
+// very last step. Requires migration 0016 (owner_activity_decisions).
+chunks.push([
+  "UPDATE activities SET active = 0, status = 'inactive' WHERE id IN (SELECT activity_id FROM owner_activity_decisions WHERE decision = 'delete');",
+  "UPDATE activities SET active = 0 WHERE active = 1 AND id IN (SELECT activity_id FROM activity_audits WHERE hidden = 1);",
+]);
+
 const tmp = mkdtempSync(join(tmpdir(), "vibin-seed-"));
 console.log(
   `Applying ${statements.length} statements to ${mode.slice(2)} D1 in ${chunks.length} chunk(s) of <=${CHUNK_SIZE}...`,

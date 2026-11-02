@@ -112,6 +112,8 @@ async function buildSwipeState(
     .where(
       and(
         eq(groupActivityPool.groupId, groupId),
+        // an activity the owner deleted (or the audit hid) never shows up again in a running deck
+        eq(activities.active, 1),
         notVotedBy(db, groupId, userId),
         notMatchedIn(db, groupId),
       ),
@@ -360,6 +362,12 @@ app.post("/:id/swipe", async (c) => {
     ),
   });
   if (!inDeck) throw badRequest("That activity isn't in this group's deck.");
+  // A stale card for an activity that was removed meanwhile must not create votes or matches.
+  const live = await db.query.activities.findFirst({
+    where: and(eq(activities.id, body.activityId), eq(activities.active, 1)),
+    columns: { id: true },
+  });
+  if (!live) throw conflict("This activity isn't available any more.");
 
   const already = await db.query.matches.findFirst({
     where: and(
