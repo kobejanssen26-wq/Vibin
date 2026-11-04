@@ -7,6 +7,8 @@ export const SETTINGS = {
   ownerSetupCompletedAt: "owner_setup_completed_at",
   maintenanceMode: "maintenance_mode",
   maintenanceMessage: "maintenance_message",
+  /** Salted hash of the "binnenkort" preview access code (see lib/preview-access.ts). Never the code itself. */
+  previewAccessCode: "preview_access_code",
 } as const;
 
 export async function getSetting(

@@ -15,6 +15,7 @@ import {
 interface SettingsResp {
   maintenanceMode: boolean;
   maintenanceMessage: string;
+  previewAccessSet: boolean;
   encryptionConfigured: boolean;
   recoveryConfigured: boolean;
   emailConfigured: boolean;
@@ -26,6 +27,7 @@ export function Settings() {
     "settings",
   );
   const [msg, setMsg] = useState("");
+  const [code, setCode] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
@@ -97,6 +99,63 @@ export function Settings() {
               >
                 Save message
               </Btn>
+            </div>
+          </Panel>
+
+          <Panel
+            title="Toegangscode (binnenkort-pagina)"
+            subtitle="Terwijl onderhoud/binnenkort aanstaat kun je met deze code toch de echte site openen. Bewaard als hash, nooit leesbaar."
+          >
+            <div className="space-y-2">
+              <Badge tone={(data.previewAccessSet ? "green" : "red") as never}>
+                {data.previewAccessSet ? "Code ingesteld" : "Geen code — niemand komt binnen"}
+              </Badge>
+              <Field label="Nieuwe code (min. 6 tekens)">
+                <div className="flex flex-wrap gap-2">
+                  <Input
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder="bv. VIBIN-2026-xxxx"
+                    className="w-64"
+                    autoComplete="off"
+                  />
+                  <Btn
+                    variant="neutral"
+                    onClick={() => {
+                      const abc = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+                      const r = crypto.getRandomValues(new Uint8Array(12));
+                      setCode([...r].map((b) => abc[b % abc.length]).join("").replace(/(.{4})(?=.)/g, "$1-"));
+                    }}
+                  >
+                    Willekeurige code
+                  </Btn>
+                </div>
+              </Field>
+              <div className="flex flex-wrap gap-2">
+                <Btn
+                  loading={busy === "preview_access_code"}
+                  disabled={code.trim().length < 6}
+                  onClick={async () => {
+                    await put("preview_access_code", code.trim());
+                    setNote(`Code opgeslagen: ${code.trim()} — bewaar hem nu, hij is hierna niet meer te zien. Oude toegangen zijn ongeldig.`);
+                    setCode("");
+                  }}
+                >
+                  Code opslaan
+                </Btn>
+                {data.previewAccessSet && (
+                  <Btn
+                    variant="danger"
+                    onClick={() => {
+                      if (window.confirm("Code verwijderen? Dan komt niemand meer langs de binnenkort-pagina (behalve via /admin).")) {
+                        void put("preview_access_code", "");
+                      }
+                    }}
+                  >
+                    Code verwijderen
+                  </Btn>
+                )}
+              </div>
             </div>
           </Panel>
 

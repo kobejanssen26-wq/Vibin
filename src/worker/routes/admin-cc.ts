@@ -45,6 +45,7 @@ import {
 } from "../lib/activity-csv-columns";
 import { audit } from "../lib/audit";
 import { SETTINGS, getSetting, setSetting } from "../lib/system-settings";
+import { PREVIEW_CODE_MAX, PREVIEW_CODE_MIN, makeStoredCode } from "../lib/preview-access";
 
 type Ctx = { Bindings: Env; Variables: Vars };
 const app = new Hono<Ctx>();
@@ -2638,16 +2639,20 @@ app.delete("/flags/:key", async (c) => {
 const SETTABLE = new Set<string>([
   SETTINGS.maintenanceMode,
   SETTINGS.maintenanceMessage,
+  SETTINGS.previewAccessCode,
 ]);
 
 app.get("/settings", async (c) => {
-  const [maint, msg] = await Promise.all([
+  const [maint, msg, previewCode] = await Promise.all([
     getSetting(c.env, SETTINGS.maintenanceMode),
     getSetting(c.env, SETTINGS.maintenanceMessage),
+    getSetting(c.env, SETTINGS.previewAccessCode),
   ]);
   return c.json({
     maintenanceMode: maint === "1",
     maintenanceMessage: msg ?? "",
+    // Only whether a code exists — the stored value is a salted hash and never leaves the server.
+    previewAccessSet: !!previewCode,
     encryptionConfigured: hasEncryptionKey(c.env),
     recoveryConfigured: !!c.env.OWNER_RECOVERY_SECRET,
     emailConfigured: !!c.env.EMAIL_API_KEY,
@@ -2663,6 +2668,21 @@ app.put("/settings", async (c) => {
     }),
   );
   if (!SETTABLE.has(body.key)) throw badRequest("That setting is not writable.");
+  if (body.key === SETTINGS.previewAccessCode) {
+    // The owner types the plain code; only a salted hash is stored. Empty value = remove the code
+    // (which also invalidates every pass already handed out).
+    const plain = body.value.trim();
+    if (plain && (plain.length < PREVIEW_CODE_MIN || plain.length > PREVIEW_CODE_MAX)) {
+      throw badRequest(`The access code must be ${PREVIEW_CODE_MIN}–${PREVIEW_CODE_MAX} characters.`);
+    }
+    await setSetting(c.env, body.key, plain ? await makeStoredCode(plain) : "", c.get("adminUserId"));
+    await audit(c, {
+      action: plain ? "preview_access.set" : "preview_access.cleared",
+      targetType: "setting",
+      targetId: body.key,
+    });
+    return c.json({ ok: true });
+  }
   // maintenance mode is boolean-ish
   const value =
     body.key === SETTINGS.maintenanceMode

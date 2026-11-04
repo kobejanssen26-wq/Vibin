@@ -1,10 +1,13 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
+import { getCookie, setCookie } from "hono/cookie";
 import { secureHeaders } from "hono/secure-headers";
 import type { Env, Vars } from "./env";
 import { AppError, toResponse } from "./lib/errors";
 import { trackNow } from "./lib/analytics";
 import { getSetting, SETTINGS } from "./lib/system-settings";
+import { PREVIEW_COOKIE, PREVIEW_PASS_DAYS, signPass, verifyCode, verifyPass } from "./lib/preview-access";
+import { clientIp, rateLimit } from "./lib/ratelimit";
 import { withSession, requireAuth } from "./middleware/auth";
 import { withAdminSession, requireOwner } from "./middleware/admin";
 import { createDb } from "./db/client";
@@ -95,39 +98,93 @@ api.get("/health", (c) => c.json({ ok: true }));
 
 /* Public status: lets the SPA render a maintenance screen before it hits a
    protected route. Never reveals anything sensitive. */
-let maintCache: { at: number; on: boolean; msg: string } | null = null;
+let maintCache: { at: number; on: boolean; msg: string; code: string | null } | null = null;
 async function maintenanceState(env: Env) {
   if (maintCache && Date.now() - maintCache.at < 15_000) return maintCache;
-  const [on, msg] = await Promise.all([
+  const [on, msg, code] = await Promise.all([
     getSetting(env, SETTINGS.maintenanceMode),
     getSetting(env, SETTINGS.maintenanceMessage),
+    getSetting(env, SETTINGS.previewAccessCode),
   ]);
   maintCache = {
     at: Date.now(),
     on: on === "1",
     msg: msg ?? "",
+    code: code || null,
   };
   return maintCache;
 }
+
+/** True when this browser entered the preview access code (signed, expiring cookie). */
+async function hasPreviewPass(c: Context, m: { code: string | null }): Promise<boolean> {
+  if (!m.code) return false;
+  return verifyPass(m.code, getCookie(c, PREVIEW_COOKIE));
+}
+
 api.get("/status", async (c) => {
   const m = await maintenanceState(c.env);
-  return c.json({ maintenance: m.on, message: m.msg });
+  // A browser holding a valid preview pass sees the real app, not the maintenance screen.
+  const open = m.on && (await hasPreviewPass(c, m));
+  return c.json({ maintenance: m.on && !open, message: m.msg, preview: open });
+});
+
+/* Preview access code: lets the owner (or anyone given the code) in while the site is in
+   "binnenkort" mode. Accepts the coming-soon page's plain form post (303 back to "/") and
+   JSON ({ code }) alike. Failures are generic and rate limited per IP. */
+api.post("/access", async (c) => {
+  const isForm = !(c.req.header("content-type") ?? "").includes("application/json");
+  const back = (flag?: string) => c.redirect(flag ? `/?toegang=${flag}` : "/", 303);
+  let code = "";
+  try {
+    if (isForm) {
+      const body = await c.req.parseBody();
+      code = typeof body.code === "string" ? body.code : "";
+    } else {
+      const body = (await c.req.json()) as { code?: unknown };
+      code = typeof body.code === "string" ? body.code : "";
+    }
+  } catch {
+    code = "";
+  }
+  try {
+    await rateLimit(c.env, "preview-access", clientIp(c.req.raw), 8, 600);
+  } catch {
+    return isForm
+      ? back("wacht")
+      : c.json({ error: "rate_limited", message: "Te veel pogingen. Probeer het later opnieuw." }, 429);
+  }
+  const m = await maintenanceState(c.env);
+  if (!code || code.length > 128 || !(await verifyCode(m.code, code))) {
+    return isForm
+      ? back("fout")
+      : c.json({ error: "invalid_code", message: "Die code klopt niet." }, 401);
+  }
+  setCookie(c, PREVIEW_COOKIE, await signPass(m.code!), {
+    httpOnly: true,
+    secure: c.env.APP_ENV !== "development",
+    sameSite: "Lax",
+    path: "/",
+    maxAge: PREVIEW_PASS_DAYS * 86400,
+  });
+  return isForm ? back() : c.json({ ok: true });
 });
 
 /* When maintenance mode is on, the whole normal-user API returns 503. The
-   Owner Command Center (/admin/*), the liveness probe and this status route
-   stay reachable so the owner can still work and turn it back off. */
+   Owner Command Center (/admin/*), the liveness probe, this status route and the
+   access-code route stay reachable so the owner can still work and turn it back
+   off. A browser with a valid preview pass is let through like normal. */
 api.use("*", async (c, next) => {
   const path = new URL(c.req.url).pathname;
   if (
     path === "/api/health" ||
     path === "/api/status" ||
+    path === "/api/access" ||
     path.startsWith("/api/admin/")
   ) {
     return next();
   }
   const m = await maintenanceState(c.env);
-  if (m.on) {
+  if (m.on && !(await hasPreviewPass(c, m))) {
     return c.json(
       { error: "maintenance", message: m.msg || "VIBIN is briefly down for maintenance." },
       503,
@@ -267,7 +324,13 @@ app.get("/.well-known/assetlinks.json", (c) => {
  * reachable, so the owner can still sign in and turn it off. The API is
  * already answering 503 to everyone but admins (see the maintenance middleware). */
 const COMING_SOON_ALLOW = /^\/(admin(\/|$)|assets\/|\.well-known\/|optout\/|icons?\/|favicon|manifest|robots\.txt|apple-touch)/;
-const comingSoonHtml = (msg: string) => `<!doctype html>
+const esc = (t: string) =>
+  t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const GATE_NOTE: Record<string, string> = {
+  fout: "Die code klopt niet.",
+  wacht: "Te veel pogingen. Probeer het over een paar minuten opnieuw.",
+};
+const comingSoonHtml = (msg: string, gate?: string | null) => `<!doctype html>
 <html lang="nl"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
@@ -283,12 +346,25 @@ const comingSoonHtml = (msg: string) => `<!doctype html>
   p{color:#b9bfdc;margin:0 0 10px}
   .pill{display:inline-block;margin-top:14px;padding:6px 14px;border-radius:999px;background:#ffffff14;color:#dfe3f7;font-size:14px}
   a{color:#7d96ff;font-size:13px;text-decoration:none}
+  details{margin-top:26px}
+  summary{cursor:pointer;color:#8f97bd;font-size:13px;list-style:none}
+  summary::-webkit-details-marker{display:none}
+  form{display:flex;gap:8px;justify-content:center;margin-top:12px}
+  input{width:190px;padding:10px 14px;border-radius:10px;border:1px solid #ffffff2e;background:#ffffff10;color:#fff;font:inherit;text-align:center;letter-spacing:.08em}
+  input:focus{outline:2px solid #7d96ff;outline-offset:1px}
+  button{padding:10px 18px;border-radius:10px;border:0;background:#b6f23a;color:#0b0e1c;font:inherit;font-weight:700;cursor:pointer}
+  .err{color:#ff9aa8;font-size:13px;margin-top:10px}
 </style></head><body><main>
 <svg width="72" height="72" viewBox="0 0 72 72" aria-hidden="true"><path d="M14 10 L36 52" stroke="#3155ff" stroke-width="12" stroke-linecap="round" fill="none"/><path d="M58 10 L36 52" stroke="#b6f23a" stroke-width="12" stroke-linecap="round" fill="none"/><circle cx="36" cy="54" r="7" fill="#fff"/></svg>
 <h1>VI<b>BIN</b></h1>
-<p>${msg}</p>
+<p>${esc(msg)}</p>
 <span class="pill">Binnenkort beschikbaar</span>
-<p style="margin-top:28px"><a href="/admin">Beheer</a></p>
+<details${gate ? " open" : ""}><summary>Heb je een toegangscode?</summary>
+<form method="post" action="/api/access" autocomplete="off">
+<input name="code" type="password" placeholder="Toegangscode" aria-label="Toegangscode" autocomplete="off" autocapitalize="off" required maxlength="128"${gate ? " autofocus" : ""}>
+<button type="submit">Open</button>
+</form>${gate && GATE_NOTE[gate] ? `<p class="err" role="alert">${GATE_NOTE[gate]}</p>` : ""}</details>
+<p style="margin-top:22px"><a href="/admin">Beheer</a></p>
 </main></body></html>`;
 
 app.all("*", async (c) => {
@@ -299,8 +375,8 @@ app.all("*", async (c) => {
     !/\.[a-z0-9]{2,5}$/i.test(url.pathname);
   if (isPageNav) {
     const m = await maintenanceState(c.env);
-    if (m.on) {
-      return c.html(comingSoonHtml(m.msg || "We werken aan iets moois. Tot snel!"), 503, {
+    if (m.on && !(await hasPreviewPass(c, m))) {
+      return c.html(comingSoonHtml(m.msg || "We werken aan iets moois. Tot snel!", url.searchParams.get("toegang")), 503, {
         "cache-control": "no-store",
         "retry-after": "3600",
         "x-content-type-options": "nosniff",
