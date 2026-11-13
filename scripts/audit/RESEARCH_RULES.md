@@ -5,6 +5,24 @@ writer: **never invent** an address, e-mail address, price, website, opening hou
 If you cannot verify something, say so (`unverified` / `not_found` / `unclear`). A wrong
 "verified" is far worse than an honest "unknown".
 
+## Budget (strict)
+
+All research agents share one usage limit, and the cost of a run grows with every step because
+the whole conversation so far is re-read at each tool call: a run of 300 steps costs roughly ten
+times a run of 100 steps (measured: batches that ran away to 200-350 steps used up a whole
+5-hour limit without finishing). So:
+
+- At most about **12 tool calls per activity** and about **100 in total** for the batch.
+- Go source by source: the activity's own website first (the input already holds a crawl of it),
+  then at most one or two corroborating sources. Read only the relevant part of a page
+  (grep/sed around the facts you need), never dump whole pages.
+- Do not write helper scripts or replicas of the audit validator. The tooling checks quotes for
+  you; copy short verbatim snippets (6-25 words) from visible text of pages you opened.
+- When an activity's budget is used up, stop and record honestly what is verified and what is
+  not (verdict `manual`, evidence status `unverified`) and say exactly what is unclear. A
+  documented unknown is better than an expensive guess: the owner reviews `manual` cases
+  separately.
+
 ## What VIBIN is (suitability)
 
 VIBIN helps friends discover and pick activities to do together. A record is suitable when it
