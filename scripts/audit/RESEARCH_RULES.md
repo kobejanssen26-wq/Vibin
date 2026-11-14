@@ -12,7 +12,7 @@ the whole conversation so far is re-read at each tool call: a run of 300 steps c
 times a run of 100 steps (measured: batches that ran away to 200-350 steps used up a whole
 5-hour limit without finishing). So:
 
-- At most about **12 tool calls per activity** and about **100 in total** for the batch.
+- At most about **12 tool calls per activity** (so about 50 for a batch of 4, about 100 for 8).
 - Go source by source: the activity's own website first (the input already holds a crawl of it),
   then at most one or two corroborating sources. Read only the relevant part of a page
   (grep/sed around the facts you need), never dump whole pages.
