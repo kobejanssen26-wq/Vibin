@@ -13,6 +13,9 @@ times a run of 100 steps (measured: batches that ran away to 200-350 steps used 
 5-hour limit without finishing). So:
 
 - At most about **12 tool calls per activity** (so about 50 for a batch of 4, about 100 for 8).
+  That is a ceiling, not a target: measured runs that stayed near 6-8 calls per activity were
+  about 40% cheaper than runs that used the full 12, with the same kind of verdicts. Stop as
+  soon as an activity is settled; only go towards 12 when it is genuinely hard.
 - Go source by source: the activity's own website first (the input already holds a crawl of it),
   then at most one or two corroborating sources. Read only the relevant part of a page
   (grep/sed around the facts you need), never dump whole pages.
