@@ -45,29 +45,33 @@ nohup bash scripts/audit/run-driver.sh $S > /dev/null 2>&1 &
 
 ## Research agents
 
-One agent per batch (`research/in/batch-N.in.json` → `research/out/batch-N.json`). The agent prompt is:
+An agent does one or more batches (`research/in/batch-N.in.json` → `research/out/batch-N.json`, one output file per
+batch, written once). The whole task description is in `scripts/audit/AGENT_TASK.md`, so the launch message (the
+`prompt` of the Agent call) is just:
 
-> You are a catalogue research agent for VIBIN (Belgian activity discovery app). Read scripts/audit/RESEARCH_RULES.md
-> completely first and follow it exactly, including its "Budget (strict)" section. Input: <in file>. Output: write ONE
-> JSON file with the Write tool to <out file> in exactly the format given under "Output" in the rules. Open pages with
-> WebFetch if you have it; if it is unavailable or returns an empty page, fetch the final URL with `curl -sL` in Bash.
-> Search results are never evidence; open the page. Today's date is <date> (use it for `checkedAt`). Keep every quote
-> verbatim from a page you actually opened. Never invent data, never decode protected e-mail addresses, never send any
-> e-mail or probe mailboxes. Write the output file only once, when every activity is finished. Before replying, check
-> that the file parses and has one result per input activity in the same order. Reply with exactly one line:
-> `done batch-N <n> results`.
+```
+Read /home/user/Vibin/scripts/audit/AGENT_TASK.md completely and do what it says.
+SCRATCH=<scratch dir>
+BATCHES=3141,3142,3143,3144
+DATE=<today, YYYY-MM-DD>
+```
 
-Rules for the agents live in `scripts/audit/RESEARCH_RULES.md` (evidence format, verdicts, budget).
+Rules for the agents live in `scripts/audit/RESEARCH_RULES.md` (evidence format, verdicts, budget); `AGENT_TASK.md`
+tells them which tools they may use (they must never call session-management tools such as `archive_session`: a cheap
+agent once tried that while looking for a way to "finish").
 
 ### Which model researches what (policy)
 
 * **Activities the owner kept in the Swipe Manager** (and the first, owner-kept batches in general): the default
   (strongest) model, one agent per batch of four. These are the activities that go live first, so the result must be
   as reliable as possible.
-* **Everything else**: a cheaper model (`model: "haiku"` on the Agent call), one agent per *three consecutive
-  batches* (`done batches a,b,c`; it writes `batch-a.json`, `batch-b.json`, `batch-c.json` one after the other). In the
-  pilot this used about half the tokens per activity and was roughly 7 times faster. The machine validation of the
-  quotes is identical, so a weak result is downgraded to `likely`/`manual` instead of being trusted.
+* **Everything else**: a cheaper model (`model: "haiku"` on the Agent call), one agent per *four consecutive
+  batches* (`BATCHES=a,b,c,d`; it writes the four output files one after the other and replies
+  `done batches a,b,c,d`). In the pilot this used about half the tokens per activity and was roughly 7 times faster.
+  The machine validation of the quotes is identical, so a weak result is downgraded to `likely`/`manual` instead of
+  being trusted. It researches leaner (typically 1-3 pages per activity), so more activities end as `manual`.
+* Bookkeeping of what was launched lives in the scratch directory (`next.json`; `python3 -I scripts/audit/status.py <scratch>` prints the progress): batches below the
+  pointers that have no output file are the ones whose agent is still running or died.
 * Owner-kept activities whose cheap-model result ended as `manual` are re-run later with the default model when there
   is budget left.
 * An agent that dies on a usage limit keeps its work: resume it with `SendMessage` (agent id) once the window has reset.
