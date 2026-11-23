@@ -59,6 +59,20 @@ One agent per batch (`research/in/batch-N.in.json` → `research/out/batch-N.jso
 
 Rules for the agents live in `scripts/audit/RESEARCH_RULES.md` (evidence format, verdicts, budget).
 
+### Which model researches what (policy)
+
+* **Activities the owner kept in the Swipe Manager** (and the first, owner-kept batches in general): the default
+  (strongest) model, one agent per batch of four. These are the activities that go live first, so the result must be
+  as reliable as possible.
+* **Everything else**: a cheaper model (`model: "haiku"` on the Agent call), one agent per *three consecutive
+  batches* (`done batches a,b,c`; it writes `batch-a.json`, `batch-b.json`, `batch-c.json` one after the other). In the
+  pilot this used about half the tokens per activity and was roughly 7 times faster. The machine validation of the
+  quotes is identical, so a weak result is downgraded to `likely`/`manual` instead of being trusted.
+* Owner-kept activities whose cheap-model result ended as `manual` are re-run later with the default model when there
+  is budget left.
+* An agent that dies on a usage limit keeps its work: resume it with `SendMessage` (agent id) once the window has reset.
+  Batches that have no transcript at all are simply launched again.
+
 ### Usage limits and cost (measured, 2026-11)
 
 * Two limits apply to the whole account: a 5-hour window and a weekly window. Subagents that hit a limit die, but
