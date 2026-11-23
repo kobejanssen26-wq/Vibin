@@ -31,8 +31,12 @@ Your launch message gives you three values:
   exactly what is unclear.
 * Open pages with WebFetch (load it via ToolSearch with `select:WebFetch` if needed); if WebFetch is unavailable or
   returns an empty page, fetch the final URL with `curl -sL` in Bash. Search results are never evidence: open the page.
+* An activity whose own website is `dead`, `blocked`, `unreachable`, `robots`, `parked` or missing (`no_website`, see
+  `crawl.site_state` in the input) is NOT settled by that: follow the section "Website dead, blocked or missing" of the
+  rules. Load WebSearch via ToolSearch (`select:WebSearch`), search for the venue by name and place, and open the
+  relevant pages. Writing `manual` after one failed fetch is a failed research.
 * Keep every quote verbatim from a page you actually opened. Never invent data, never decode protected e-mail
   addresses, never send any e-mail or probe mailboxes.
-* Use only Read, Write, Bash, ToolSearch (to load WebFetch) and WebFetch. Do not call session-management, scheduling,
+* Use only Read, Write, Bash, ToolSearch (to load WebFetch / WebSearch), WebFetch and WebSearch. Do not call session-management, scheduling,
   GitHub or other MCP tools (for example `archive_session`): finishing means writing your output files and replying.
 * Do not modify any other file; do not touch the git repo or any database.

@@ -15,7 +15,8 @@ times a run of 100 steps (measured: batches that ran away to 200-350 steps used 
 - At most about **12 tool calls per activity** (so about 50 for a batch of 4, about 100 for 8).
   That is a ceiling, not a target: measured runs that stayed near 6-8 calls per activity were
   about 40% cheaper than runs that used the full 12, with the same kind of verdicts. Stop as
-  soon as an activity is settled; only go towards 12 when it is genuinely hard.
+  soon as an activity is settled (an unreachable or missing website does NOT settle it, see
+  "Website dead, blocked or missing" below); only go towards 12 when it is genuinely hard.
 - Go source by source: the activity's own website first (the input already holds a crawl of it),
   then at most one or two corroborating sources. Read only the relevant part of a page
   (grep/sed around the facts you need), never dump whole pages.
@@ -52,6 +53,29 @@ If WebFetch returns an empty page (for example a redirect to another host), fetc
 important facts (address, existence, e-mail) with a second source when the first is not the
 venue's own site. Respect robots/access limits; do not hammer a site; do not send any e-mail;
 do not try to guess or probe mailboxes.
+
+## Website dead, blocked or missing: this is NOT the end of the research
+
+Every input activity has `crawl.site_state`: `alive`, `dead`, `blocked`, `unreachable`, `robots`, `parked` or
+`no_website`. Only `alive` gives you a page of the venue to start from. In every other case the activity is **not
+settled yet**: an unreachable or missing website proves nothing about the venue, and a result that only says "site not
+reachable" is a failed research, not a finding. Do this (it fits in the budget, 6-10 calls):
+
+1. `blocked` / `robots` / `unreachable` / `dead`: try the URL once more with `curl -sL` in Bash (some sites only
+   reject WebFetch) and try the `https://` / `www.` variant.
+2. Find the venue by name and place: load WebSearch with ToolSearch (`select:WebSearch`) and search for
+   `"<title>" <city>` (add the category if the name is ambiguous). Then OPEN the 1-3 most relevant pages yourself:
+   the venue's real website under another address, its Facebook/Instagram/Google business page, a municipality or
+   tourism-board listing, a reputable directory or booking page. Snippets are never evidence; quotes must come from
+   pages you opened.
+3. Decide from what you opened. `confirmed` when a current source shows the venue exists and is offered; `closed`
+   when a source says it closed or moved (quote it). A parked / for-sale domain or a domain that does not resolve is
+   a strong hint of closure, but look for one more source before you write `closed`.
+4. If you find the venue's real website, report it as a correction (`field: "website_url"`, quote from that site) and
+   use it as the main source for the other fields.
+5. Only when two independent attempts (different queries/pages) found nothing useful, write `manual` and list in
+   `note` what you tried (queries and pages), so the owner does not repeat it. Never write `manual` after just
+   one failed fetch.
 
 ## For each activity decide
 

@@ -96,3 +96,19 @@ agent once tried that while looking for a way to "finish").
 that really occurs on the page, `approved` needs confirmed existence, corrections only when verified), turns the result
 into guarded SQL (`make-research-sql.py`) and applies it with `wrangler d1 execute --remote`. Outputs of `manual`
 verdicts and unresolved facts are reviewed by the owner under *Kwaliteit → Onderzoek*.
+
+## What the queue looks like (2026-11 numbers) and why it matters for cost
+
+`make-batches.py` orders the batches by how much the activity's own website gives the agent, so the cost and the
+quality per activity change along the queue (`crawl.site_state` in every input activity):
+
+| Batches | Activities | Own website | What happened / expectation |
+|---|---|---|---|
+| 3001-3086 | owner-kept | mostly alive | default model, ~91% `approved` with ~4 sources each |
+| 3087-3156, 3201-3348 | ~700 | `alive` | cheap model works well: ~70-80% `approved`/`fix_data` |
+| 3157-3200 | 174 | `dead` / `blocked` / `unreachable` / `robots` / `parked` | the first cheap-model pass stopped at the failed fetch: ~89% `manual`, 0-1 sources. Re-run with the "Website dead, blocked or missing" procedure (search by name + place) |
+| 3350-3643 | ~1,180 | `no_website` (OpenStreetMap imports) | there is no page to start from: the agent has to find the venue first (WebSearch). Pilot before the bulk run |
+
+Lesson: a `manual` verdict is only acceptable after two independent attempts (see the rules). When an agent stops at
+the first failed fetch the result looks "safe" (it is honest) but nothing was researched, and the owner gets the work.
+Check `manual` share and sources per activity per batch range (see `research/out`) before launching the next range.
