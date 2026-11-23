@@ -40,6 +40,16 @@ a monument with nothing to do, a duplicate listing, or something that does not e
 Use judgement: a unique, interactive experience can be perfect even if it is not a "classic"
 activity. Judge the concrete experience and justify the decision.
 
+**Types the catalogue already accepts.** The app's own quality rules decided which *types* are suitable. When
+`current_audit.reason` says `Geschikt type (X)` (for example Club, Viewpoint, Park, Nature reserve, Forest walk,
+Historic site, Spa & sauna, Tennis, Swimming pool, Golf), type X counts as suitable (`fit`): do NOT write `manual` or
+`unclear` merely because the type is not named in the list above. What you judge is the concrete record: does this
+venue exist and is it open to visitors now, is it a real instance of the type (not a hall for hire, a private or
+members-only place, a shop, accommodation, a school or a company canteen), and is its data right? A free public place
+(viewpoint, park, nature reserve, forest walk, historic site) is `confirmed` when a page you opened shows that the place
+exists: a municipality or tourism page, Wikipedia, Natuurpunt / Agentschap Natuur en Bos, a walking-route site, or the
+OpenStreetMap page of the element; it needs no official website, and it needs no opening hours or price.
+
 ## Source order (prefer top)
 
 1. The venue's own official website (the activity page, then contact/location page).
