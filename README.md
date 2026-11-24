@@ -150,6 +150,8 @@ and deploy values go in env files — see [`.env.example`](.env.example):
 | `EMAIL_API_KEY` / `EMAIL_FROM` | secret                  | Transactional email via **Resend** (`src/worker/lib/email.ts`). `EMAIL_FROM` e.g. `VIBIN <noreply@vibin.be>`. Blank in prod → send is skipped with a warning (never throws); blank in dev → the link is logged. |
 | `ENCRYPTION_KEY`       | `.dev.vars` / `wrangler secret` | **Owner Command Center.** AES-256-GCM key (base64 of 32 bytes) for the credential vault + TOTP secrets. Required before owner setup. Never commit. |
 | `OWNER_RECOVERY_SECRET`| `.dev.vars` / `wrangler secret` | **Owner Command Center.** Break-glass recovery string. Presenting it triggers a one-shot owner password-reset email + MFA clear. Leave blank to disable recovery. |
+| `GITHUB_TOKEN` | `wrangler secret` | **Admin File Manager.** Fine-grained GitHub token, *Contents: read & write* on this repo only. Without it the File Manager shows a setup page. See [docs/developer-access.md](docs/developer-access.md). |
+| `GITHUB_REPO` / `GITHUB_BRANCH` | `wrangler.jsonc` | Repo (`owner/name`) and branch the File Manager reads and commits to. |
 | `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` | GitHub secrets | CI deploy. |
 
 Generate secrets:
@@ -335,6 +337,13 @@ listed under **Security**; *Revoke all* logs out every other device.
   audited, grants **no session**, and simply emails a password-reset link and
   clears MFA so you can re-enrol. There is **no master password and no
   backdoor** — if `OWNER_RECOVERY_SECRET` is unset, this path is disabled.
+
+### Developers & the File Manager
+
+The owner can invite **developers** (Team / Developers): normal VIBIN accounts with a per-permission, server-enforced
+slice of the Command Center, behind the same password + authenticator. A **File Manager** lets permitted people
+browse and edit the repository's source (saves become GitHub commits; nothing is live until the next deploy). Setup,
+permissions and safety rules: [docs/developer-access.md](docs/developer-access.md).
 
 ### What's in it
 

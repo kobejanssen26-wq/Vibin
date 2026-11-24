@@ -203,3 +203,39 @@ export const LIMITS = {
   maxActiveMembers: 20,
   deckSize: 40,
 } as const;
+
+/* -------------------------------------------------------------------------- */
+/* Developer access (role-based access control for the admin panel)           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Permissions the owner can grant to a developer. The owner implicitly holds all of them and
+ * additionally owns everything not listed here (users, settings, vault, outreach, swipe manager,
+ * analytics …) — those areas are never reachable by a developer. Enforced on the server.
+ */
+export const ADMIN_PERMISSIONS = [
+  { key: "catalogue", label: "Catalogue", description: "Activities, categories, catalogue quality, CSV import, data quality." },
+  { key: "support", label: "Support & reports", description: "Help-desk tickets and user reports." },
+  { key: "events", label: "Live events", description: "Live events and ingestion sources." },
+  { key: "files.read", label: "Files: view", description: "Browse and open project files in the File Manager." },
+  { key: "files.write", label: "Files: edit", description: "Save changes to project files (commits to the repository)." },
+  { key: "team.manage", label: "Manage developers", description: "Invite and remove other developers (never the owner)." },
+] as const;
+
+export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number]["key"];
+
+export const ALL_ADMIN_PERMISSIONS: AdminPermission[] = ADMIN_PERMISSIONS.map((p) => p.key);
+
+/** Pre-selected when inviting someone. File editing and team management are opt-in. */
+export const DEFAULT_DEVELOPER_PERMISSIONS: AdminPermission[] = ["catalogue", "support", "events", "files.read"];
+
+/** Keep only known permission keys; `files.write` implies `files.read`. Order is stable. */
+export function normalizePermissions(input: unknown): AdminPermission[] {
+  const raw = Array.isArray(input) ? input : [];
+  const set = new Set<string>(raw.filter((x): x is string => typeof x === "string"));
+  if (set.has("files.write")) set.add("files.read");
+  return ALL_ADMIN_PERMISSIONS.filter((p) => set.has(p));
+}
+
+/** Roles that may sign in to the admin panel. */
+export const ADMIN_STAFF_ROLES = ["owner", "developer"] as const;

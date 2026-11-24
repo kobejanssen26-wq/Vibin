@@ -120,6 +120,13 @@
       "when": 1793629827208,
       "tag": "0016_owner_swipe",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1795553430922,
+      "tag": "0017_developer_access",
+      "breakpoints": true
     }
   ]
 }

@@ -1,33 +1,36 @@
 import { useState, type ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { useAdminAuth } from "./auth";
+import { useAdminAuth, useCan } from "./auth";
 import { LogoMark } from "../components/Logo";
 import { GlobalSearch } from "./components/GlobalSearch";
 import { Btn } from "./ui";
 
-const NAV: { to: string; label: string; group: string }[] = [
-  { to: "/admin", label: "Dashboard", group: "" },
-  { to: "/admin/users", label: "Users", group: "Data" },
-  { to: "/admin/groups", label: "Groups", group: "Data" },
-  { to: "/admin/swipe", label: "Swipe Manager", group: "Data" },
-  { to: "/admin/activities", label: "Activities", group: "Data" },
-  { to: "/admin/events", label: "Live events", group: "Data" },
-  { to: "/admin/providers", label: "Providers", group: "Data" },
-  { to: "/admin/outreach", label: "Outreach", group: "Data" },
-  { to: "/admin/quality", label: "Catalogus-kwaliteit", group: "Data" },
-  { to: "/admin/categories", label: "Categories", group: "Data" },
-  { to: "/admin/data-quality", label: "Data quality", group: "Insight" },
-  { to: "/admin/analytics", label: "Analytics", group: "Insight" },
-  { to: "/admin/funnel", label: "Funnel & retention", group: "Insight" },
-  { to: "/admin/errors", label: "Errors", group: "Ops" },
-  { to: "/admin/system", label: "System health", group: "Ops" },
-  { to: "/admin/flags", label: "Feature flags", group: "Ops" },
-  { to: "/admin/reports", label: "Reports", group: "Moderation" },
-  { to: "/admin/support", label: "Support", group: "Moderation" },
-  { to: "/admin/audit", label: "Audit log", group: "Security" },
-  { to: "/admin/sessions", label: "Admin sessions", group: "Security" },
-  { to: "/admin/vault", label: "Credential vault", group: "Security" },
-  { to: "/admin/settings", label: "Settings", group: "Security" },
+/** `need`: who sees the entry. "owner" = owner only, "any" = any signed-in staff, else a developer permission. */
+const NAV: { to: string; label: string; group: string; need: string }[] = [
+  { to: "/admin", label: "Dashboard", group: "", need: "any" },
+  { to: "/admin/users", label: "Users", group: "Data", need: "owner" },
+  { to: "/admin/groups", label: "Groups", group: "Data", need: "owner" },
+  { to: "/admin/swipe", label: "Swipe Manager", group: "Data", need: "owner" },
+  { to: "/admin/activities", label: "Activities", group: "Data", need: "catalogue" },
+  { to: "/admin/events", label: "Live events", group: "Data", need: "events" },
+  { to: "/admin/providers", label: "Providers", group: "Data", need: "owner" },
+  { to: "/admin/outreach", label: "Outreach", group: "Data", need: "owner" },
+  { to: "/admin/quality", label: "Catalogus-kwaliteit", group: "Data", need: "catalogue" },
+  { to: "/admin/categories", label: "Categories", group: "Data", need: "catalogue" },
+  { to: "/admin/data-quality", label: "Data quality", group: "Insight", need: "catalogue" },
+  { to: "/admin/analytics", label: "Analytics", group: "Insight", need: "owner" },
+  { to: "/admin/funnel", label: "Funnel & retention", group: "Insight", need: "owner" },
+  { to: "/admin/errors", label: "Errors", group: "Ops", need: "owner" },
+  { to: "/admin/system", label: "System health", group: "Ops", need: "owner" },
+  { to: "/admin/flags", label: "Feature flags", group: "Ops", need: "owner" },
+  { to: "/admin/reports", label: "Reports", group: "Moderation", need: "support" },
+  { to: "/admin/support", label: "Support", group: "Moderation", need: "support" },
+  { to: "/admin/files", label: "File Manager", group: "Developer", need: "files.read" },
+  { to: "/admin/team", label: "Team / Developers", group: "Developer", need: "team.manage" },
+  { to: "/admin/audit", label: "Audit log", group: "Security", need: "owner" },
+  { to: "/admin/sessions", label: "Admin sessions", group: "Security", need: "owner" },
+  { to: "/admin/vault", label: "Credential vault", group: "Security", need: "owner" },
+  { to: "/admin/settings", label: "Settings", group: "Security", need: "owner" },
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
@@ -36,7 +39,10 @@ export function Shell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [open, setOpen] = useState(false);
 
-  const groups = [...new Set(NAV.map((n) => n.group))];
+  const can = useCan();
+  const visible = NAV.filter((n) => can(n.need));
+  const groups = [...new Set(visible.map((n) => n.group))];
+  const isOwner = user?.role === "owner";
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
@@ -65,7 +71,7 @@ export function Shell({ children }: { children: ReactNode }) {
                   {g}
                 </p>
               )}
-              {NAV.filter((n) => n.group === g).map((n) => (
+              {visible.filter((n) => n.group === g).map((n) => (
                 <NavLink
                   key={n.to}
                   to={n.to}
@@ -109,9 +115,14 @@ export function Shell({ children }: { children: ReactNode }) {
                 {import.meta.env.DEV ? "development" : "production"}
               </span>
             </div>
-            <GlobalSearch />
+            {isOwner ? <GlobalSearch /> : <span />}
             <div className="flex items-center gap-3">
-              <span className="text-xs text-slate-500">{user?.email}</span>
+              <span className="hidden text-xs text-slate-500 sm:inline">{user?.email}</span>
+              {!isOwner && (
+                <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700">
+                  Developer
+                </span>
+              )}
               <Btn
                 variant="ghost"
                 className="!py-1 !text-xs"

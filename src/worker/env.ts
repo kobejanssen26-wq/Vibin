@@ -64,6 +64,17 @@ export interface Env {
   /** Where a new support ticket's escalation email is sent. Falls back to
    *  EMAIL_FROM when unset — set this to the real inbox someone reads. */
   SUPPORT_EMAIL?: string;
+  /**
+   * Admin File Manager — Cloudflare Workers have no filesystem, so the "project directory" is the
+   * GitHub repository. `GITHUB_TOKEN` is a fine-grained personal access token limited to this one
+   * repository with "Contents: read & write" (`wrangler secret put GITHUB_TOKEN`). It never leaves
+   * the server. `GITHUB_REPO` ("owner/name") and `GITHUB_BRANCH` are plain vars in wrangler.jsonc;
+   * `GITHUB_API_BASE` only exists so the integration tests can point at a local mock.
+   */
+  GITHUB_TOKEN?: string;
+  GITHUB_REPO?: string;
+  GITHUB_BRANCH?: string;
+  GITHUB_API_BASE?: string;
   /** Development / staging only: "fail" makes the outreach mock provider return an error
    *  (used by the integration tests). Ignored in production. */
   OUTREACH_MOCK_PROVIDER?: string;
@@ -76,4 +87,8 @@ export interface Vars {
   /** Set by the Owner Command Center admin-session middleware. */
   adminUserId: string | null;
   adminSessionId: string | null;
+  /** Set by requireStaff()/requireOwner(): which kind of staff account this admin session is. */
+  adminRole: "owner" | "developer" | null;
+  /** Permissions held by the admin account (the owner holds all of them). */
+  adminPerms: string[];
 }

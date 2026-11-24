@@ -22,12 +22,13 @@ import {
   adminRecoveryCodes,
   adminSessions,
   adminTotp,
+  developerInvites,
   emailTokens,
   notificationPrefs,
   profiles,
   users,
 } from "../db/schema";
-import { emailSchema, parseBody, passwordSchema } from "../lib/validate";
+import { displayNameSchema, emailSchema, parseBody, passwordSchema } from "../lib/validate";
 import { badRequest, forbidden, unauthorized } from "../lib/errors";
 import { rateLimit, clientIp } from "../lib/ratelimit";
 import { hashPassword, sha256Hex, verifyPassword } from "../lib/password";
@@ -59,12 +60,14 @@ import {
 } from "../lib/system-settings";
 import { audit } from "../lib/audit";
 import { sendEmail, resetEmailBody } from "../lib/email";
-import { requireOwner, requirePendingAdmin } from "../middleware/admin";
+import { requireOwner, requirePendingAdmin, requireStaff } from "../middleware/admin";
+import { findOpenInvite, makeDeveloper, permissionsOf } from "../lib/developer-access";
+import { loadPermissions } from "../lib/admin-rbac";
 
 type Ctx = { Bindings: Env; Variables: Vars };
 const app = new Hono<Ctx>();
 const nowS = () => Math.floor(Date.now() / 1000);
-const ISSUER = "VIBIN Owner";
+const ISSUER = "VIBIN Admin";
 
 /** Timing-safe string compare for the deployment recovery secret. */
 async function secretEquals(a: string, b: string): Promise<boolean> {
@@ -205,12 +208,13 @@ app.post("/login", async (c) => {
     "pbkdf2$100000x6$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
   const { ok } = await verifyPassword(body.password, stored);
 
-  if (!user || !ok || user.role !== "owner" || user.status !== "active") {
+  const isStaff = user?.role === "owner" || user?.role === "developer";
+  if (!user || !ok || !isStaff || user.status !== "active") {
     await audit(c, {
       action: "admin.login_failed",
       actorType: "system",
       actorId: user?.id ?? null,
-      meta: { email: body.email, reason: !user ? "no_user" : !ok ? "bad_password" : "not_owner" },
+      meta: { email: body.email, reason: !user ? "no_user" : !ok ? "bad_password" : "not_staff" },
     });
     throw unauthorized("Email or password is incorrect.");
   }
@@ -326,15 +330,16 @@ app.get("/session", async (c) => {
     .where(eq(users.id, adminUserId))
     .get();
 
-  if (!user || user.role !== "owner" || user.status !== "active") {
+  if (!user || (user.role !== "owner" && user.role !== "developer") || user.status !== "active") {
     return c.json({ user: null, stage: "none", setupComplete });
   }
   const totp = await db.query.adminTotp.findFirst({ where: eq(adminTotp.userId, adminUserId) });
   let stage: "mfa" | "enroll" | "ready" = "ready";
   if (!session?.mfaVerifiedAt) stage = totp?.confirmedAt ? "mfa" : "enroll";
 
+  const permissions = user.role === "owner" ? ["*"] : await loadPermissions(c.env, user.id);
   return c.json({
-    user: { id: user.id, email: user.email, displayName: user.displayName, role: user.role },
+    user: { id: user.id, email: user.email, displayName: user.displayName, role: user.role, permissions },
     stage,
     setupComplete,
     sessionExpiresAt: session?.expiresAt ?? null,
@@ -449,7 +454,7 @@ async function reauth(env: Env, userId: string, password: string): Promise<void>
   if (!ok) throw forbidden("Password re-entry failed.");
 }
 
-app.post("/recovery-codes/regenerate", requireOwner(), async (c) => {
+app.post("/recovery-codes/regenerate", requireStaff(), async (c) => {
   const { password } = await parseBody(c, z.object({ password: z.string().min(1).max(200) }));
   await reauth(c.env, c.get("adminUserId")!, password);
   const codes = await regenerateRecoveryCodes(c.env, c.get("adminUserId")!);
@@ -457,11 +462,11 @@ app.post("/recovery-codes/regenerate", requireOwner(), async (c) => {
   return c.json({ ok: true, recoveryCodes: codes });
 });
 
-app.get("/recovery-codes/remaining", requireOwner(), async (c) => {
+app.get("/recovery-codes/remaining", requireStaff(), async (c) => {
   return c.json({ remaining: await remainingRecoveryCodes(c.env, c.get("adminUserId")!) });
 });
 
-app.post("/mfa/reset", requireOwner(), async (c) => {
+app.post("/mfa/reset", requireStaff(), async (c) => {
   const { password } = await parseBody(c, z.object({ password: z.string().min(1).max(200) }));
   await reauth(c.env, c.get("adminUserId")!, password);
   const db = createDb(c.env);
@@ -469,6 +474,109 @@ app.post("/mfa/reset", requireOwner(), async (c) => {
   await db.delete(adminRecoveryCodes).where(eq(adminRecoveryCodes.userId, c.get("adminUserId")!));
   await audit(c, { action: "admin.mfa_reset" });
   return c.json({ ok: true, note: "Authenticator cleared — you'll re-enrol on next sign-in." });
+});
+
+/* ----------------------------- developer invitations ----------------------------- */
+/**
+ * Public (token-protected) endpoints behind the invitation link the owner (or a delegated manager)
+ * shares. The token is single-use, expires after a week and only its hash is stored. Accepting
+ * creates (or upgrades) a normal VIBIN account with role 'developer'; the person then signs in to
+ * /admin with the same credentials and enrols an authenticator before getting any access.
+ */
+app.get("/invite/:token", async (c) => {
+  await rateLimit(c.env, "admin-invite-peek", clientIp(c.req.raw), 30, 10 * 60);
+  const inv = await findOpenInvite(c.env, c.req.param("token") ?? "");
+  if (!inv) throw unauthorized("This invitation is invalid or has expired.");
+  const db = createDb(c.env);
+  const existing = await db.query.users.findFirst({
+    where: eq(users.emailNormalized, inv.emailNormalized),
+    columns: { id: true, role: true },
+  });
+  if (existing?.role === "owner") throw unauthorized("This invitation is invalid or has expired.");
+  return c.json({
+    email: inv.emailNormalized,
+    accountExists: !!existing,
+    permissions: permissionsOf(inv.permissions),
+    expiresAt: inv.expiresAt,
+  });
+});
+
+app.post("/invite/accept", async (c) => {
+  const ip = clientIp(c.req.raw);
+  await rateLimit(c.env, "admin-invite-accept", ip, 10, 10 * 60);
+  const body = await parseBody(
+    c,
+    z.object({
+      token: z.string().min(32).max(200),
+      password: z.string().min(1).max(200),
+      displayName: displayNameSchema.optional(),
+    }),
+  );
+  const inv = await findOpenInvite(c.env, body.token);
+  if (!inv) throw unauthorized("This invitation is invalid or has expired.");
+  await rateLimit(c.env, "admin-invite-email", inv.emailNormalized, 8, 10 * 60);
+
+  const db = createDb(c.env);
+  const now = nowS();
+  const existing = await db.query.users.findFirst({
+    where: eq(users.emailNormalized, inv.emailNormalized),
+  });
+  let userId: string;
+  if (existing) {
+    // An existing account proves it is theirs with its current password. The owner is never touched.
+    if (existing.role === "owner" || existing.status !== "active") {
+      throw unauthorized("This invitation is invalid or has expired.");
+    }
+    const { ok } = await verifyPassword(body.password, existing.passwordHash);
+    if (!ok) throw unauthorized("That password is not correct for the account with this email.");
+    userId = existing.id;
+  } else {
+    const parsed = passwordSchema.safeParse(body.password);
+    if (!parsed.success) throw badRequest(parsed.error.issues[0]?.message ?? "Choose a stronger password.");
+    userId = newId();
+    const displayName =
+      body.displayName ?? (inv.emailNormalized.split("@")[0] ?? "Developer").slice(0, 40);
+    await db.batch([
+      db.insert(users).values({
+        id: userId,
+        email: inv.emailNormalized,
+        emailNormalized: inv.emailNormalized,
+        passwordHash: await hashPassword(body.password),
+        // The invitation link was delivered by the owner, so the address counts as verified.
+        emailVerifiedAt: now,
+        role: "user",
+        createdAt: now,
+        updatedAt: now,
+      }),
+      db.insert(profiles).values({ userId, displayName, updatedAt: now }),
+      db.insert(notificationPrefs).values({
+        userId,
+        channels: JSON.stringify({
+          invites: true,
+          joins: true,
+          activityMatch: true,
+          dateVoting: true,
+          dateMatch: true,
+          upcoming: true,
+          messages: true,
+        }),
+        updatedAt: now,
+      }),
+    ]);
+  }
+
+  await makeDeveloper(c.env, userId, permissionsOf(inv.permissions), inv.invitedBy);
+  await db.update(developerInvites).set({ acceptedAt: now }).where(eq(developerInvites.id, inv.id));
+  await createAdminSession(c, userId);
+  await audit(c, {
+    action: "team.invite_accepted",
+    actorType: "admin",
+    actorId: userId,
+    targetType: "user",
+    targetId: userId,
+    meta: { email: inv.emailNormalized, createdAccount: !existing },
+  });
+  return c.json({ ok: true, next: "enroll" });
 });
 
 export default app;

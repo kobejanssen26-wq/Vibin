@@ -47,7 +47,8 @@ export async function audit(c: Ctx, entry: AuditEntry): Promise<void> {
         : c.get("adminUserId") ?? c.get("userId") ?? null;
     await db.insert(auditLog).values({
       id: newId(),
-      actorType: entry.actorType ?? "owner",
+      actorType:
+        entry.actorType ?? (c.get("adminRole") === "developer" ? "admin" : "owner"),
       actorId,
       action: entry.action,
       targetType: entry.targetType ?? null,

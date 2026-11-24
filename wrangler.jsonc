@@ -31,7 +31,11 @@
     "APP_URL": "https://vibin.be",
     // Sliding session window: a user who opens the app within this many days
     // of their last visit stays logged in; past it, they must sign in again.
-    "SESSION_INACTIVITY_DAYS": "14"
+    "SESSION_INACTIVITY_DAYS": "14",
+    // Admin File Manager: the GitHub repo + branch it reads and commits to. The access token is a
+    // secret and is NOT set here — `npx wrangler secret put GITHUB_TOKEN` (see docs/developer-access.md).
+    "GITHUB_REPO": "kobejanssen26-wq/Vibin",
+    "GITHUB_BRANCH": "main"
   },
   "d1_databases": [
     {

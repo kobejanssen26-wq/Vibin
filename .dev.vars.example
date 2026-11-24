@@ -10,3 +10,7 @@ EMAIL_FROM=hello@vibin.local
 #   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ENCRYPTION_KEY=ZGV2LW9ubHktMzItYnl0ZS1rZXktZG8tbm90LXNoaXA=
 OWNER_RECOVERY_SECRET=dev-only-owner-recovery-secret-change-me
+
+# Admin File Manager (optional; see docs/developer-access.md). A fine-grained GitHub token with
+# Contents read/write on this repo only. Leave unset and the File Manager shows its setup page.
+# GITHUB_TOKEN=

@@ -22,7 +22,7 @@ function Frame({
             V
           </span>
           <span className="text-sm font-semibold text-slate-700">
-            VIBIN — Owner Command Center
+            VIBIN — Command Center
           </span>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-6">

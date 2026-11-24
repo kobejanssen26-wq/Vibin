@@ -13,6 +13,8 @@ export interface AdminUser {
   email: string;
   displayName: string;
   role: string;
+  /** Owner: ["*"]. Developer: the permission keys granted by the owner. */
+  permissions?: string[];
 }
 
 /**
@@ -87,6 +89,18 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       {children}
     </Ctx.Provider>
   );
+}
+
+/** UI-only helper: `can("files.read")`. The server enforces the same rules on every request. */
+export function useCan(): (need: string) => boolean {
+  const { user } = useAdminAuth();
+  return (need) => {
+    if (!user) return false;
+    if (user.role === "owner") return true;
+    if (need === "owner") return false;
+    if (need === "any") return true;
+    return !!user.permissions?.includes(need);
+  };
 }
 
 export function useAdminAuth(): AdminAuthState {

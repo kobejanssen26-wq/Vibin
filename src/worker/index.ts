@@ -9,7 +9,11 @@ import { getSetting, SETTINGS } from "./lib/system-settings";
 import { PREVIEW_COOKIE, PREVIEW_PASS_DAYS, signPass, verifyCode, verifyPass } from "./lib/preview-access";
 import { clientIp, rateLimit } from "./lib/ratelimit";
 import { withSession, requireAuth } from "./middleware/auth";
-import { withAdminSession, requireOwner } from "./middleware/admin";
+import { withAdminSession, requireStaff, ccPermissionGate } from "./middleware/admin";
+import { resolveAdminSession } from "./lib/admin-session";
+import { ADMIN_SESSION_COOKIE } from "@shared/constants";
+import { eq } from "drizzle-orm";
+import { users } from "./db/schema";
 import { createDb } from "./db/client";
 import { runDueSources } from "./events/sync";
 
@@ -37,6 +41,8 @@ import adminSupportRoutes from "./routes/admin-support";
 import adminVaultRoutes from "./routes/admin-vault";
 import adminQualityRoutes from "./routes/admin-quality";
 import adminSwipeRoutes from "./routes/admin-swipe";
+import adminTeamRoutes from "./routes/admin-team";
+import adminFilesRoutes from "./routes/admin-files";
 import adminOutreachRoutes from "./routes/admin-outreach";
 import adminOutreachMailRoutes from "./routes/admin-outreach-mail";
 import outreachPublicRoutes from "./routes/outreach-public";
@@ -115,8 +121,21 @@ async function maintenanceState(env: Env) {
   return maintCache;
 }
 
-/** True when this browser entered the preview access code (signed, expiring cookie). */
-async function hasPreviewPass(c: Context, m: { code: string | null }): Promise<boolean> {
+/** A signed-in owner or developer (admin session, MFA done) always sees the real site. */
+async function hasStaffSession(c: Context<Ctx>): Promise<boolean> {
+  if (!getCookie(c, ADMIN_SESSION_COOKIE)) return false;
+  const session = await resolveAdminSession(c);
+  if (!session?.mfaVerifiedAt) return false;
+  const user = await createDb(c.env).query.users.findFirst({
+    where: eq(users.id, session.userId),
+    columns: { role: true, status: true },
+  });
+  return !!user && user.status === "active" && (user.role === "owner" || user.role === "developer");
+}
+
+/** True when this browser may see past the coming-soon page: a staff session, or the preview code. */
+async function hasPreviewPass(c: Context<Ctx>, m: { code: string | null }): Promise<boolean> {
+  if (await hasStaffSession(c)) return true;
   if (!m.code) return false;
   return verifyPass(m.code, getCookie(c, PREVIEW_COOKIE));
 }
@@ -219,7 +238,8 @@ adminAuth.route("/", adminAuthRoutes);
 api.route("/admin/auth", adminAuth);
 
 const commandCenter = new Hono<Ctx>();
-commandCenter.use("*", withAdminSession, requireOwner());
+// Owner or developer; developers only reach the areas whose permission they hold (default: owner only).
+commandCenter.use("*", withAdminSession, requireStaff(), ccPermissionGate());
 commandCenter.route("/", adminCcRoutes); // dashboards, analytics, browsers, CRM
 commandCenter.route("/", adminRoutes); // catalogue + moderation actions
 commandCenter.route("/", adminImportRoutes); // CSV template/preview/confirm
@@ -230,6 +250,8 @@ commandCenter.route("/", adminQualityRoutes); // catalogue quality audit
 commandCenter.route("/", adminSwipeRoutes); // owner swipe manager: keep / delete / later
 commandCenter.route("/outreach", adminOutreachRoutes); // provider outreach: orgs, contacts, settings
 commandCenter.route("/outreach", adminOutreachMailRoutes); // drafts, approval, send, campaigns
+commandCenter.route("/team", adminTeamRoutes); // developers: invite, permissions, remove (team.manage)
+commandCenter.route("/files", adminFilesRoutes); // File Manager on the GitHub repository (files.read / files.write)
 api.route("/admin/cc", commandCenter);
 
 // Everything below requires a normal user session.

@@ -39,9 +39,10 @@ export const users = sqliteTable(
     /**
      * user  -> normal VIBIN member
      * admin -> catalogue / moderation access (legacy)
-     * owner -> full Owner Command Center; the only role that can enter /admin
+     * owner -> full Owner Command Center (single account, highest authority)
+     * developer -> may enter /admin with the permissions in `developer_access`
      */
-    role: text("role", { enum: ["user", "admin", "owner"] })
+    role: text("role", { enum: ["user", "admin", "developer", "owner"] })
       .notNull()
       .default("user"),
     status: text("status", { enum: ["active", "suspended", "deleted"] })
@@ -66,6 +67,43 @@ export const profiles = sqliteTable("profiles", {
   bio: text("bio"),
   updatedAt: integer("updated_at").notNull().default(now),
 });
+
+/**
+ * Developer access: one row per user with role='developer'. `permissions` is a JSON array of keys
+ * from ADMIN_PERMISSIONS. Deleting the row (and resetting the role) removes the access.
+ */
+export const developerAccess = sqliteTable("developer_access", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  permissions: text("permissions").notNull().default("[]"),
+  invitedBy: text("invited_by"),
+  createdAt: integer("created_at").notNull().default(now),
+  updatedAt: integer("updated_at").notNull().default(now),
+});
+
+/**
+ * Pending developer invitations. Only the SHA-256 hash of the invite token is stored; the link is
+ * shown once to whoever created the invite. Single use, expires, revocable.
+ */
+export const developerInvites = sqliteTable(
+  "developer_invites",
+  {
+    id: text("id").primaryKey(),
+    emailNormalized: text("email_normalized").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    permissions: text("permissions").notNull().default("[]"),
+    invitedBy: text("invited_by").notNull(),
+    expiresAt: integer("expires_at").notNull(),
+    acceptedAt: integer("accepted_at"),
+    revokedAt: integer("revoked_at"),
+    createdAt: integer("created_at").notNull().default(now),
+  },
+  (t) => ({
+    tokenUnq: uniqueIndex("developer_invites_token_unq").on(t.tokenHash),
+    emailIdx: index("developer_invites_email_idx").on(t.emailNormalized),
+  }),
+);
 
 /**
  * Single-use tokens for email verification and password reset.

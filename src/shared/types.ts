@@ -23,7 +23,7 @@ export interface PublicUser {
 export interface Me extends PublicUser {
   email: string;
   emailVerified: boolean;
-  role: "user" | "admin" | "owner";
+  role: "user" | "admin" | "developer" | "owner";
   age: number | null;
   locationLabel: string | null;
   bio: string | null;
