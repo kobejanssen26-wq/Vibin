@@ -69,7 +69,9 @@ do not try to guess or probe mailboxes.
 Every input activity has `crawl.site_state`: `alive`, `dead`, `blocked`, `unreachable`, `robots`, `parked` or
 `no_website`. Only `alive` gives you a page of the venue to start from. In every other case the activity is **not
 settled yet**: an unreachable or missing website proves nothing about the venue, and a result that only says "site not
-reachable" is a failed research, not a finding. Do this (it fits in the budget, 6-10 calls):
+reachable" is a failed research, not a finding. But these activities are also the most expensive and the least
+likely to yield a decision, so keep it tight: **at most about 6 tool calls per activity** (one `curl` retry, at most
+two searches, at most two pages opened; do not chase a third and fourth search). Do this:
 
 1. `blocked` / `robots` / `unreachable` / `dead`: try the URL once more with `curl -sL` in Bash (some sites only
    reject WebFetch) and try the `https://` / `www.` variant.
