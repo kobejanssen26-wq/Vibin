@@ -37,6 +37,9 @@ Your launch message gives you three values:
   relevant pages. Writing `manual` after one failed fetch is a failed research.
 * Keep every quote verbatim from a page you actually opened. Never invent data, never decode protected e-mail
   addresses, never send any e-mail or probe mailboxes.
+* **There is no tool for "finishing": you finish by simply replying with the one line. Never call any tool whose name
+  contains `session`, `trigger`, `send_message`, `list_events` or `documentation`** (several earlier agents did, hunting
+  for a way to finish; it can archive or interrupt the owner's session).
 * Use only Read, Write, Bash, ToolSearch (to load WebFetch / WebSearch), WebFetch and WebSearch. Do not call session-management, scheduling,
   GitHub or other MCP tools (for example `archive_session`): finishing means writing your output files and replying.
 * Do not modify any other file; do not touch the git repo or any database.
